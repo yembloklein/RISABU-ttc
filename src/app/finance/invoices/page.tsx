@@ -180,8 +180,8 @@ export default function InvoicesPage() {
                   <GraduationCap className="h-10 w-10 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-black text-primary uppercase">Risabu Technical</h1>
-                  <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Training Institute</p>
+                  <h1 className="text-2xl font-black text-primary uppercase">Risabu Connect</h1>
+                  <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Training College</p>
                 </div>
               </div>
               <div className="text-right">
@@ -265,7 +265,7 @@ export default function InvoicesPage() {
                 <p className="text-[10px] text-muted-foreground">This is an electronically generated document. No physical signature required.</p>
               </div>
               <div className="text-right space-y-1">
-                <p className="text-xs font-bold uppercase text-primary">Risabu Connect ERP</p>
+                <p className="text-xs font-bold uppercase text-primary">Risabu Connect College</p>
                 <p className="text-[10px] text-muted-foreground">finance@risabu.ac.ke</p>
               </div>
             </footer>

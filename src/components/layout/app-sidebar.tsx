@@ -93,7 +93,7 @@ export function AppSidebar() {
           </div>
           <div className="flex flex-col overflow-hidden transition-all group-data-[collapsible=icon]:hidden">
             <span className="text-lg font-bold leading-none text-primary">Risabu</span>
-            <span className="text-xs text-muted-foreground">Connect Institute</span>
+            <span className="text-xs text-muted-foreground">Connect College</span>
           </div>
         </div>
       </SidebarHeader>

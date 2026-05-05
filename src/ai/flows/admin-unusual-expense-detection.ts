@@ -52,7 +52,7 @@ const prompt = ai.definePrompt({
   name: 'unusualExpenseDetectionPrompt',
   input: {schema: AdminUnusualExpenseDetectionInputSchema},
   output: {schema: AdminUnusualExpenseDetectionOutputSchema},
-  prompt: `You are a highly analytical financial expert for Risabu Technical Training Institute specializing in identifying anomalies and outliers in expense data.
+  prompt: `You are a highly analytical financial expert for Risabu Technical Training College specializing in identifying anomalies and outliers in expense data.
 Your goal is to review a given new expense against a history of past expenses and determine if the new expense is unusual.
 Provide a clear "isUnusual" boolean flag and a "reason" explaining your decision.
 

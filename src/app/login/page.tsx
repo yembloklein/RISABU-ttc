@@ -51,7 +51,7 @@ export default function LoginPage() {
           <div>
             <CardTitle className="text-2xl font-bold">Risabu Connect</CardTitle>
             <CardDescription>
-              {isSignUp ? "Create an account to get started" : "Sign in to access the Institute ERP"}
+              {isSignUp ? "Create an account to get started" : "Sign in to access the College ERP"}
             </CardDescription>
           </div>
         </CardHeader>

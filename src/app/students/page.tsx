@@ -186,7 +186,7 @@ export default function StudentsPage() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] font-bold text-white uppercase leading-none tracking-tight">Risabu Technical</span>
-                  <span className="text-[8px] text-white/90 leading-none font-medium">Training Institute</span>
+                  <span className="text-[8px] text-white/90 leading-none font-medium">Training College</span>
                 </div>
                 <div className="ml-auto">
                    <span className="text-[7px] font-bold text-white/50 uppercase">Student ID</span>
@@ -250,7 +250,7 @@ export default function StudentsPage() {
                   </div>
                   <div className="space-y-1">
                     <h1 className="text-5xl font-black text-primary uppercase tracking-tighter">Risabu Technical</h1>
-                    <h2 className="text-2xl font-bold text-slate-600 uppercase tracking-[0.3em]">Training Institute</h2>
+                    <h2 className="text-2xl font-bold text-slate-600 uppercase tracking-[0.3em]">Training College</h2>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 justify-center">
@@ -586,6 +586,7 @@ export default function StudentsPage() {
       {/* Edit Student Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Student Record</DialogTitle>
             <DialogDescription>Update the professional and personal information for this student.</DialogDescription>
@@ -699,6 +700,7 @@ export default function StudentsPage() {
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleSaveEdit} className="bg-primary">Save Changes</Button>
           </DialogFooter>
+          </DialogContent>
         </DialogContent>
       </Dialog>
     </div>
