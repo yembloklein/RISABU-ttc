@@ -186,7 +186,7 @@ export default function StudentsPage() {
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[10px] font-bold text-white uppercase leading-none tracking-tight">Risabu Technical</span>
-                  <span className="text-[8px] text-white/90 leading-none font-medium">Training College</span>
+                  <span className="text-[8px] text-white/90 leading-none font-medium">Training Institute</span>
                 </div>
                 <div className="ml-auto">
                    <span className="text-[7px] font-bold text-white/50 uppercase">Student ID</span>
@@ -250,7 +250,7 @@ export default function StudentsPage() {
                   </div>
                   <div className="space-y-1">
                     <h1 className="text-5xl font-black text-primary uppercase tracking-tighter">Risabu Technical</h1>
-                    <h2 className="text-2xl font-bold text-slate-600 uppercase tracking-[0.3em]">Training College</h2>
+                    <h2 className="text-2xl font-bold text-slate-600 uppercase tracking-[0.3em]">Training Institute</h2>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 justify-center">

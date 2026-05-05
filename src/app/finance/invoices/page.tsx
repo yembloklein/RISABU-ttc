@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useMemo } from "react"
@@ -182,7 +181,7 @@ export default function InvoicesPage() {
                 </div>
                 <div>
                   <h1 className="text-2xl font-black text-primary uppercase">Risabu Technical</h1>
-                  <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Training College</p>
+                  <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Training Institute</p>
                 </div>
               </div>
               <div className="text-right">

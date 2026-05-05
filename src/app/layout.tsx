@@ -5,7 +5,7 @@ import { ClientLayout } from '@/components/layout/client-layout';
 
 export const metadata: Metadata = {
   title: 'Risabu Connect ERP',
-  description: 'Enterprise Resource Planning for Risabu Technical Training College',
+  description: 'Enterprise Resource Planning for Risabu Technical Training Institute',
 };
 
 export default function RootLayout({
