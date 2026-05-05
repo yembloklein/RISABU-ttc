@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -50,7 +50,8 @@ import {
   GraduationCap,
   BadgeCheck,
   Building2,
-  MailQuestion
+  Info,
+  Calculator
 } from "lucide-react"
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, serverTimestamp, doc, query, orderBy } from "firebase/firestore"
@@ -73,13 +74,15 @@ export default function InvoicesPage() {
   }, [firestore, user])
 
   const studentsRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "students") : null, [firestore, user])
+  const programsRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "programs") : null, [firestore, user])
   
   const { data: invoices, isLoading } = useCollection(invoicesQuery)
   const { data: students } = useCollection(studentsRef)
+  const { data: programs } = useCollection(programsRef)
 
   const getStudentInfo = (studentId: string) => {
     const s = (students || []).find(student => student.id === studentId)
-    return s ? { name: `${s.firstName} ${s.lastName}`, adm: s.id.substring(0, 8).toUpperCase(), email: s.contactEmail } : null
+    return s ? { ...s, name: `${s.firstName} ${s.lastName}`, adm: s.id.substring(0, 8).toUpperCase(), email: s.contactEmail } : null
   }
 
   const filteredInvoices = useMemo(() => {
@@ -96,6 +99,46 @@ export default function InvoicesPage() {
       return matchesSearch && matchesStatus;
     })
   }, [invoices, students, searchTerm, statusFilter])
+
+  // Calculation Logic for Auto-Billing
+  const billingContext = useMemo(() => {
+    if (!formData.studentId || !students || !programs || !invoices) return null;
+
+    const student = (students || []).find(s => s.id === formData.studentId);
+    if (!student) return null;
+
+    const program = (programs || []).find(p => p.name === student.appliedCourse);
+    const courseFee = program ? Number(program.tuitionFee) : 0;
+
+    const alreadyInvoiced = (invoices || [])
+      .filter(inv => inv.studentId === formData.studentId)
+      .reduce((acc, inv) => acc + (Number(inv.totalAmount) || 0), 0);
+
+    const balanceLeftToInvoice = Math.max(0, courseFee - alreadyInvoiced);
+
+    return {
+      courseName: student.appliedCourse || "General",
+      courseFee,
+      alreadyInvoiced,
+      balanceLeftToInvoice
+    };
+  }, [formData.studentId, students, programs, invoices]);
+
+  // Handle student selection to auto-populate the amount
+  const handleStudentSelect = (studentId: string) => {
+    setFormData(prev => ({ ...prev, studentId }));
+  };
+
+  // Effect to update amount when billing context changes
+  useEffect(() => {
+    if (billingContext && billingContext.balanceLeftToInvoice > 0) {
+      setFormData(prev => ({ 
+        ...prev, 
+        amount: billingContext.balanceLeftToInvoice.toString(),
+        description: prev.description || `Tuition Fees - ${billingContext.courseName}`
+      }));
+    }
+  }, [billingContext]);
 
   const activePrintInvoice = useMemo(() => {
     return (invoices || []).find(inv => inv.id === printInvoiceId) || null
@@ -173,11 +216,10 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Printable Invoice/Receipt Redesign */}
+      {/* Printable Invoice/Receipt */}
       {activePrintInvoice && (
         <div id="invoice-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999] p-8">
           <div className="max-w-4xl mx-auto bg-white flex flex-col h-full relative border-[8px] border-primary/10 p-12">
-            {/* Watermark for Paid */}
             {activePrintInvoice.status === "Paid" && (
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-12 opacity-[0.03] pointer-events-none select-none">
                 <span className="text-[180px] font-black text-primary leading-none">PAID</span>
@@ -332,17 +374,18 @@ export default function InvoicesPage() {
                 <FilePlus className="mr-2 h-4 w-4" /> New Invoice
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[600px] overflow-hidden">
               <DialogHeader>
                 <DialogTitle>Generate Bill</DialogTitle>
-                <DialogDescription>Create a new fee obligation for a student.</DialogDescription>
+                <DialogDescription>Create a new fee obligation based on the student's program.</DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
+              
+              <div className="grid gap-6 py-4">
                 <div className="space-y-2">
-                  <Label htmlFor="student">Student Name / ADM</Label>
-                  <Select onValueChange={(v) => setFormData({...formData, studentId: v})}>
+                  <Label htmlFor="student">Select Student</Label>
+                  <Select onValueChange={handleStudentSelect} value={formData.studentId}>
                     <SelectTrigger className="h-11">
-                      <SelectValue placeholder="Select student to bill" />
+                      <SelectValue placeholder="Search student name or ADM..." />
                     </SelectTrigger>
                     <SelectContent>
                       {(students || []).filter(s => s.admissionStatus === "Enrolled").map(s => (
@@ -353,20 +396,55 @@ export default function InvoicesPage() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {billingContext && (
+                  <Card className="bg-primary/[0.03] border-primary/20">
+                    <CardContent className="p-4 space-y-3">
+                      <div className="flex items-start gap-3">
+                        <Info className="h-4 w-4 text-primary mt-1 shrink-0" />
+                        <div>
+                          <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Course Enrollment</p>
+                          <p className="text-sm font-black text-primary">{billingContext.courseName}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 pt-2 border-t border-primary/10">
+                        <div>
+                          <p className="text-[10px] uppercase text-muted-foreground font-bold">Program Fee</p>
+                          <p className="text-sm font-mono">KES {billingContext.courseFee.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase text-muted-foreground font-bold">Already Invoiced</p>
+                          <p className="text-sm font-mono text-orange-600">KES {billingContext.alreadyInvoiced.toLocaleString()}</p>
+                        </div>
+                      </div>
+
+                      <div className="pt-2 flex items-center justify-between border-t border-primary/10">
+                        <p className="text-xs font-bold text-primary flex items-center gap-1">
+                          <Calculator className="h-3 w-3" /> Remaining to Invoice
+                        </p>
+                        <p className="text-lg font-black text-primary">KES {billingContext.balanceLeftToInvoice.toLocaleString()}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="amount">Total Amount (KES)</Label>
+                    <Label htmlFor="amount">Invoice Amount (KES)</Label>
                     <Input 
-                      id="amount" type="number" placeholder="0.00"
-                      className="h-11"
+                      id="amount" type="number" 
+                      placeholder="0.00"
+                      className="h-11 font-mono font-bold"
                       value={formData.amount}
                       onChange={(e) => setFormData({...formData, amount: e.target.value})}
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="type">Description</Label>
+                    <Label htmlFor="type">Description / Particulars</Label>
                     <Input 
-                      id="desc" placeholder="e.g. Tuition Q1"
+                      id="desc" 
+                      placeholder="e.g. Tuition Phase 1"
                       className="h-11"
                       value={formData.description}
                       onChange={(e) => setFormData({...formData, description: e.target.value})}
@@ -374,8 +452,11 @@ export default function InvoicesPage() {
                   </div>
                 </div>
               </div>
-              <DialogFooter>
-                <Button onClick={handleCreateInvoice} className="w-full bg-primary h-11">Generate & Save Invoice</Button>
+
+              <DialogFooter className="bg-muted/30 -mx-6 -mb-6 p-6 mt-4">
+                <Button onClick={handleCreateInvoice} className="w-full bg-primary h-12 text-md font-bold shadow-lg">
+                  Confirm & Generate Invoice
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
