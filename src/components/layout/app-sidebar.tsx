@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -14,7 +15,8 @@ import {
   FileText,
   CreditCard,
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  LineChart
 } from "lucide-react"
 
 import {
@@ -30,6 +32,8 @@ import {
   SidebarGroupContent,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { useAuth } from "@/firebase"
+import { signOut } from "firebase/auth"
 
 const menuItems = [
   {
@@ -58,6 +62,11 @@ const menuItems = [
     url: "/staff",
   },
   {
+    title: "Audit & Strategy",
+    icon: LineChart,
+    url: "/insights",
+  },
+  {
     title: "Finance",
     group: true,
     items: [
@@ -67,9 +76,9 @@ const menuItems = [
         url: "/finance/invoices",
       },
       {
-        title: "Fees",
+        title: "Income Ledger",
         icon: CreditCard,
-        url: "/finance/fees",
+        url: "/finance/payments",
       },
       {
         title: "Expenses",
@@ -83,6 +92,11 @@ const menuItems = [
 export function AppSidebar() {
   const pathname = usePathname()
   const { setOpenMobile } = useSidebar()
+  const auth = useAuth()
+
+  const handleLogout = () => {
+    signOut(auth).catch(err => console.error("Logout failed", err))
+  }
 
   return (
     <Sidebar variant="sidebar" collapsible="icon">
@@ -149,13 +163,11 @@ export function AppSidebar() {
       <SidebarFooter className="border-t p-4">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Settings">
-              <Settings className="h-4 w-4" />
-              <span>Settings</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton tooltip="Logout" className="text-destructive hover:text-destructive">
+            <SidebarMenuButton 
+              tooltip="Logout" 
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={handleLogout}
+            >
               <LogOut className="h-4 w-4" />
               <span>Log Out</span>
             </SidebarMenuButton>

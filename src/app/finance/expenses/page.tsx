@@ -30,46 +30,47 @@ import {
   Plus, 
   Filter, 
   Receipt, 
-  Calendar, 
-  ShoppingCart, 
   Loader2, 
   Trash2, 
   AlertCircle,
   TrendingDown,
-  ChevronRight
+  Settings2,
+  Tag
 } from "lucide-react"
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, doc, serverTimestamp, query, orderBy } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
 
-const COMMON_CATEGORIES = [
-  "Salaries",
-  "Utilities",
-  "Maintenance",
-  "Office Supplies",
-  "Marketing",
-  "Travel",
-  "General",
-  "Rent",
-  "Insurance"
+const DEFAULT_CATEGORIES = [
+  "Salaries", "Utilities", "Maintenance", "Office Supplies", 
+  "Marketing", "Travel", "Rent", "Insurance", "General"
 ]
 
 export default function ExpensesPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("All")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState("")
   const [formData, setFormData] = useState({ description: "", categoryId: "General", amount: "", payee: "" })
   
   const firestore = useFirestore()
   const { user } = useUser()
   const isAdmin = user?.email === "clainyemblo@gmail.com"
   
+  const categoriesRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "expenseCategories") : null, [firestore, user])
   const expensesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return query(collection(firestore, "expenses"), orderBy("createdAt", "desc"));
   }, [firestore, user]);
 
-  const { data: expenses, isLoading } = useCollection(expensesQuery);
+  const { data: categories, isLoading: loadingCategories } = useCollection(categoriesRef);
+  const { data: expenses, isLoading: loadingExpenses } = useCollection(expensesQuery);
+
+  const activeCategories = useMemo(() => {
+    if (!categories || categories.length === 0) return DEFAULT_CATEGORIES;
+    return categories.map(c => c.name);
+  }, [categories]);
 
   const filteredExpenses = useMemo(() => {
     return (expenses || []).filter(exp => {
@@ -88,7 +89,6 @@ export default function ExpensesPage() {
     const total = list.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
     const count = list.length;
     
-    // Categorized breakdown for the current view
     const categoryTotals = list.reduce((acc: any, curr) => {
       const cat = curr.categoryId || "General";
       acc[cat] = (acc[cat] || 0) + (Number(curr.amount) || 0);
@@ -127,6 +127,18 @@ export default function ExpensesPage() {
     setFormData({ description: "", categoryId: "General", amount: "", payee: "" });
   };
 
+  const handleAddCategory = () => {
+    if (!categoriesRef || !newCategoryName.trim()) return;
+    addDocumentNonBlocking(categoriesRef, {
+      name: newCategoryName.trim(),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    });
+    setNewCategoryName("");
+    setIsCategoryDialogOpen(false);
+    toast({ title: "Category Added", description: `Added ${newCategoryName} to expense categories.` });
+  };
+
   const handleDelete = (id: string) => {
     if (!firestore || !isAdmin) return;
     if (confirm("Are you sure you want to delete this expense record?")) {
@@ -143,72 +155,106 @@ export default function ExpensesPage() {
           <p className="text-muted-foreground">Monitor and control institutional spending</p>
         </div>
         
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/90 shadow-md">
-              <Plus className="mr-2 h-4 w-4" /> Log New Expense
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Record Expenditure</DialogTitle>
-              <DialogDescription>
-                Provide details for the cost incurred by the college.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="desc">Purpose / Description</Label>
-                <Input 
-                  id="desc" 
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  placeholder="e.g. Monthly Internet Subscription" 
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cat">Category</Label>
-                  <Select 
-                    onValueChange={(v) => setFormData({...formData, categoryId: v})}
-                    defaultValue="General"
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select Category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {COMMON_CATEGORIES.map(cat => (
-                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+        <div className="flex gap-2">
+          {isAdmin && (
+            <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Settings2 className="mr-2 h-4 w-4" /> Categories
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Manage Expense Categories</DialogTitle>
+                  <DialogDescription>Add new categories to organize your institutional spending.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="flex gap-2">
+                    <Input 
+                      placeholder="Category Name (e.g. Lab Supplies)" 
+                      value={newCategoryName} 
+                      onChange={(e) => setNewCategoryName(e.target.value)} 
+                    />
+                    <Button onClick={handleAddCategory}><Plus className="h-4 w-4" /></Button>
+                  </div>
+                  <div className="border rounded-md overflow-hidden">
+                    <div className="bg-muted px-3 py-2 text-xs font-bold uppercase">Active Categories</div>
+                    <div className="p-3 flex flex-wrap gap-2">
+                      {activeCategories.map(cat => (
+                        <Badge key={cat} variant="secondary">{cat}</Badge>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </div>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-primary hover:bg-primary/90 shadow-md">
+                <Plus className="mr-2 h-4 w-4" /> Log New Expense
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Record Expenditure</DialogTitle>
+                <DialogDescription>Provide details for the cost incurred by the college.</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="desc">Purpose / Description</Label>
+                  <Input 
+                    id="desc" 
+                    value={formData.description}
+                    onChange={(e) => setFormData({...formData, description: e.target.value})}
+                    placeholder="e.g. Monthly Internet Subscription" 
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="cat">Category</Label>
+                    <Select 
+                      onValueChange={(v) => setFormData({...formData, categoryId: v})}
+                      value={formData.categoryId}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {activeCategories.map(cat => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="amount">Amount (KES)</Label>
+                    <Input 
+                      id="amount" 
+                      type="number" 
+                      value={formData.amount}
+                      onChange={(e) => setFormData({...formData, amount: e.target.value})}
+                      placeholder="0.00" 
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Amount (KES)</Label>
+                  <Label htmlFor="payee">Payee / Vendor</Label>
                   <Input 
-                    id="amount" 
-                    type="number" 
-                    value={formData.amount}
-                    onChange={(e) => setFormData({...formData, amount: e.target.value})}
-                    placeholder="0.00" 
+                    id="payee" 
+                    value={formData.payee}
+                    onChange={(e) => setFormData({...formData, payee: e.target.value})}
+                    placeholder="e.g. Safaricom PLC" 
                   />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="payee">Payee / Vendor</Label>
-                <Input 
-                  id="payee" 
-                  value={formData.payee}
-                  onChange={(e) => setFormData({...formData, payee: e.target.value})}
-                  placeholder="e.g. Safaricom PLC" 
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={handleSaveExpense} className="w-full bg-primary">Confirm & Log Expense</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+              <DialogFooter>
+                <Button onClick={handleSaveExpense} className="w-full bg-primary">Confirm & Log Expense</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -242,7 +288,7 @@ export default function ExpensesPage() {
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-bold uppercase text-muted-foreground">Highest Spend Area</CardTitle>
             <div className="bg-accent/10 p-2 rounded-full text-accent">
-              <ShoppingCart className="h-4 w-4" />
+              <Tag className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent>
@@ -269,7 +315,7 @@ export default function ExpensesPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="All">All Categories</SelectItem>
-            {COMMON_CATEGORIES.map(cat => (
+            {activeCategories.map(cat => (
               <SelectItem key={cat} value={cat}>{cat}</SelectItem>
             ))}
           </SelectContent>
@@ -290,7 +336,7 @@ export default function ExpensesPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
+              {loadingExpenses || loadingCategories ? (
                 <TableRow>
                   <TableCell colSpan={isAdmin ? 6 : 5} className="h-32 text-center">
                     <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
