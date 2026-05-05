@@ -7,7 +7,7 @@ import {
   LayoutDashboard,
   Users,
   UserPlus,
-  Wallet,
+  BookOpen,
   Receipt,
   Sparkles,
   Settings,
@@ -46,6 +46,11 @@ const menuItems = [
     title: "Students",
     icon: Users,
     url: "/students",
+  },
+  {
+    title: "Courses",
+    icon: BookOpen,
+    url: "/courses",
   },
   {
     title: "Finance",
