@@ -1,0 +1,196 @@
+
+"use client"
+
+import { useState, useMemo } from "react"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { 
+  Search, 
+  ShieldCheck, 
+  Mail, 
+  UserCog, 
+  Loader2, 
+  MoreVertical, 
+  ShieldAlert,
+  Trash2,
+  Lock,
+  Unlock,
+  CheckCircle2
+} from "lucide-react"
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu"
+import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from "@/firebase"
+import { collection, doc, serverTimestamp } from "firebase/firestore"
+import { toast } from "@/hooks/use-toast"
+
+export default function StaffPage() {
+  const [searchTerm, setSearchTerm] = useState("")
+  const firestore = useFirestore()
+  const { user } = useUser()
+  const isAdmin = user?.email === "clainyemblo@gmail.com"
+
+  const usersRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return collection(firestore, "users");
+  }, [firestore, user]);
+
+  const { data: users, isLoading } = useCollection(usersRef);
+
+  const filteredStaff = useMemo(() => {
+    return (users || []).filter(u => {
+      const matchesSearch = 
+        u.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.email?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      return matchesSearch;
+    }).sort((a, b) => (a.role === "Admin" ? -1 : 1));
+  }, [users, searchTerm]);
+
+  const handleUpdateRole = (userId: string, newRole: string) => {
+    if (!firestore || !isAdmin) return;
+    const docRef = doc(firestore, "users", userId);
+    updateDocumentNonBlocking(docRef, {
+      role: newRole,
+      updatedAt: serverTimestamp(),
+    });
+    toast({
+      title: "Role Updated",
+      description: `User role changed to ${newRole}.`,
+    });
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    if (!firestore || !isAdmin) return;
+    if (confirm("Are you sure you want to remove this staff member's profile? This does not delete their auth account.")) {
+      deleteDocumentNonBlocking(doc(firestore, "users", userId));
+      toast({
+        title: "User Removed",
+        description: "The staff record has been removed from the directory.",
+      });
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-3">
+            <ShieldCheck className="h-8 w-8 text-primary" />
+            Staff Directory
+          </h1>
+          <p className="text-muted-foreground">Manage college employees and access permissions</p>
+        </div>
+      </div>
+
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input 
+          placeholder="Search staff by name or email..." 
+          className="pl-10 h-10"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-24">
+          <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
+          <p className="text-muted-foreground animate-pulse">Retrieving staff records...</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredStaff.length > 0 ? (
+            filteredStaff.map((staff) => (
+              <Card key={staff.id} className={`group transition-all hover:shadow-md ${staff.role === 'Admin' ? 'border-primary/20 bg-primary/[0.02]' : ''}`}>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <div className="flex items-center gap-4">
+                    <Avatar className="h-12 w-12 ring-2 ring-background ring-offset-2 ring-offset-muted">
+                      <AvatarImage src={`https://picsum.photos/seed/${staff.id}/200/200`} />
+                      <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                        {staff.firstName?.[0]}{staff.lastName?.[0]}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex flex-col">
+                      <CardTitle className="text-base font-bold flex items-center gap-2">
+                        {staff.firstName} {staff.lastName}
+                        {staff.role === "Admin" && <ShieldAlert className="h-3.5 w-3.5 text-primary" />}
+                      </CardTitle>
+                      <CardDescription className="text-xs flex items-center gap-1">
+                        <Mail className="h-3 w-3" />
+                        {staff.email}
+                      </CardDescription>
+                    </div>
+                  </div>
+                  
+                  {isAdmin && staff.email !== "clainyemblo@gmail.com" && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuLabel>Manage Access</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleUpdateRole(staff.id, "Staff")}>
+                          <UserCog className="mr-2 h-4 w-4" /> Reset to Staff
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteUser(staff.id)}>
+                          <Trash2 className="mr-2 h-4 w-4" /> Remove Profile
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+                </CardHeader>
+
+                <CardContent className="pt-4">
+                  <div className="flex items-center justify-between">
+                    <Badge variant={staff.role === "Admin" ? "default" : "secondary"} className="rounded-md px-2 py-0.5 text-[10px] uppercase font-bold tracking-tight">
+                      {staff.role || "Staff"}
+                    </Badge>
+                    <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                      <CheckCircle2 className="h-3 w-3 text-green-500" />
+                      Active Account
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <div className="col-span-full py-24 text-center bg-muted/20 rounded-2xl border-2 border-dashed">
+              <h3 className="text-lg font-semibold">No users found</h3>
+              <p className="text-muted-foreground text-sm mt-1">
+                Your search did not return any staff members.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {!isAdmin && (
+        <Card className="border-orange-200 bg-orange-50/50">
+          <CardHeader className="flex flex-row items-start gap-4 p-4">
+            <Lock className="h-5 w-5 text-orange-600 mt-1" />
+            <div>
+              <CardTitle className="text-sm font-bold text-orange-900">Restricted Access</CardTitle>
+              <CardDescription className="text-xs text-orange-700">
+                You are viewing the staff directory. Only the Super Admin can modify roles or remove employee profiles.
+              </CardDescription>
+            </div>
+          </CardHeader>
+        </Card>
+      )}
+    </div>
+  )
+}

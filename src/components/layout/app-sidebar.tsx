@@ -10,13 +10,12 @@ import {
   UserPlus,
   BookOpen,
   Receipt,
-  Sparkles,
   Settings,
   GraduationCap,
   FileText,
   CreditCard,
   LogOut,
-  FileBarChart
+  ShieldCheck
 } from "lucide-react"
 
 import {
@@ -55,6 +54,11 @@ const menuItems = [
     url: "/courses",
   },
   {
+    title: "Staff",
+    icon: ShieldCheck,
+    url: "/staff",
+  },
+  {
     title: "Finance",
     group: true,
     items: [
@@ -74,11 +78,6 @@ const menuItems = [
         url: "/finance/expenses",
       },
     ],
-  },
-  {
-    title: "Financial Reports",
-    icon: FileBarChart,
-    url: "/insights",
   },
 ]
 
