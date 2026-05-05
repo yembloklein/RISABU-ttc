@@ -45,19 +45,14 @@ import {
   FileText, 
   Calendar, 
   Printer, 
-  Mail, 
   GraduationCap, 
   BadgeCheck, 
   Building2, 
-  Wallet,
-  Sparkles,
-  Send
+  Wallet
 } from "lucide-react"
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, serverTimestamp, doc, query, orderBy } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
-import { generateFeeReminder, type FeeReminderOutput } from "@/ai/flows/student-fee-reminder"
-import { ScrollArea } from "@/components/ui/scroll-area"
 
 export default function InvoicesPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -66,12 +61,6 @@ export default function InvoicesPage() {
   const [formData, setFormData] = useState({ studentId: "", amount: "", description: "" })
   const [printInvoiceId, setPrintInvoiceId] = useState<string | null>(null)
   
-  // Reminder State
-  const [isReminderOpen, setIsReminderOpen] = useState(false)
-  const [isGeneratingReminder, setIsGeneratingReminder] = useState(false)
-  const [activeReminder, setActiveReminder] = useState<FeeReminderOutput | null>(null)
-  const [targetInvoiceForReminder, setTargetInvoiceForReminder] = useState<any>(null)
-
   const firestore = useFirestore()
   const { user } = useUser()
   const isAdmin = user?.email === "clainyemblo@gmail.com"
@@ -211,48 +200,6 @@ export default function InvoicesPage() {
     }, 100);
   };
 
-  const handleSendReminder = async (invoice: any) => {
-    const student = getStudentInfo(invoice.studentId)
-    if (!student) return;
-
-    setTargetInvoiceForReminder(invoice)
-    setIsReminderOpen(true)
-    setIsGeneratingReminder(true)
-    setActiveReminder(null)
-
-    try {
-      const reminder = await generateFeeReminder({
-        studentName: `${student.firstName} ${student.lastName}`,
-        admissionNumber: student.admissionNumber || student.id,
-        courseName: student.appliedCourse || "General",
-        outstandingAmount: Number(invoice.outstandingAmount),
-        dueDate: invoice.dueDate,
-        collegeName: "Risabu Technical Training College"
-      })
-      setActiveReminder(reminder)
-    } catch (error) {
-      console.error("Reminder generation failed", error)
-      toast({
-        title: "Generation Failed",
-        description: "AI was unable to draft the reminder at this time.",
-        variant: "destructive"
-      })
-      setIsReminderOpen(false)
-    } finally {
-      setIsGeneratingReminder(false)
-    }
-  };
-
-  const handleConfirmSendReminder = () => {
-    const student = getStudentInfo(targetInvoiceForReminder.studentId)
-    toast({
-      title: "Reminder Sent",
-      description: `Payment reminder successfully dispatched to ${student?.firstName}'s registered contact.`,
-    })
-    setIsReminderOpen(false)
-    setActiveReminder(null)
-  }
-
   const exportToCSV = () => {
     if (!filteredInvoices.length) return;
 
@@ -298,52 +245,6 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Reminder Preview Dialog */}
-      <Dialog open={isReminderOpen} onOpenChange={setIsReminderOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              AI Reminder Draft
-            </DialogTitle>
-            <DialogDescription>
-              Personalized reminder for {getStudentInfo(targetInvoiceForReminder?.studentId)?.firstName}.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {isGeneratingReminder ? (
-            <div className="py-12 flex flex-col items-center justify-center gap-4">
-              <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground animate-pulse font-medium">Drafting professional reminder...</p>
-            </div>
-          ) : activeReminder ? (
-            <div className="space-y-4">
-              <div className="bg-muted/30 p-4 rounded-lg border">
-                <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Subject</p>
-                <p className="text-sm font-semibold">{activeReminder.subject}</p>
-              </div>
-              <div className="bg-muted/30 p-4 rounded-lg border">
-                <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Message Body</p>
-                <ScrollArea className="h-[200px] pr-4">
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{activeReminder.message}</p>
-                </ScrollArea>
-              </div>
-              <div className="flex items-center justify-between">
-                <Badge variant="outline" className="text-[10px]">Tone: {activeReminder.tone}</Badge>
-                <p className="text-[10px] text-muted-foreground italic">Generated by AI Finance Agent</p>
-              </div>
-            </div>
-          ) : null}
-
-          <DialogFooter className="mt-4 gap-2">
-            <Button variant="ghost" onClick={() => setIsReminderOpen(false)}>Cancel</Button>
-            <Button onClick={handleConfirmSendReminder} disabled={isGeneratingReminder} className="bg-primary px-8">
-              <Send className="mr-2 h-4 w-4" /> Send Reminder
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* Individual Printable Invoice Container */}
       {activePrintInvoice && (
         <div id="invoice-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999] p-8">
@@ -714,9 +615,6 @@ export default function InvoicesPage() {
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handlePrintInvoice(inv.id)}>
                               <Printer className="mr-2 h-4 w-4 text-primary" /> {inv.status === "Paid" ? "View Receipt" : "View Invoice"}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleSendReminder(inv)}>
-                              <Mail className="mr-2 h-4 w-4 text-orange-600" /> Send Reminder
                             </DropdownMenuItem>
                             {isAdmin && (
                               <>
