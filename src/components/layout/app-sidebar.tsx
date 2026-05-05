@@ -10,7 +10,6 @@ import {
   UserPlus,
   BookOpen,
   Receipt,
-  Settings,
   GraduationCap,
   FileText,
   CreditCard,
@@ -70,9 +69,9 @@ const menuItems = [
         url: "/finance/invoices",
       },
       {
-        title: "Income Ledger",
+        title: "Fee Payments",
         icon: CreditCard,
-        url: "/finance/payments",
+        url: "/finance/fees",
       },
       {
         title: "Expenses",
