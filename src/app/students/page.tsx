@@ -120,6 +120,7 @@ export default function StudentsPage() {
   };
 
   const handleOpenEditDialog = (student: any) => {
+    setSelectedStudent(student)
     setEditFormData({
       firstName: student.firstName || "",
       lastName: student.lastName || "",
@@ -145,7 +146,7 @@ export default function StudentsPage() {
     
     toast({
       title: "Profile Updated",
-      description: "The student record has been successfully updated.",
+      description: "The student record has been successfully updated in Firestore.",
     });
     
     setIsEditDialogOpen(false);
@@ -664,7 +665,7 @@ export default function StudentsPage() {
                 <Label>Gender</Label>
                 <Select 
                   onValueChange={(v) => setEditFormData({...editFormData, gender: v})} 
-                  defaultValue={editFormData.gender}
+                  value={editFormData.gender}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select Gender" />
@@ -680,7 +681,7 @@ export default function StudentsPage() {
                 <Label>Academic Status</Label>
                 <Select 
                   onValueChange={(v) => setEditFormData({...editFormData, status: v})} 
-                  defaultValue={editFormData.status}
+                  value={editFormData.status}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select Status" />
