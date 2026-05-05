@@ -24,24 +24,20 @@ import {
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/tabs"
 import { 
   Search, 
   Plus, 
   CreditCard, 
-  Banknote, 
-  Landmark, 
   Download, 
   Loader2, 
   History,
-  CheckCircle2,
   Filter,
   DollarSign,
   User,
   Wallet,
   GraduationCap,
-  Hash,
-  FileText
+  Hash
 } from "lucide-react"
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, serverTimestamp, doc } from "firebase/firestore"
@@ -163,6 +159,10 @@ export default function PaymentsPage() {
 
   const isLoading = loadingPayments || loadingInvoices
 
+  const pendingInvoices = useMemo(() => {
+    return (invoices || []).filter(i => i.status !== "Paid");
+  }, [invoices]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -186,7 +186,7 @@ export default function PaymentsPage() {
                 <DialogTitle>Record Income</DialogTitle>
                 <DialogDescription>Choose a category to log student fees or other revenue.</DialogDescription>
               </DialogHeader>
-              <div className="grid gap-5 py-2">
+              <div className="grid gap-5 py-4">
                 <Tabs value={paymentType} onValueChange={(v: any) => setPaymentType(v)} className="w-full">
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="Fee" className="flex items-center gap-2">
@@ -199,36 +199,47 @@ export default function PaymentsPage() {
                 </Tabs>
 
                 {paymentType === "Fee" ? (
-                  <div className="space-y-4 animate-in fade-in duration-200">
+                  <div className="space-y-4 animate-in fade-in duration-300">
                     <div className="space-y-2">
                       <Label htmlFor="invoice">Select Student & Admission No.</Label>
                       <Select onValueChange={(v) => setFormData({...formData, invoiceId: v})}>
-                        <SelectTrigger id="invoice" className="h-12">
-                          <SelectValue placeholder="Search by name or ADM number..." />
+                        <SelectTrigger id="invoice" className="w-full h-11 border-muted-foreground/20">
+                          <SelectValue placeholder="Choose student to credit..." />
                         </SelectTrigger>
                         <SelectContent className="max-h-[300px]">
-                          {(invoices || []).filter(i => i.status !== "Paid").map(i => {
-                            const info = getStudentInfo(i.studentId)
-                            return (
-                              <SelectItem key={i.id} value={i.id} className="py-3">
-                                <div className="flex flex-col">
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-bold text-sm">{info.name}</span>
-                                    <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-mono">{info.adm}</span>
+                          {loadingInvoices ? (
+                            <div className="flex items-center justify-center py-6">
+                              <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                            </div>
+                          ) : pendingInvoices.length === 0 ? (
+                            <div className="p-4 text-center text-xs text-muted-foreground italic">
+                              No pending invoices found.
+                            </div>
+                          ) : (
+                            pendingInvoices.map(i => {
+                              const info = getStudentInfo(i.studentId)
+                              return (
+                                <SelectItem key={i.id} value={i.id} className="py-3 border-b last:border-0 cursor-pointer">
+                                  <div className="flex flex-col gap-0.5">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-sm">{info.name}</span>
+                                      <Badge variant="secondary" className="text-[9px] h-4 px-1 font-mono">{info.adm}</Badge>
+                                    </div>
+                                    <div className="flex justify-between items-center w-full pr-6">
+                                      <span className="text-[10px] text-muted-foreground">{i.invoiceNumber}</span>
+                                      <span className="text-[10px] font-bold text-destructive">Due: KES {Number(i.outstandingAmount).toLocaleString()}</span>
+                                    </div>
                                   </div>
-                                  <span className="text-[11px] text-muted-foreground mt-0.5">
-                                    {i.invoiceNumber} • Outstanding: <span className="font-bold text-destructive">KES {Number(i.outstandingAmount).toLocaleString()}</span>
-                                  </span>
-                                </div>
-                              </SelectItem>
-                            )
-                          })}
+                                </SelectItem>
+                              )
+                            })
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4 animate-in fade-in duration-200">
+                  <div className="space-y-4 animate-in fade-in duration-300">
                     <div className="space-y-2">
                       <Label htmlFor="payee">Source / Payer Name</Label>
                       <div className="relative">
@@ -236,7 +247,7 @@ export default function PaymentsPage() {
                         <Input 
                           id="payee" 
                           placeholder="e.g. Canteen Contractor" 
-                          className="pl-9"
+                          className="pl-9 h-11 border-muted-foreground/20"
                           value={formData.receivedFrom}
                           onChange={(e) => setFormData({...formData, receivedFrom: e.target.value})}
                         />
@@ -247,6 +258,7 @@ export default function PaymentsPage() {
                       <Input 
                         id="desc" 
                         placeholder="e.g. Monthly Rent Payment"
+                        className="h-11 border-muted-foreground/20"
                         value={formData.description}
                         onChange={(e) => setFormData({...formData, description: e.target.value})}
                       />
@@ -262,7 +274,7 @@ export default function PaymentsPage() {
                       <Input 
                         id="amount" type="number" 
                         placeholder="0.00"
-                        className="pl-9"
+                        className="pl-9 h-11 border-muted-foreground/20"
                         value={formData.amount}
                         onChange={(e) => setFormData({...formData, amount: e.target.value})}
                       />
@@ -271,7 +283,7 @@ export default function PaymentsPage() {
                   <div className="space-y-2">
                     <Label htmlFor="method">Method</Label>
                     <Select onValueChange={(v) => setFormData({...formData, method: v})} defaultValue="M-Pesa">
-                      <SelectTrigger id="method">
+                      <SelectTrigger id="method" className="h-11 border-muted-foreground/20">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -290,16 +302,16 @@ export default function PaymentsPage() {
                     <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input 
                       id="ref" placeholder="Transaction ID"
-                      className="pl-9 font-mono uppercase"
+                      className="pl-9 font-mono uppercase h-11 border-muted-foreground/20"
                       value={formData.reference}
                       onChange={(e) => setFormData({...formData, reference: e.target.value})}
                     />
                   </div>
                 </div>
               </div>
-              <DialogFooter className="mt-4">
-                <Button onClick={handleRecordPayment} className="w-full bg-primary h-11">
-                  Complete Transaction
+              <DialogFooter className="mt-2">
+                <Button onClick={handleRecordPayment} className="w-full bg-primary h-12 text-md font-semibold shadow-lg">
+                  Confirm & Process Income
                 </Button>
               </DialogFooter>
             </DialogContent>
