@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from "react"
@@ -36,8 +37,8 @@ export default function InvoicesPage() {
   const firestore = useFirestore()
   const { user } = useUser()
 
-  const invoicesRef = useMemoFirebase(() => firestore ? collection(firestore, "invoices") : null, [firestore])
-  const studentsRef = useMemoFirebase(() => firestore ? collection(firestore, "students") : null, [firestore])
+  const invoicesRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "invoices") : null, [firestore, user])
+  const studentsRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "students") : null, [firestore, user])
   
   const { data: invoices, isLoading } = useCollection(invoicesRef)
   const { data: students } = useCollection(studentsRef)
@@ -54,7 +55,6 @@ export default function InvoicesPage() {
     const invNumber = `INV-${Date.now().toString().slice(-6)}`
     
     addDocumentNonBlocking(invoicesRef, {
-      id: invNumber, // Using simple ID for this prototype
       studentId: formData.studentId,
       invoiceNumber: invNumber,
       totalAmount: amount,
@@ -62,7 +62,7 @@ export default function InvoicesPage() {
       status: "Issued",
       description: formData.description,
       issueDate: new Date().toISOString().split('T')[0],
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days due
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       recordedByUserFirebaseUid: user.uid,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),

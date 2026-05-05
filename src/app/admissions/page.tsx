@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from "react"
@@ -24,7 +25,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Search, Plus, Filter, MoreHorizontal, UserCheck, XCircle, Loader2 } from "lucide-react"
-import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase"
+import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, doc, serverTimestamp } from "firebase/firestore"
 
 export default function AdmissionsPage() {
@@ -33,16 +34,17 @@ export default function AdmissionsPage() {
   const [formData, setFormData] = useState({ firstName: "", lastName: "", course: "", email: "" })
   
   const firestore = useFirestore()
+  const { user } = useUser()
   
   const studentsRef = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !user) return null;
     return collection(firestore, "students");
-  }, [firestore]);
+  }, [firestore, user]);
 
   const { data: students, isLoading } = useCollection(studentsRef);
 
   const filteredApplications = (students || []).filter(app => 
-    app.admissionStatus !== "Enrolled" && // Only show prospective/pending ones in admissions
+    app.admissionStatus !== "Enrolled" && 
     (app.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     app.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (app.appliedCourse && app.appliedCourse.toLowerCase().includes(searchTerm.toLowerCase())))

@@ -1,3 +1,4 @@
+
 "use client"
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -19,20 +20,21 @@ import {
   TableRow 
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { useFirestore, useCollection, useMemoFirebase } from "@/firebase"
+import { useFirestore, useCollection, useMemoFirebase, useUser } from "@/firebase"
 import { collection, query, orderBy, limit } from "firebase/firestore"
 
 export default function Dashboard() {
   const firestore = useFirestore()
+  const { user } = useUser()
 
-  const studentsRef = useMemoFirebase(() => firestore ? collection(firestore, "students") : null, [firestore])
-  const invoicesRef = useMemoFirebase(() => firestore ? collection(firestore, "invoices") : null, [firestore])
-  const paymentsRef = useMemoFirebase(() => firestore ? collection(firestore, "payments") : null, [firestore])
+  const studentsRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "students") : null, [firestore, user])
+  const invoicesRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "invoices") : null, [firestore, user])
+  const paymentsRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "payments") : null, [firestore, user])
   
   const recentInvoicesQuery = useMemoFirebase(() => {
-    if (!firestore) return null
+    if (!firestore || !user) return null
     return query(collection(firestore, "invoices"), orderBy("createdAt", "desc"), limit(5))
-  }, [firestore])
+  }, [firestore, user])
 
   const { data: students, isLoading: loadingStudents } = useCollection(studentsRef)
   const { data: invoices, isLoading: loadingInvoices } = useCollection(invoicesRef)

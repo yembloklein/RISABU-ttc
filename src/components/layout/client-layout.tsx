@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useUser, useFirestore, setDocumentNonBlocking } from "@/firebase"
@@ -25,26 +26,47 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
 
   // Administrative Bootstrapping logic
   useEffect(() => {
-    if (user && user.email === "clainyemblo@gmail.com" && firestore) {
-      const adminRoleRef = doc(firestore, "roles_admin", user.uid)
+    if (user && firestore) {
       const userDocRef = doc(firestore, "users", user.uid)
+      
+      // Auto-bootstrap Admin Role for specific email
+      if (user.email === "clainyemblo@gmail.com") {
+        const adminRoleRef = doc(firestore, "roles_admin", user.uid)
+        setDocumentNonBlocking(adminRoleRef, {
+          email: user.email,
+          assignedAt: serverTimestamp(),
+        }, { merge: true })
 
-      // Non-blocking creation of administrative records
-      setDocumentNonBlocking(adminRoleRef, {
-        email: user.email,
-        assignedAt: serverTimestamp(),
-      }, { merge: true })
+        setDocumentNonBlocking(userDocRef, {
+          id: user.uid,
+          firebaseUid: user.uid,
+          email: user.email,
+          firstName: user.displayName?.split(' ')[0] || "Admin",
+          lastName: user.displayName?.split(' ').slice(1).join(' ') || "User",
+          role: "Admin",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }, { merge: true })
+      } 
+      // Auto-bootstrap Staff Role for Guest/Other users to ensure app visibility
+      else {
+        const staffRoleRef = doc(firestore, "roles_staff", user.uid)
+        setDocumentNonBlocking(staffRoleRef, {
+          email: user.email || "guest@risabu.ac.ke",
+          assignedAt: serverTimestamp(),
+        }, { merge: true })
 
-      setDocumentNonBlocking(userDocRef, {
-        id: user.uid,
-        firebaseUid: user.uid,
-        email: user.email,
-        firstName: user.displayName?.split(' ')[0] || "Admin",
-        lastName: user.displayName?.split(' ').slice(1).join(' ') || "User",
-        role: "Admin",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }, { merge: true })
+        setDocumentNonBlocking(userDocRef, {
+          id: user.uid,
+          firebaseUid: user.uid,
+          email: user.email || "guest@risabu.ac.ke",
+          firstName: "Guest",
+          lastName: "Staff",
+          role: "Staff",
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        }, { merge: true })
+      }
     }
   }, [user, firestore])
 
@@ -90,7 +112,7 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-4">
             <div className="flex flex-col items-end">
               <span className="text-sm font-medium">{user?.displayName || user?.email?.split('@')[0] || 'Admin User'}</span>
-              <span className="text-xs text-muted-foreground">{user?.isAnonymous ? 'Guest Admin' : 'Super Admin'}</span>
+              <span className="text-xs text-muted-foreground">{user?.isAnonymous ? 'Guest Staff' : 'Authorized User'}</span>
             </div>
             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
               {(user?.displayName?.[0] || user?.email?.[0] || 'A').toUpperCase()}
