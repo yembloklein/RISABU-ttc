@@ -24,7 +24,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger } from "@/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
   Search, 
   Plus, 
