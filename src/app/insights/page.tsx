@@ -8,7 +8,6 @@ import {
   CheckCircle2, 
   BrainCircuit,
   Calendar,
-  ChevronRight,
   RefreshCcw,
   ArrowUp,
   ArrowDown
@@ -20,36 +19,8 @@ import { adminFinancialTrendSummary, type AdminFinancialTrendSummaryOutput } fro
 import { adminUnusualExpenseDetection, type AdminUnusualExpenseDetectionOutput } from "@/ai/flows/admin-unusual-expense-detection"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ScrollArea } from "@/components/ui/scroll-area"
-
-const MOCK_HISTORICAL_DATA = {
-  currentPeriodData: {
-    periodDescription: "Q1 2024",
-    expenses: [
-      { category: "Staff Salaries", amount: 2500000 },
-      { category: "Office Supplies", amount: 150000 },
-      { category: "Utilities", amount: 280000 },
-      { category: "Marketing", amount: 450000 },
-      { category: "Maintenance", amount: 120000 },
-    ]
-  },
-  previousPeriodData: {
-    periodDescription: "Q4 2023",
-    expenses: [
-      { category: "Staff Salaries", amount: 2400000 },
-      { category: "Office Supplies", amount: 120000 },
-      { category: "Utilities", amount: 260000 },
-      { category: "Marketing", amount: 380000 },
-      { category: "Maintenance", amount: 450000 },
-    ]
-  },
-  currency: "KES"
-}
-
-const MOCK_ANOMALY_EXPENSES = [
-  { category: "Utilities", amount: 85000, date: "2024-03-01", description: "Water bill for block B" },
-  { category: "Office Supplies", amount: 450000, date: "2024-03-05", description: "Bulk printer ink purchase" },
-  { category: "Staff Salaries", amount: 150000, date: "2024-03-07", description: "New intern stipend" },
-]
+import { useFirestore, useCollection, useMemoFirebase } from "@/firebase"
+import { collection } from "firebase/firestore"
 
 export default function AIInsightsPage() {
   const [loading, setLoading] = useState(false)
@@ -58,10 +29,38 @@ export default function AIInsightsPage() {
   const [anomalyResult, setAnomalyResult] = useState<AdminUnusualExpenseDetectionOutput | null>(null)
   const [analyzingAnomaly, setAnalyzingAnomaly] = useState(false)
 
+  const firestore = useFirestore()
+  const expensesRef = useMemoFirebase(() => firestore ? collection(firestore, "expenses") : null, [firestore])
+  const { data: realExpenses } = useCollection(expensesRef)
+
   const handleGenerateSummary = async () => {
+    if (!realExpenses) return;
     setLoading(true)
+    
+    // Group expenses by category for the AI
+    const categorized = realExpenses.reduce((acc: any, exp) => {
+      const cat = exp.categoryId || 'General'
+      acc[cat] = (acc[cat] || 0) + (Number(exp.amount) || 0)
+      return acc
+    }, {})
+
+    const currentPeriodExpenses = Object.entries(categorized).map(([category, amount]) => ({
+      category,
+      amount: amount as number
+    }))
+
     try {
-      const result = await adminFinancialTrendSummary(MOCK_HISTORICAL_DATA)
+      const result = await adminFinancialTrendSummary({
+        currentPeriodData: {
+          periodDescription: "Current Records",
+          expenses: currentPeriodExpenses
+        },
+        previousPeriodData: {
+          periodDescription: "Baseline (Empty)",
+          expenses: []
+        },
+        currency: "KES"
+      })
       setSummary(result)
     } catch (error) {
       console.error("Failed to generate summary", error)
@@ -71,12 +70,28 @@ export default function AIInsightsPage() {
   }
 
   const handleAnalyzeAnomaly = async (index: number) => {
+    if (!realExpenses) return;
     setSelectedAnomalyIndex(index)
     setAnalyzingAnomaly(true)
+    
+    const historical = realExpenses.filter((_, i) => i !== index).map(e => ({
+      category: e.categoryId || 'General',
+      amount: Number(e.amount),
+      date: e.expenseDate,
+      description: e.description
+    }))
+
+    const newExp = {
+      category: realExpenses[index].categoryId || 'General',
+      amount: Number(realExpenses[index].amount),
+      date: realExpenses[index].expenseDate,
+      description: realExpenses[index].description
+    }
+
     try {
       const result = await adminUnusualExpenseDetection({
-        historicalExpenses: MOCK_HISTORICAL_DATA.currentPeriodData.expenses.map(e => ({ ...e, date: "2024-01-01" })),
-        newExpense: MOCK_ANOMALY_EXPENSES[index]
+        historicalExpenses: historical,
+        newExpense: newExp
       })
       setAnomalyResult(result)
     } catch (error) {
@@ -96,7 +111,7 @@ export default function AIInsightsPage() {
           </h1>
           <p className="text-muted-foreground mt-1">Advanced AI analysis of Risabu's spending and revenue patterns.</p>
         </div>
-        <Button onClick={handleGenerateSummary} disabled={loading} className="bg-primary hover:bg-primary/90">
+        <Button onClick={handleGenerateSummary} disabled={loading || !realExpenses} className="bg-primary hover:bg-primary/90">
           {loading ? <RefreshCcw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
           Generate Full Analysis
         </Button>
@@ -167,7 +182,7 @@ export default function AIInsightsPage() {
           ) : (
             <div className="flex flex-col items-center justify-center py-20 bg-muted/30 rounded-3xl border-2 border-dashed border-muted">
               <Sparkles className="h-12 w-12 text-muted-foreground mb-4 opacity-20" />
-              <p className="text-muted-foreground">Click "Generate Full Analysis" to start the AI evaluation.</p>
+              <p className="text-muted-foreground">Click "Generate Full Analysis" to start the AI evaluation based on real expenses.</p>
             </div>
           )}
         </div>
@@ -179,30 +194,34 @@ export default function AIInsightsPage() {
                 <AlertTriangle className="h-5 w-5 text-orange-500" />
                 Unusual Expense Detection
               </CardTitle>
-              <CardDescription>Select an expense to evaluate risk</CardDescription>
+              <CardDescription>Analyze real expenditure risks</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               <ScrollArea className="h-[300px]">
                 <div className="px-6 pb-6 space-y-3">
-                  {MOCK_ANOMALY_EXPENSES.map((expense, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleAnalyzeAnomaly(idx)}
-                      className={`w-full text-left p-3 rounded-lg border transition-all hover:bg-muted/50 ${
-                        selectedAnomalyIndex === idx ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border'
-                      }`}
-                    >
-                      <div className="flex justify-between items-start mb-1">
-                        <span className="font-semibold text-sm">{expense.category}</span>
-                        <span className="text-xs font-mono">KES {expense.amount.toLocaleString()}</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground line-clamp-1">{expense.description}</p>
-                      <div className="flex items-center mt-2 text-[10px] text-muted-foreground">
-                        <Calendar className="h-3 w-3 mr-1" />
-                        {expense.date}
-                      </div>
-                    </button>
-                  ))}
+                  {realExpenses && realExpenses.length > 0 ? (
+                    realExpenses.map((expense, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleAnalyzeAnomaly(idx)}
+                        className={`w-full text-left p-3 rounded-lg border transition-all hover:bg-muted/50 ${
+                          selectedAnomalyIndex === idx ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="font-semibold text-sm capitalize">{expense.categoryId || 'General'}</span>
+                          <span className="text-xs font-mono font-bold">KES {Number(expense.amount).toLocaleString()}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground line-clamp-1">{expense.description}</p>
+                        <div className="flex items-center mt-2 text-[10px] text-muted-foreground">
+                          <Calendar className="h-3 w-3 mr-1" />
+                          {expense.expenseDate}
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <p className="p-6 text-sm text-muted-foreground text-center italic">Record some expenses to use the risk analyzer.</p>
+                  )}
                 </div>
               </ScrollArea>
             </CardContent>
@@ -229,16 +248,6 @@ export default function AIInsightsPage() {
                 ) : null}
               </CardFooter>
             )}
-          </Card>
-
-          <Card className="bg-accent text-accent-foreground">
-            <CardHeader>
-              <CardTitle className="text-base">Quick Help</CardTitle>
-            </CardHeader>
-            <CardContent className="text-xs space-y-2 opacity-90">
-              <p>AI Insights uses current and historical Firestore data to build comparison models.</p>
-              <p>Anomalies are flagged when values deviate more than 2 standard deviations from categorical averages.</p>
-            </CardContent>
           </Card>
         </div>
       </div>

@@ -12,23 +12,80 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table"
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger 
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Search, Plus, CreditCard, Banknote, Landmark, Download } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Search, Plus, CreditCard, Banknote, Landmark, Download, Loader2 } from "lucide-react"
+import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, useUser } from "@/firebase"
+import { collection, serverTimestamp, doc, updateDoc, increment } from "firebase/firestore"
 
 export default function PaymentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [formData, setFormData] = useState({ invoiceId: "", amount: "", method: "M-Pesa", reference: "" })
 
-  const payments = [
-    { id: "PAY-5001", student: "Alice Mwangi", amount: "KES 45,000", method: "M-Pesa", ref: "RCD98S291", date: "2024-03-01" },
-    { id: "PAY-5002", student: "Sarah Kemboi", amount: "KES 5,000", method: "Bank Transfer", ref: "BNK-00122", date: "2024-03-02" },
-    { id: "PAY-5003", student: "John Kamau", amount: "KES 15,000", method: "Cash", ref: "RCP-110", date: "2024-03-03" },
-    { id: "PAY-5004", student: "Grace Wanjiku", amount: "KES 10,000", method: "M-Pesa", ref: "RDH12K310", date: "2024-03-04" },
-  ]
+  const firestore = useFirestore()
+  const { user } = useUser()
 
-  const filteredPayments = payments.filter(p => 
-    p.student.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.ref.toLowerCase().includes(searchTerm.toLowerCase())
+  const paymentsRef = useMemoFirebase(() => firestore ? collection(firestore, "payments") : null, [firestore])
+  const invoicesRef = useMemoFirebase(() => firestore ? collection(firestore, "invoices") : null, [firestore])
+  
+  const { data: payments, isLoading } = useCollection(paymentsRef)
+  const { data: invoices } = useCollection(invoicesRef)
+
+  const handleRecordPayment = async () => {
+    if (!paymentsRef || !user || !firestore) return;
+
+    const amount = Number(formData.amount)
+    const selectedInvoice = (invoices || []).find(i => i.id === formData.invoiceId)
+    
+    if (!selectedInvoice) return;
+
+    // Record the payment
+    addDocumentNonBlocking(paymentsRef, {
+      invoiceId: formData.invoiceId,
+      studentId: selectedInvoice.studentId,
+      amount: amount,
+      paymentMethod: formData.method,
+      transactionReference: formData.reference,
+      paymentDate: new Date().toISOString(),
+      recordedByUserId: user.uid,
+      recordedByUserFirebaseUid: user.uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    // Update invoice outstanding balance
+    const invoiceDocRef = doc(firestore, "invoices", formData.invoiceId)
+    const newOutstanding = Number(selectedInvoice.outstandingAmount) - amount
+    
+    updateDoc(invoiceDocRef, {
+      outstandingAmount: newOutstanding,
+      status: newOutstanding <= 0 ? "Paid" : "Partially Paid",
+      updatedAt: serverTimestamp()
+    })
+
+    setIsDialogOpen(false);
+    setFormData({ invoiceId: "", amount: "", method: "M-Pesa", reference: "" });
+  };
+
+  const filteredPayments = (payments || []).filter(p => 
+    p.transactionReference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.invoiceId?.toLowerCase().includes(searchTerm.toLowerCase())
   )
+
+  const mpesaTotal = (payments || []).filter(p => p.paymentMethod === "M-Pesa").reduce((acc, p) => acc + Number(p.amount), 0)
+  const bankTotal = (payments || []).filter(p => p.paymentMethod === "Bank Transfer").reduce((acc, p) => acc + Number(p.amount), 0)
+  const otherTotal = (payments || []).filter(p => p.paymentMethod === "Cash" || p.paymentMethod === "Card").reduce((acc, p) => acc + Number(p.amount), 0)
 
   return (
     <div className="space-y-6">
@@ -41,9 +98,68 @@ export default function PaymentsPage() {
           <Button variant="outline">
             <Download className="mr-2 h-4 w-4" /> Reports
           </Button>
-          <Button className="bg-primary hover:bg-primary/90">
-            <Plus className="mr-2 h-4 w-4" /> Record Payment
-          </Button>
+          
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-primary hover:bg-primary/90">
+                <Plus className="mr-2 h-4 w-4" /> Record Payment
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Record New Payment</DialogTitle>
+                <DialogDescription>Log a payment against an issued invoice.</DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="invoice" className="text-right">Invoice</Label>
+                  <Select onValueChange={(v) => setFormData({...formData, invoiceId: v})}>
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue placeholder="Select invoice" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(invoices || []).filter(i => i.status !== "Paid").map(i => (
+                        <SelectItem key={i.id} value={i.id}>{i.invoiceNumber} (Bal: {Number(i.outstandingAmount).toLocaleString()})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="amount" className="text-right">Amount</Label>
+                  <Input 
+                    id="amount" type="number" className="col-span-3"
+                    value={formData.amount}
+                    onChange={(e) => setFormData({...formData, amount: e.target.value})}
+                  />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="method" className="text-right">Method</Label>
+                  <Select onValueChange={(v) => setFormData({...formData, method: v})} defaultValue="M-Pesa">
+                    <SelectTrigger className="col-span-3">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="M-Pesa">M-Pesa</SelectItem>
+                      <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="Card">Card</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="ref" className="text-right">Reference</Label>
+                  <Input 
+                    id="ref" className="col-span-3"
+                    value={formData.reference}
+                    onChange={(e) => setFormData({...formData, reference: e.target.value})}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleRecordPayment}>Save Payment</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -56,8 +172,7 @@ export default function PaymentsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">KES 520,000</div>
-            <p className="text-xs text-muted-foreground">75% of total revenue</p>
+            <div className="text-2xl font-bold">KES {mpesaTotal.toLocaleString()}</div>
           </CardContent>
         </Card>
         <Card className="hover:shadow-md transition-shadow">
@@ -68,20 +183,18 @@ export default function PaymentsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">KES 280,000</div>
-            <p className="text-xs text-muted-foreground">20% of total revenue</p>
+            <div className="text-2xl font-bold">KES {bankTotal.toLocaleString()}</div>
           </CardContent>
         </Card>
         <Card className="hover:shadow-md transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Cash/Cheque</CardTitle>
+            <CardTitle className="text-sm font-medium">Other Methods</CardTitle>
             <div className="bg-orange-100 p-2 rounded text-orange-700">
               <Banknote className="h-4 w-4" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">KES 50,000</div>
-            <p className="text-xs text-muted-foreground">5% of total revenue</p>
+            <div className="text-2xl font-bold">KES {otherTotal.toLocaleString()}</div>
           </CardContent>
         </Card>
       </div>
@@ -90,7 +203,7 @@ export default function PaymentsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search by student or reference..." 
+            placeholder="Search by reference or invoice ID..." 
             className="pl-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -103,27 +216,39 @@ export default function PaymentsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Receipt ID</TableHead>
-                <TableHead>Student</TableHead>
+                <TableHead>Payment Date</TableHead>
+                <TableHead>Invoice #</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Method</TableHead>
                 <TableHead>Reference</TableHead>
-                <TableHead className="text-right">Date</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredPayments.map((pay) => (
-                <TableRow key={pay.id}>
-                  <TableCell className="font-mono text-xs font-semibold">{pay.id}</TableCell>
-                  <TableCell className="font-medium">{pay.student}</TableCell>
-                  <TableCell className="font-semibold text-accent">{pay.amount}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{pay.method}</Badge>
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{pay.ref}</TableCell>
-                  <TableCell className="text-right">{pay.date}</TableCell>
                 </TableRow>
-              ))}
+              ) : filteredPayments.length > 0 ? (
+                filteredPayments.map((pay) => (
+                  <TableRow key={pay.id}>
+                    <TableCell className="text-xs text-muted-foreground">{new Date(pay.paymentDate).toLocaleDateString()}</TableCell>
+                    <TableCell className="font-mono text-xs">{pay.invoiceId}</TableCell>
+                    <TableCell className="font-semibold text-accent">KES {Number(pay.amount).toLocaleString()}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{pay.paymentMethod}</Badge>
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{pay.transactionReference}</TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                    No payment records found.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

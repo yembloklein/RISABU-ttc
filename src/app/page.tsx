@@ -1,12 +1,13 @@
+"use client"
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { 
   Users, 
   UserPlus, 
-  TrendingUp, 
   Wallet, 
   ArrowUpRight, 
-  ArrowDownRight,
-  Clock
+  Clock,
+  Loader2
 } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { 
@@ -18,13 +19,36 @@ import {
   TableRow 
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { useFirestore, useCollection, useMemoFirebase } from "@/firebase"
+import { collection, query, orderBy, limit } from "firebase/firestore"
 
 export default function Dashboard() {
+  const firestore = useFirestore()
+
+  const studentsRef = useMemoFirebase(() => firestore ? collection(firestore, "students") : null, [firestore])
+  const invoicesRef = useMemoFirebase(() => firestore ? collection(firestore, "invoices") : null, [firestore])
+  const paymentsRef = useMemoFirebase(() => firestore ? collection(firestore, "payments") : null, [firestore])
+  
+  const recentInvoicesQuery = useMemoFirebase(() => {
+    if (!firestore) return null
+    return query(collection(firestore, "invoices"), orderBy("createdAt", "desc"), limit(5))
+  }, [firestore])
+
+  const { data: students, isLoading: loadingStudents } = useCollection(studentsRef)
+  const { data: invoices, isLoading: loadingInvoices } = useCollection(invoicesRef)
+  const { data: payments, isLoading: loadingPayments } = useCollection(paymentsRef)
+  const { data: recentInvoices } = useCollection(recentInvoicesQuery)
+
+  const totalStudents = (students || []).filter(s => s.admissionStatus === "Enrolled").length
+  const newAdmissions = (students || []).filter(s => s.admissionStatus === "Approved" || s.admissionStatus === "Applied").length
+  const totalRevenue = (payments || []).reduce((acc, p) => acc + (Number(p.amount) || 0), 0)
+  const totalOutstanding = (invoices || []).reduce((acc, i) => acc + (Number(i.outstandingAmount) || 0), 0)
+
   const stats = [
     {
       title: "Total Students",
-      value: "1,248",
-      change: "+12%",
+      value: totalStudents.toLocaleString(),
+      change: "+0%",
       trending: "up",
       icon: Users,
       color: "text-blue-600",
@@ -32,8 +56,8 @@ export default function Dashboard() {
     },
     {
       title: "New Admissions",
-      value: "156",
-      change: "+8%",
+      value: newAdmissions.toLocaleString(),
+      change: "+0%",
       trending: "up",
       icon: UserPlus,
       color: "text-primary",
@@ -41,8 +65,8 @@ export default function Dashboard() {
     },
     {
       title: "Total Revenue",
-      value: "KES 4.2M",
-      change: "+24%",
+      value: `KES ${totalRevenue.toLocaleString()}`,
+      change: "+0%",
       trending: "up",
       icon: Wallet,
       color: "text-accent",
@@ -50,8 +74,8 @@ export default function Dashboard() {
     },
     {
       title: "Outstanding",
-      value: "KES 850k",
-      change: "-5%",
+      value: `KES ${totalOutstanding.toLocaleString()}`,
+      change: "-0%",
       trending: "down",
       icon: Clock,
       color: "text-orange-600",
@@ -59,12 +83,7 @@ export default function Dashboard() {
     },
   ]
 
-  const recentInvoices = [
-    { id: "INV-001", student: "John Doe", amount: "KES 45,000", status: "Paid", date: "2024-03-01" },
-    { id: "INV-002", student: "Jane Smith", amount: "KES 32,500", status: "Pending", date: "2024-03-02" },
-    { id: "INV-003", student: "Michael Johnson", amount: "KES 28,000", status: "Overdue", date: "2024-02-15" },
-    { id: "INV-004", student: "Sarah Williams", amount: "KES 50,000", status: "Paid", date: "2024-03-03" },
-  ]
+  const isLoading = loadingStudents || loadingInvoices || loadingPayments
 
   return (
     <div className="space-y-8">
@@ -85,18 +104,18 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <div className="flex items-center text-xs mt-1">
-                {stat.trending === "up" ? (
-                  <ArrowUpRight className="h-3 w-3 text-primary mr-1" />
-                ) : (
-                  <ArrowDownRight className="h-3 w-3 text-destructive mr-1" />
-                )}
-                <span className={stat.trending === "up" ? "text-primary" : "text-destructive"}>
-                  {stat.change}
-                </span>
-                <span className="text-muted-foreground ml-1">from last month</span>
-              </div>
+              {isLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">{stat.value}</div>
+                  <div className="flex items-center text-xs mt-1">
+                    <ArrowUpRight className="h-3 w-3 text-primary mr-1" />
+                    <span className="text-primary">{stat.change}</span>
+                    <span className="text-muted-foreground ml-1">from last month</span>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         ))}
@@ -108,39 +127,47 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>Recent Financial Activity</CardTitle>
-                <CardDescription>Latest invoices and student payments</CardDescription>
+                <CardDescription>Latest invoices generated</CardDescription>
               </div>
-              <Badge variant="outline" className="text-xs">Last 30 days</Badge>
+              <Badge variant="outline" className="text-xs">Real-time</Badge>
             </div>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Invoice ID</TableHead>
-                  <TableHead>Student</TableHead>
+                  <TableHead>Invoice #</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentInvoices.map((invoice) => (
-                  <TableRow key={invoice.id}>
-                    <TableCell className="font-medium">{invoice.id}</TableCell>
-                    <TableCell>{invoice.student}</TableCell>
-                    <TableCell>{invoice.amount}</TableCell>
-                    <TableCell>
-                      <Badge variant={
-                        invoice.status === "Paid" ? "default" : 
-                        invoice.status === "Pending" ? "secondary" : "destructive"
-                      }>
-                        {invoice.status}
-                      </Badge>
+                {recentInvoices && recentInvoices.length > 0 ? (
+                  recentInvoices.map((invoice) => (
+                    <TableRow key={invoice.id}>
+                      <TableCell className="font-medium font-mono text-xs">{invoice.invoiceNumber}</TableCell>
+                      <TableCell>KES {Number(invoice.totalAmount).toLocaleString()}</TableCell>
+                      <TableCell>
+                        <Badge variant={
+                          invoice.status === "Paid" ? "default" : 
+                          invoice.status === "Issued" ? "secondary" : "destructive"
+                        }>
+                          {invoice.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-xs text-muted-foreground">
+                        {invoice.issueDate}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
+                      No recent invoices found.
                     </TableCell>
-                    <TableCell className="text-right">{invoice.date}</TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </CardContent>
@@ -148,8 +175,8 @@ export default function Dashboard() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Enrollment Capacity</CardTitle>
-            <CardDescription>Tracking departmental admissions</CardDescription>
+            <CardTitle>Enrollment Distribution</CardTitle>
+            <CardDescription>Estimated departmental capacity</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
@@ -172,13 +199,6 @@ export default function Dashboard() {
                 <span className="text-muted-foreground">91%</span>
               </div>
               <Progress value={91} className="h-2" />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="font-medium">Applied Sciences</span>
-                <span className="text-muted-foreground">45%</span>
-              </div>
-              <Progress value={45} className="h-2" />
             </div>
           </CardContent>
         </Card>
