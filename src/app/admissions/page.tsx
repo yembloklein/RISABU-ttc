@@ -71,6 +71,11 @@ export default function AdmissionsPage() {
     return collection(firestore, "programs");
   }, [firestore, user]);
 
+  const invoicesRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return collection(firestore, "invoices");
+  }, [firestore, user]);
+
   const { data: students, isLoading } = useCollection(studentsRef);
   const { data: programs, isLoading: isLoadingPrograms } = useCollection(programsRef);
 
@@ -133,7 +138,7 @@ export default function AdmissionsPage() {
   };
 
   const handleStatusUpdate = (studentId: string, status: string) => {
-    if (!firestore) return;
+    if (!firestore || !user) return;
     const docRef = doc(firestore, "students", studentId);
     
     const updateData: any = {
@@ -144,16 +149,42 @@ export default function AdmissionsPage() {
     if (status === "Enrolled") {
       const student = (students || []).find(s => s.id === studentId);
       if (student && !student.admissionNumber) {
-        updateData.admissionNumber = generateAdmissionNumber();
-        updateData.status = "Active"; // Initial status for enrolled students
+        const admNo = generateAdmissionNumber();
+        updateData.admissionNumber = admNo;
+        updateData.status = "Active";
+
+        // Logic Enhancement: Automated Initial Billing
+        const program = (programs || []).find(p => p.name === student.appliedCourse);
+        if (program && invoicesRef) {
+          const courseFee = Number(program.tuitionFee);
+          const invNumber = `INV-${Date.now().toString().slice(-6)}`;
+          
+          addDocumentNonBlocking(invoicesRef, {
+            studentId: studentId,
+            invoiceNumber: invNumber,
+            totalAmount: courseFee,
+            outstandingAmount: courseFee,
+            status: "Issued",
+            description: `Initial Tuition Fee - ${program.name}`,
+            issueDate: new Date().toISOString().split('T')[0],
+            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            recordedByUserFirebaseUid: user.uid,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+          
+          toast({ 
+            title: "Enrollment Complete", 
+            description: `Student enrolled (${admNo}) and tuition invoice generated.` 
+          });
+        }
       }
     }
 
     updateDocumentNonBlocking(docRef, updateData);
-    toast({ 
-      title: "Status Updated", 
-      description: `Student marked as ${status}. ${updateData.admissionNumber ? `ADM: ${updateData.admissionNumber}` : ''}` 
-    });
+    if (status !== "Enrolled") {
+      toast({ title: "Status Updated", description: `Student marked as ${status}.` });
+    }
   };
 
   const handleBulkImport = () => {

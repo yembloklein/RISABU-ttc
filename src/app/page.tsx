@@ -13,7 +13,9 @@ import {
   Loader2,
   TrendingUp,
   CreditCard,
-  Target
+  Target,
+  Activity,
+  Zap
 } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { 
@@ -35,6 +37,7 @@ export default function Dashboard() {
   const studentsRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "students") : null, [firestore, user])
   const invoicesRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "invoices") : null, [firestore, user])
   const paymentsRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "payments") : null, [firestore, user])
+  const expensesRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "expenses") : null, [firestore, user])
   
   const recentInvoicesQuery = useMemoFirebase(() => {
     if (!firestore || !user) return null
@@ -44,26 +47,30 @@ export default function Dashboard() {
   const { data: students, isLoading: loadingStudents } = useCollection(studentsRef)
   const { data: invoices, isLoading: loadingInvoices } = useCollection(invoicesRef)
   const { data: payments, isLoading: loadingPayments } = useCollection(paymentsRef)
+  const { data: expenses } = useCollection(expensesRef)
   const { data: recentInvoices } = useCollection(recentInvoicesQuery)
 
   const stats = useMemo(() => {
     const enrolled = (students || []).filter(s => s.admissionStatus === "Enrolled")
     const pending = (students || []).filter(s => s.admissionStatus === "Applied" || s.admissionStatus === "Approved")
     const revenue = (payments || []).filter(p => p.type === "Fee").reduce((acc, p) => acc + (Number(p.amount) || 0), 0)
+    const totalExpenses = (expenses || []).reduce((acc, e) => acc + (Number(e.amount) || 0), 0)
     const outstanding = (invoices || []).reduce((acc, i) => acc + (Number(i.outstandingAmount) || 0), 0)
     const totalBilled = (invoices || []).reduce((acc, i) => acc + (Number(i.totalAmount) || 0), 0)
+    
     const collectionRate = totalBilled > 0 ? (revenue / totalBilled) * 100 : 0
+    const sustainabilityRatio = totalExpenses > 0 ? (revenue / totalExpenses).toFixed(1) : "N/A"
 
     return {
       totalStudents: enrolled.length,
       newAdmissions: pending.length,
       totalRevenue: revenue,
       totalOutstanding: outstanding,
-      collectionRate: collectionRate.toFixed(1)
+      collectionRate: collectionRate.toFixed(1),
+      sustainabilityRatio
     }
-  }, [students, invoices, payments])
+  }, [students, invoices, payments, expenses])
 
-  // Dynamically calculate enrollment by course
   const enrollmentDistribution = useMemo(() => {
     const enrolled = (students || []).filter(s => s.admissionStatus === "Enrolled")
     const groups: Record<string, number> = {}
@@ -88,15 +95,15 @@ export default function Dashboard() {
     {
       title: "Enrolled Students",
       value: stats.totalStudents.toLocaleString(),
-      description: "Active in system",
+      description: "Active Scholars",
       icon: Users,
       color: "text-blue-600",
       bg: "bg-blue-50",
     },
     {
-      title: "Admission Funnel",
+      title: "Pending Applicants",
       value: stats.newAdmissions.toLocaleString(),
-      description: "Pending/Approved",
+      description: "Admission Pipeline",
       icon: UserPlus,
       color: "text-primary",
       bg: "bg-primary/10",
@@ -104,18 +111,18 @@ export default function Dashboard() {
     {
       title: "Fee Revenue",
       value: `KES ${stats.totalRevenue.toLocaleString()}`,
-      description: `${stats.collectionRate}% collection rate`,
+      description: `${stats.collectionRate}% Collect Rate`,
       icon: Wallet,
       color: "text-accent",
       bg: "bg-accent/10",
     },
     {
-      title: "Fee Arrears",
-      value: `KES ${stats.totalOutstanding.toLocaleString()}`,
-      description: "Immediate follow-up req.",
-      icon: Clock,
-      color: "text-orange-600",
-      bg: "bg-orange-50",
+      title: "Revenue/Expense Ratio",
+      value: `${stats.sustainabilityRatio}x`,
+      description: "Financial Sustainability",
+      icon: Activity,
+      color: "text-purple-600",
+      bg: "bg-purple-50",
     },
   ]
 
@@ -125,22 +132,22 @@ export default function Dashboard() {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-foreground tracking-tight">College Dashboard</h1>
+          <h1 className="text-3xl font-bold text-foreground tracking-tight">Institutional Dashboard</h1>
           <p className="text-muted-foreground mt-1">
-            Real-time operational metrics for {user?.email === "clainyemblo@gmail.com" ? "Super Admin" : "College Staff"}
+            Operational Intelligence for {user?.email === "clainyemblo@gmail.com" ? "Super Admin" : "Staff"}
           </p>
         </div>
-        <div className="flex items-center gap-2 bg-muted/50 px-4 py-2 rounded-full border">
-          <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-          <span className="text-xs font-medium uppercase tracking-wider">Live System Status</span>
+        <div className="flex items-center gap-2 bg-muted/50 px-4 py-2 rounded-full border shadow-sm">
+          <Zap className="h-3.5 w-3.5 text-primary animate-pulse" />
+          <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Real-time Performance Metrics</span>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {cards.map((stat) => (
-          <Card key={stat.title} className="border-none shadow-sm ring-1 ring-border">
+          <Card key={stat.title} className="border-none shadow-sm ring-1 ring-border hover:ring-primary/30 transition-all">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <CardTitle className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 {stat.title}
               </CardTitle>
               <div className={`${stat.bg} p-2 rounded-lg`}>
@@ -153,7 +160,7 @@ export default function Dashboard() {
               ) : (
                 <>
                   <div className="text-2xl font-bold">{stat.value}</div>
-                  <p className="text-xs text-muted-foreground mt-1 flex items-center">
+                  <p className="text-[10px] text-muted-foreground mt-1 flex items-center">
                     <TrendingUp className="h-3 w-3 mr-1 text-primary" />
                     {stat.description}
                   </p>
@@ -169,11 +176,11 @@ export default function Dashboard() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg">Recent Financials</CardTitle>
-                <CardDescription>Latest generated fee invoices</CardDescription>
+                <CardTitle className="text-lg">Recent Ledger Activity</CardTitle>
+                <CardDescription>Latest student billing operations</CardDescription>
               </div>
               <Button variant="ghost" size="sm" className="text-xs text-primary" asChild>
-                <a href="/finance/invoices">View All</a>
+                <a href="/finance/invoices">View Full Ledger</a>
               </Button>
             </div>
           </CardHeader>
@@ -181,10 +188,10 @@ export default function Dashboard() {
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="h-9">Invoice #</TableHead>
+                  <TableHead className="h-9">Invoice Ref</TableHead>
                   <TableHead className="h-9">Amount</TableHead>
                   <TableHead className="h-9">Status</TableHead>
-                  <TableHead className="h-9 text-right">Date</TableHead>
+                  <TableHead className="h-9 text-right">Issue Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -192,12 +199,12 @@ export default function Dashboard() {
                   recentInvoices.map((invoice) => (
                     <TableRow key={invoice.id} className="hover:bg-muted/10 transition-colors">
                       <TableCell className="font-mono text-xs font-semibold">{invoice.invoiceNumber}</TableCell>
-                      <TableCell className="font-medium">KES {Number(invoice.totalAmount).toLocaleString()}</TableCell>
+                      <TableCell className="font-medium text-sm">KES {Number(invoice.totalAmount).toLocaleString()}</TableCell>
                       <TableCell>
                         <Badge variant={
                           invoice.status === "Paid" ? "default" : 
                           invoice.status === "Issued" ? "secondary" : "destructive"
-                        } className="rounded-md text-[10px] px-1.5 py-0 h-5">
+                        } className="rounded-md text-[9px] px-1.5 py-0 h-4 uppercase font-bold">
                           {invoice.status}
                         </Badge>
                       </TableCell>
@@ -223,44 +230,45 @@ export default function Dashboard() {
             <CardHeader className="pb-4">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Target className="h-4 w-4 text-primary" />
-                Enrollment Mix
+                Departmental Mix
               </CardTitle>
-              <CardDescription>Distribution across departments</CardDescription>
+              <CardDescription>Scholar distribution by course</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               {enrollmentDistribution.length > 0 ? (
                 enrollmentDistribution.map((item) => (
                   <div key={item.name} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs font-medium">
+                    <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-tight">
                       <span className="truncate max-w-[150px]">{item.name}</span>
                       <span className="text-muted-foreground">{item.percentage}%</span>
                     </div>
-                    <Progress value={item.percentage} className="h-1.5" />
+                    <Progress value={item.percentage} className="h-1.5 bg-muted" />
                   </div>
                 ))
               ) : (
                 <div className="py-10 text-center bg-muted/20 rounded-lg border border-dashed">
-                  <p className="text-xs text-muted-foreground italic">No enrolled students yet</p>
+                  <p className="text-xs text-muted-foreground italic">No enrolled data</p>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <Card className="bg-primary border-none shadow-lg text-primary-foreground">
+          <Card className="bg-primary border-none shadow-lg text-primary-foreground relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 -mr-16 -mt-16 rounded-full group-hover:bg-white/10 transition-all" />
             <CardHeader>
               <CardTitle className="text-md flex items-center gap-2">
                 <CreditCard className="h-4 w-4" />
-                Quick Action
+                Quick Operations
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-xs opacity-90">Manage financial records or record a new student payment instantly.</p>
-              <div className="grid grid-cols-2 gap-2">
-                <Button variant="secondary" size="sm" className="text-xs h-8" asChild>
-                  <a href="/finance/fees">Record Fee</a>
+              <p className="text-xs opacity-80 leading-relaxed">Instantly manage financial logs or add new scholars to the institutional directory.</p>
+              <div className="grid grid-cols-2 gap-2 relative z-10">
+                <Button variant="secondary" size="sm" className="text-[10px] h-8 font-bold uppercase" asChild>
+                  <a href="/finance/fees">Collect Fee</a>
                 </Button>
-                <Button variant="secondary" size="sm" className="text-xs h-8" asChild>
-                  <a href="/admissions">Add Student</a>
+                <Button variant="secondary" size="sm" className="text-[10px] h-8 font-bold uppercase" asChild>
+                  <a href="/admissions">Add Scholar</a>
                 </Button>
               </div>
             </CardContent>
