@@ -23,7 +23,8 @@ import {
   UserX,
   Printer,
   Award,
-  FileBadge
+  FileBadge,
+  Edit2
 } from "lucide-react"
 import { 
   Sheet, 
@@ -42,6 +43,16 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, doc, serverTimestamp } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
@@ -51,6 +62,20 @@ export default function StudentsPage() {
   const [activeTab, setActiveTab] = useState("Active")
   const [selectedStudent, setSelectedStudent] = useState<any>(null)
   const [printMode, setPrintMode] = useState<'id' | 'certificate' | null>(null)
+  
+  // Edit State
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editFormData, setEditFormData] = useState<any>({
+    firstName: "",
+    lastName: "",
+    contactEmail: "",
+    contactPhone: "",
+    address: "",
+    appliedCourse: "",
+    gender: "",
+    dateOfBirth: "",
+    status: ""
+  })
 
   const firestore = useFirestore()
   const { user } = useUser()
@@ -92,6 +117,38 @@ export default function StudentsPage() {
       title: "Status Updated",
       description: `Student status changed to ${newStatus}.`,
     });
+  };
+
+  const handleOpenEditDialog = (student: any) => {
+    setEditFormData({
+      firstName: student.firstName || "",
+      lastName: student.lastName || "",
+      contactEmail: student.contactEmail || "",
+      contactPhone: student.contactPhone || "",
+      address: student.address || "",
+      appliedCourse: student.appliedCourse || "",
+      gender: student.gender || "",
+      dateOfBirth: student.dateOfBirth || "",
+      status: student.status || "Active"
+    })
+    setIsEditDialogOpen(true)
+  }
+
+  const handleSaveEdit = () => {
+    if (!firestore || !selectedStudent) return;
+    
+    const docRef = doc(firestore, "students", selectedStudent.id);
+    updateDocumentNonBlocking(docRef, {
+      ...editFormData,
+      updatedAt: serverTimestamp(),
+    });
+    
+    toast({
+      title: "Profile Updated",
+      description: "The student record has been successfully updated.",
+    });
+    
+    setIsEditDialogOpen(false);
   };
 
   const handlePrintID = (student: any) => {
@@ -327,6 +384,9 @@ export default function StudentsPage() {
                       <DropdownMenuItem onClick={() => setSelectedStudent(student)}>
                         <UserCircle className="mr-2 h-4 w-4" /> View Full Profile
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleOpenEditDialog(student)}>
+                        <Edit2 className="mr-2 h-4 w-4 text-primary" /> Edit Record
+                      </DropdownMenuItem>
                       {student.status === "Graduated" && (
                         <DropdownMenuItem onClick={() => handlePrintCertificate(student)}>
                           <Award className="mr-2 h-4 w-4 text-primary" /> Print Certificate
@@ -484,7 +544,13 @@ export default function StudentsPage() {
                                 <Printer className="h-4 w-4 mr-2" />
                                 Print ID Card
                               </Button>
-                              <Button variant="outline" className="flex-1">Edit Records</Button>
+                              <Button 
+                                variant="outline" 
+                                className="flex-1"
+                                onClick={() => handleOpenEditDialog(selectedStudent)}
+                              >
+                                Edit Records
+                              </Button>
                             </div>
                             {selectedStudent?.status === "Graduated" && (
                               <Button className="w-full bg-accent hover:bg-accent/90" onClick={() => handlePrintCertificate(selectedStudent)}>
@@ -516,6 +582,125 @@ export default function StudentsPage() {
           )}
         </div>
       )}
+
+      {/* Edit Student Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Student Record</DialogTitle>
+            <DialogDescription>Update the professional and personal information for this student.</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-6 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-fName">First Name</Label>
+                <Input 
+                  id="edit-fName" 
+                  value={editFormData.firstName} 
+                  onChange={(e) => setEditFormData({...editFormData, firstName: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-lName">Last Name</Label>
+                <Input 
+                  id="edit-lName" 
+                  value={editFormData.lastName} 
+                  onChange={(e) => setEditFormData({...editFormData, lastName: e.target.value})}
+                />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">Contact Email</Label>
+                <Input 
+                  id="edit-email" 
+                  type="email" 
+                  value={editFormData.contactEmail} 
+                  onChange={(e) => setEditFormData({...editFormData, contactEmail: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-phone">Contact Phone</Label>
+                <Input 
+                  id="edit-phone" 
+                  value={editFormData.contactPhone} 
+                  onChange={(e) => setEditFormData({...editFormData, contactPhone: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-address">Physical Address</Label>
+              <Input 
+                id="edit-address" 
+                value={editFormData.address} 
+                onChange={(e) => setEditFormData({...editFormData, address: e.target.value})}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-course">Course Program</Label>
+                <Input 
+                  id="edit-course" 
+                  value={editFormData.appliedCourse} 
+                  onChange={(e) => setEditFormData({...editFormData, appliedCourse: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-dob">Date of Birth</Label>
+                <Input 
+                  id="edit-dob" 
+                  type="date"
+                  value={editFormData.dateOfBirth} 
+                  onChange={(e) => setEditFormData({...editFormData, dateOfBirth: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Gender</Label>
+                <Select 
+                  onValueChange={(v) => setEditFormData({...editFormData, gender: v})} 
+                  defaultValue={editFormData.gender}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Male">Male</SelectItem>
+                    <SelectItem value="Female">Female</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Academic Status</Label>
+                <Select 
+                  onValueChange={(v) => setEditFormData({...editFormData, status: v})} 
+                  defaultValue={editFormData.status}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="On Leave">On Leave</SelectItem>
+                    <SelectItem value="Graduated">Graduated</SelectItem>
+                    <SelectItem value="Withdrawn">Withdrawn</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveEdit} className="bg-primary">Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
