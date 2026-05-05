@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useMemo } from "react"
@@ -22,7 +21,9 @@ import {
   CheckCircle2,
   Clock,
   UserX,
-  Printer
+  Printer,
+  Award,
+  FileBadge
 } from "lucide-react"
 import { 
   Sheet, 
@@ -49,6 +50,7 @@ export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [activeTab, setActiveTab] = useState("Active")
   const [selectedStudent, setSelectedStudent] = useState<any>(null)
+  const [printMode, setPrintMode] = useState<'id' | 'certificate' | null>(null)
 
   const firestore = useFirestore()
   const { user } = useUser()
@@ -92,21 +94,30 @@ export default function StudentsPage() {
     });
   };
 
-  const handlePrintID = () => {
-    window.print();
+  const handlePrintID = (student: any) => {
+    setSelectedStudent(student);
+    setPrintMode('id');
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  };
+
+  const handlePrintCertificate = (student: any) => {
+    setSelectedStudent(student);
+    setPrintMode('certificate');
+    setTimeout(() => {
+      window.print();
+    }, 100);
   };
 
   return (
     <div className="space-y-6">
-      {/* Printable ID Card Component (Hidden in UI, visible on Print) */}
-      {selectedStudent && (
+      {/* Printable ID Card Component */}
+      {selectedStudent && printMode === 'id' && (
         <div id="id-card-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999]">
           <div className="flex items-center justify-center h-screen bg-white">
             <div className="w-[3.375in] h-[2.125in] border-[3px] border-primary rounded-xl overflow-hidden flex flex-col relative bg-white shadow-none">
-              {/* Green Sidebar Accent */}
               <div className="absolute left-0 top-0 bottom-0 w-2 bg-primary"></div>
-              
-              {/* Card Header */}
               <div className="bg-primary p-2 flex items-center gap-3 pl-4">
                 <div className="bg-white p-1 rounded-md shadow-sm">
                   <GraduationCap className="h-4 w-4 text-primary" />
@@ -119,8 +130,6 @@ export default function StudentsPage() {
                    <span className="text-[7px] font-bold text-white/50 uppercase">Student ID</span>
                 </div>
               </div>
-              
-              {/* Card Body */}
               <div className="flex p-3 gap-4 flex-1 pl-4">
                 <div className="w-20 h-24 bg-muted rounded-lg overflow-hidden border-2 border-primary/20 shadow-sm">
                   <img 
@@ -152,8 +161,6 @@ export default function StudentsPage() {
                   </div>
                 </div>
               </div>
-
-              {/* Card Footer */}
               <div className="border-t border-primary/10 px-4 py-1.5 flex justify-between items-center bg-primary/[0.03]">
                 <span className="text-[6px] font-bold text-primary/60 italic">Official Institutional Identity Card</span>
                 <div className="flex flex-col items-end">
@@ -162,6 +169,77 @@ export default function StudentsPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Printable Graduation Certificate Component */}
+      {selectedStudent && printMode === 'certificate' && (
+        <div id="certificate-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999]">
+          <div className="w-[11in] h-[8.5in] border-[12px] border-primary p-12 bg-white flex flex-col items-center justify-between text-center relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 -mr-32 -mt-32 rounded-full"></div>
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/5 -ml-32 -mb-32 rounded-full"></div>
+            
+            <header className="space-y-4">
+              <div className="flex items-center justify-center gap-4">
+                <div className="bg-primary p-4 rounded-xl shadow-lg">
+                  <GraduationCap className="h-12 w-12 text-white" />
+                </div>
+                <div className="text-left">
+                  <h1 className="text-4xl font-black text-primary uppercase tracking-tighter">Risabu Technical</h1>
+                  <h2 className="text-2xl font-bold text-slate-700 uppercase tracking-widest -mt-1">Training College</h2>
+                </div>
+              </div>
+              <div className="w-full h-1 bg-primary/20 rounded-full mx-auto max-w-2xl"></div>
+            </header>
+
+            <main className="space-y-10 flex-1 flex flex-col justify-center">
+              <div className="space-y-2">
+                <span className="text-xl font-bold italic text-primary/60 uppercase tracking-widest">This is to certify that</span>
+                <h3 className="text-6xl font-black text-slate-900 py-4 decoration-primary decoration-4 underline-offset-8">
+                  {selectedStudent.firstName} {selectedStudent.lastName}
+                </h3>
+              </div>
+
+              <div className="space-y-4">
+                <span className="text-xl font-medium text-slate-600">has successfully fulfilled the requirements for the award of</span>
+                <div className="bg-primary/5 py-6 px-12 rounded-2xl border-2 border-primary/10 inline-block">
+                  <h4 className="text-4xl font-black text-primary uppercase tracking-tight">
+                    {selectedStudent.appliedCourse || "Professional Certification"}
+                  </h4>
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-2">
+                <span className="text-lg text-slate-500 italic">Given this day of {new Date().toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                <Badge className="px-6 py-2 text-lg rounded-full bg-primary/10 text-primary border-primary/20 font-bold">
+                  Class of {new Date().getFullYear()}
+                </Badge>
+              </div>
+            </main>
+
+            <footer className="w-full flex justify-around items-end pt-12">
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-48 border-b-2 border-slate-300 h-12 flex items-center justify-center italic text-slate-400">
+                  <span className="font-mono text-xs opacity-30 uppercase tracking-[0.2em]">{selectedStudent.id.substring(0, 12)}</span>
+                </div>
+                <span className="text-sm font-bold text-slate-600 uppercase tracking-widest">Registrar</span>
+              </div>
+              
+              <div className="relative">
+                <div className="w-32 h-32 border-4 border-primary/20 rounded-full flex items-center justify-center">
+                   <FileBadge className="h-16 w-16 text-primary/30" />
+                </div>
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary/10 font-black text-xl uppercase rotate-45 pointer-events-none">
+                  OFFICIAL SEAL
+                </div>
+              </div>
+
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-48 border-b-2 border-slate-300 h-12"></div>
+                <span className="text-sm font-bold text-slate-600 uppercase tracking-widest">Principal</span>
+              </div>
+            </footer>
           </div>
         </div>
       )}
@@ -235,8 +313,13 @@ export default function StudentsPage() {
                       <DropdownMenuItem onClick={() => setSelectedStudent(student)}>
                         <UserCircle className="mr-2 h-4 w-4" /> View Full Profile
                       </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Mail className="mr-2 h-4 w-4" /> Email Student
+                      {student.status === "Graduated" && (
+                        <DropdownMenuItem onClick={() => handlePrintCertificate(student)}>
+                          <Award className="mr-2 h-4 w-4 text-primary" /> Print Certificate
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem onClick={() => handlePrintID(student)}>
+                        <Printer className="mr-2 h-4 w-4" /> Print ID Card
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground">Manage Status</DropdownMenuLabel>
@@ -381,12 +464,20 @@ export default function StudentsPage() {
                             </div>
                           </section>
                           
-                          <div className="flex gap-2 pt-6">
-                            <Button className="flex-1 bg-primary" onClick={handlePrintID}>
-                              <Printer className="h-4 w-4 mr-2" />
-                              Print ID Card
-                            </Button>
-                            <Button variant="outline" className="flex-1">Edit Records</Button>
+                          <div className="flex flex-col gap-2 pt-6">
+                            <div className="flex gap-2">
+                              <Button className="flex-1 bg-primary" onClick={() => handlePrintID(selectedStudent)}>
+                                <Printer className="h-4 w-4 mr-2" />
+                                Print ID Card
+                              </Button>
+                              <Button variant="outline" className="flex-1">Edit Records</Button>
+                            </div>
+                            {selectedStudent?.status === "Graduated" && (
+                              <Button className="w-full bg-accent hover:bg-accent/90" onClick={() => handlePrintCertificate(selectedStudent)}>
+                                <Award className="h-4 w-4 mr-2" />
+                                Print Graduation Certificate
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </SheetContent>
