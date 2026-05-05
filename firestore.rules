@@ -1,3 +1,4 @@
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -57,8 +58,8 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isOwner(userId) || isInternal();
       allow list: if isInternal();
-      allow create: if isOwner(userId) && request.resource.data.firebaseUid == userId;
-      allow update: if (isOwner(userId) || isAdmin()) && request.resource.data.firebaseUid == resource.data.firebaseUid;
+      allow create: if (isOwner(userId) && request.resource.data.firebaseUid == userId) || isAdmin();
+      allow update: if (isOwner(userId) || isAdmin()) && (isAdmin() || request.resource.data.firebaseUid == resource.data.firebaseUid);
       allow delete: if isAdmin();
     }
 
@@ -72,7 +73,7 @@ service cloud.firestore {
     match /roles_staff/{userId} {
       allow get: if isSignedIn();
       allow list: if isAdmin();
-      allow create: if isSignedIn(); 
+      allow create: if isSignedIn() || isAdmin(); 
       allow update, delete: if isAdmin();
     }
 
