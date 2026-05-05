@@ -7,14 +7,16 @@ import {
   TrendingUp, 
   AlertTriangle, 
   CheckCircle2, 
-  BrainCircuit,
+  FileBarChart,
   Calendar,
   RefreshCcw,
   ArrowUpRight,
   ArrowDownRight,
-  BarChart3,
   PieChart as PieChartIcon,
-  Info
+  Info,
+  DollarSign,
+  Users,
+  AlertCircle
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -26,10 +28,10 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { useFirestore, useCollection, useMemoFirebase, useUser } from "@/firebase"
 import { collection } from "firebase/firestore"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { Bar, BarChart, XAxis, YAxis, ResponsiveContainer, Cell, Pie, PieChart } from "recharts"
+import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts"
 
-export default function AIInsightsPage() {
-  const [loading, setLoading] = useState(false)
+export default function FinancialReportsPage() {
+  const [loadingAI, setLoadingAI] = useState(false)
   const [summary, setSummary] = useState<AdminFinancialTrendSummaryOutput | null>(null)
   const [selectedAnomalyIndex, setSelectedAnomalyIndex] = useState<number | null>(null)
   const [anomalyResult, setAnomalyResult] = useState<AdminUnusualExpenseDetectionOutput | null>(null)
@@ -38,89 +40,100 @@ export default function AIInsightsPage() {
   const firestore = useFirestore()
   const { user } = useUser()
   
-  const expensesRef = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return collection(firestore, "expenses");
-  }, [firestore, user]);
+  const expensesRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "expenses") : null, [firestore, user])
+  const paymentsRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "payments") : null, [firestore, user])
+  const invoicesRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "invoices") : null, [firestore, user])
+  const studentsRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "students") : null, [firestore, user])
   
-  const { data: realExpenses, isLoading: loadingExpenses } = useCollection(expensesRef)
+  const { data: expenses, isLoading: loadingExpenses } = useCollection(expensesRef)
+  const { data: payments, isLoading: loadingPayments } = useCollection(paymentsRef)
+  const { data: invoices, isLoading: loadingInvoices } = useCollection(invoicesRef)
+  const { data: students } = useCollection(studentsRef)
 
-  // Period Analysis Logic
-  const periodAnalysis = useMemo(() => {
-    if (!realExpenses || realExpenses.length === 0) return null;
-
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
+  // Sustainability Logic (Revenue vs. Expenses)
+  const financialBalance = useMemo(() => {
+    const totalRev = (payments || []).reduce((acc, p) => acc + (Number(p.amount) || 0), 0)
+    const totalExp = (expenses || []).reduce((acc, e) => acc + (Number(e.amount) || 0), 0)
+    const net = totalRev - totalExp
     
-    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-    const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
-
-    const currentPeriod: Record<string, number> = {};
-    const previousPeriod: Record<string, number> = {};
-
-    realExpenses.forEach(exp => {
-      const expDate = new Date(exp.expenseDate);
-      const m = expDate.getMonth();
-      const y = expDate.getFullYear();
-      const cat = exp.categoryId || "General";
-      const amt = Number(exp.amount) || 0;
-
-      if (m === currentMonth && y === currentYear) {
-        currentPeriod[cat] = (currentPeriod[cat] || 0) + amt;
-      } else if (m === prevMonth && y === prevYear) {
-        previousPeriod[cat] = (previousPeriod[cat] || 0) + amt;
-      }
-    });
-
-    const formatForAI = (obj: Record<string, number>) => 
-      Object.entries(obj).map(([category, amount]) => ({ category, amount }));
-
-    const chartData = Object.entries(currentPeriod).map(([name, value]) => ({
-      name,
-      value
-    })).sort((a, b) => b.value - a.value);
-
     return {
-      current: formatForAI(currentPeriod),
-      previous: formatForAI(previousPeriod),
-      chartData,
-      currentDesc: now.toLocaleString('default', { month: 'long', year: 'numeric' }),
-      prevDesc: new Date(prevYear, prevMonth).toLocaleString('default', { month: 'long', year: 'numeric' })
-    };
-  }, [realExpenses]);
+      totalRev,
+      totalExp,
+      net,
+      ratio: totalExp > 0 ? (totalRev / totalExp).toFixed(2) : "0"
+    }
+  }, [payments, expenses])
 
-  const handleGenerateSummary = async () => {
-    if (!periodAnalysis) return;
-    setLoading(true)
+  // Debtors Aging (Arrears)
+  const topDebtors = useMemo(() => {
+    const debtMap: Record<string, number> = {}
+    
+    ;(invoices || []).forEach(inv => {
+      debtMap[inv.studentId] = (debtMap[inv.studentId] || 0) + (Number(inv.outstandingAmount) || 0)
+    })
+
+    return Object.entries(debtMap)
+      .map(([studentId, amount]) => {
+        const student = (students || []).find(s => s.id === studentId)
+        return {
+          id: studentId,
+          name: student ? `${student.firstName} ${student.lastName}` : "Unknown Student",
+          course: student?.appliedCourse || "N/A",
+          amount
+        }
+      })
+      .filter(d => d.amount > 0)
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5)
+  }, [invoices, students])
+
+  // Chart Data for Sustainability
+  const pieData = [
+    { name: "Revenue", value: financialBalance.totalRev, fill: "hsl(var(--primary))" },
+    { name: "Expenses", value: financialBalance.totalExp, fill: "hsl(var(--destructive))" },
+  ]
+
+  const handleGenerateAISummary = async () => {
+    if (!expenses) return
+    setLoadingAI(true)
+    
+    // Grouping for AI
+    const now = new Date()
+    const currentMonth = now.getMonth()
+    const currentYear = now.getFullYear()
+    
+    const cur = expenses.filter(e => {
+      const d = new Date(e.expenseDate)
+      return d.getMonth() === currentMonth && d.getFullYear() === currentYear
+    })
     
     try {
       const result = await adminFinancialTrendSummary({
         currentPeriodData: {
-          periodDescription: periodAnalysis.currentDesc,
-          expenses: periodAnalysis.current
+          periodDescription: now.toLocaleString('default', { month: 'long', year: 'numeric' }),
+          expenses: cur.map(e => ({ category: e.categoryId || 'General', amount: Number(e.amount) }))
         },
         previousPeriodData: {
-          periodDescription: periodAnalysis.prevDesc,
-          expenses: periodAnalysis.previous
+          periodDescription: "Historical Baseline",
+          expenses: expenses.map(e => ({ category: e.categoryId || 'General', amount: Number(e.amount) }))
         },
         currency: "KES"
       })
       setSummary(result)
     } catch (error) {
-      console.error("Failed to generate summary", error)
+      console.error("AI Generation failed", error)
     } finally {
-      setLoading(false)
+      setLoadingAI(false)
     }
   }
 
   const handleAnalyzeAnomaly = async (index: number) => {
-    if (!realExpenses) return;
+    if (!expenses) return;
     setSelectedAnomalyIndex(index)
     setAnomalyResult(null)
     setAnalyzingAnomaly(true)
     
-    const historical = realExpenses.filter((_, i) => i !== index).map(e => ({
+    const historical = expenses.filter((_, i) => i !== index).map(e => ({
       category: e.categoryId || 'General',
       amount: Number(e.amount),
       date: e.expenseDate,
@@ -128,10 +141,10 @@ export default function AIInsightsPage() {
     }))
 
     const newExp = {
-      category: realExpenses[index].categoryId || 'General',
-      amount: Number(realExpenses[index].amount),
-      date: realExpenses[index].expenseDate,
-      description: realExpenses[index].description
+      category: expenses[index].categoryId || 'General',
+      amount: Number(expenses[index].amount),
+      date: expenses[index].expenseDate,
+      description: expenses[index].description
     }
 
     try {
@@ -141,242 +154,207 @@ export default function AIInsightsPage() {
       })
       setAnomalyResult(result)
     } catch (error) {
-      console.error("Failed to analyze expense", error)
+      console.error("Anomaly audit failed", error)
     } finally {
       setAnalyzingAnomaly(false)
     }
   }
 
-  const chartConfig = {
-    value: { label: "Amount (KES)", color: "hsl(var(--primary))" }
-  };
-
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 border-b pb-8">
-        <div className="space-y-1">
-          <h1 className="text-4xl font-extrabold tracking-tight flex items-center gap-3 text-foreground">
-            <BrainCircuit className="h-10 w-10 text-primary" />
-            Strategic Insights
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
+            <FileBarChart className="h-8 w-8 text-primary" />
+            Financial Audit & Strategy
           </h1>
-          <p className="text-muted-foreground text-lg">AI-powered fiscal analysis and anomaly detection for Risabu College.</p>
+          <p className="text-muted-foreground">Comprehensive reporting and institutional health analysis.</p>
         </div>
         <Button 
-          size="lg"
-          onClick={handleGenerateSummary} 
-          disabled={loading || !periodAnalysis} 
-          className="bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20 h-14 px-8 rounded-2xl transition-all hover:scale-[1.02] active:scale-[0.98]"
+          onClick={handleGenerateAISummary} 
+          disabled={loadingAI || !expenses?.length}
+          variant="secondary"
+          className="shadow-sm border border-primary/20"
         >
-          {loading ? <RefreshCcw className="mr-2 h-5 w-5 animate-spin" /> : <Sparkles className="mr-2 h-5 w-5" />}
-          Generate Financial Analysis
+          {loadingAI ? <RefreshCcw className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4 text-primary" />}
+          Run AI Strategic Audit
         </Button>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
+        {/* Left Column: Core Financial Health */}
         <div className="xl:col-span-8 space-y-8">
-          {/* Spending Visualization */}
-          <Card className="border-none shadow-sm ring-1 ring-border">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-xl flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5 text-primary" />
-                  Spending Distribution
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="border-none ring-1 ring-border shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-primary" />
+                  Sustainability Ratio
                 </CardTitle>
-                <CardDescription>Visual breakdown of current period expenditures</CardDescription>
-              </div>
-              <Badge variant="outline" className="h-6">{periodAnalysis?.currentDesc || "Loading..."}</Badge>
+              </CardHeader>
+              <CardContent className="flex items-center justify-between">
+                <div>
+                  <div className="text-3xl font-bold">{financialBalance.ratio}x</div>
+                  <p className="text-xs text-muted-foreground mt-1">Revenue coverage vs Expenses</p>
+                </div>
+                <div className="h-[80px] w-[80px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        innerRadius={25}
+                        outerRadius={35}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-none ring-1 ring-border shadow-sm bg-destructive/[0.02]">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 text-destructive" />
+                  Outstanding Arrears
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-destructive">
+                  KES {( (invoices || []).reduce((acc, i) => acc + (Number(i.outstandingAmount) || 0), 0) ).toLocaleString()}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Total uncollected student fees</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
+                Critical Collection List
+              </CardTitle>
+              <CardDescription>Top 5 students with the highest outstanding balances</CardDescription>
             </CardHeader>
-            <CardContent>
-              {loadingExpenses ? (
-                <Skeleton className="h-[300px] w-full" />
-              ) : periodAnalysis?.chartData.length ? (
-                <div className="h-[300px] w-full mt-4">
-                  <ChartContainer config={chartConfig} className="h-full w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={periodAnalysis.chartData}>
-                        <XAxis 
-                          dataKey="name" 
-                          stroke="#888888" 
-                          fontSize={12} 
-                          tickLine={false} 
-                          axisLine={false} 
-                        />
-                        <YAxis 
-                          stroke="#888888" 
-                          fontSize={12} 
-                          tickLine={false} 
-                          axisLine={false} 
-                          tickFormatter={(value) => `KES ${value.toLocaleString()}`}
-                        />
-                        <ChartTooltip content={<ChartTooltipContent />} />
-                        <Bar 
-                          dataKey="value" 
-                          fill="var(--color-value)" 
-                          radius={[6, 6, 0, 0]} 
-                          barSize={40}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </ChartContainer>
-                </div>
-              ) : (
-                <div className="h-[300px] flex items-center justify-center border-2 border-dashed rounded-xl">
-                  <p className="text-muted-foreground italic">Insufficient data for visualization</p>
-                </div>
-              )}
+            <CardContent className="p-0">
+              <div className="border-t">
+                {topDebtors.length > 0 ? (
+                  topDebtors.map((debtor, i) => (
+                    <div key={debtor.id} className="flex items-center justify-between p-4 border-b last:border-0 hover:bg-muted/30 transition-colors">
+                      <div>
+                        <p className="font-bold text-sm">{debtor.name}</p>
+                        <p className="text-xs text-muted-foreground">{debtor.course}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-destructive">KES {debtor.amount.toLocaleString()}</p>
+                        <Badge variant="outline" className="text-[10px] h-4">Pending</Badge>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-8 text-center text-muted-foreground italic text-sm">
+                    No active arrears detected.
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 
-          {loading ? (
-            <div className="space-y-6">
-              <Skeleton className="h-[120px] w-full rounded-2xl" />
-              <div className="grid grid-cols-2 gap-4">
-                <Skeleton className="h-[100px] rounded-2xl" />
-                <Skeleton className="h-[100px] rounded-2xl" />
-              </div>
-              <Skeleton className="h-[200px] w-full rounded-2xl" />
-            </div>
-          ) : summary ? (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <Card className="border-primary/20 bg-primary/5 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                  <TrendingUp className="h-24 w-24" />
-                </div>
+          {/* AI Strategic Results */}
+          {summary && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+              <Card className="border-primary/20 bg-primary/5">
                 <CardHeader>
-                  <CardTitle className="text-2xl text-primary flex items-center gap-3">
-                    {summary.summaryTitle}
-                  </CardTitle>
+                  <CardTitle className="text-xl text-primary">{summary.summaryTitle}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-lg leading-relaxed text-foreground/90 font-medium">
-                    {summary.overallSummary}
-                  </p>
+                  <p className="text-sm leading-relaxed text-foreground/80">{summary.overallSummary}</p>
                 </CardContent>
               </Card>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {summary.topCategories.map((cat, idx) => (
-                  <Card key={idx} className="hover:ring-2 hover:ring-primary/20 transition-all cursor-default group">
-                    <CardHeader className="pb-2">
-                      <div className="flex justify-between items-start">
-                        <Badge variant="secondary" className="px-3 py-0.5 rounded-lg group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                          {cat.category}
-                        </Badge>
-                        <div className={`flex items-center text-sm font-bold px-2 py-0.5 rounded-md ${cat.changePercentage > 0 ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary'}`}>
-                          {cat.changePercentage > 0 ? <ArrowUpRight className="h-4 w-4 mr-1" /> : <ArrowDownRight className="h-4 w-4 mr-1" />}
-                          {Math.abs(cat.changePercentage).toFixed(1)}%
-                        </div>
+                {summary.keyInsights.map((insight, idx) => (
+                  <Card key={idx} className="border-none ring-1 ring-border bg-card">
+                    <CardContent className="p-4 flex gap-4">
+                      <div className="h-8 w-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                        {idx + 1}
                       </div>
-                      <CardTitle className="text-2xl mt-3 font-bold">KES {cat.currentAmount.toLocaleString()}</CardTitle>
-                    </CardHeader>
-                    <CardContent className="text-sm text-muted-foreground font-medium">
-                      {cat.trendDescription}
+                      <p className="text-xs font-medium leading-relaxed">{insight}</p>
                     </CardContent>
                   </Card>
                 ))}
               </div>
-
-              <Card className="shadow-lg border-none ring-1 ring-border">
-                <CardHeader className="bg-muted/30 pb-4">
-                  <CardTitle className="flex items-center gap-2">
-                    <CheckCircle2 className="h-5 w-5 text-primary" />
-                    Actionable Insights
-                  </CardTitle>
-                  <CardDescription>Strategic recommendations for administration</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  <div className="grid gap-4">
-                    {summary.keyInsights.map((insight, idx) => (
-                      <div key={idx} className="flex gap-4 p-4 rounded-xl bg-muted/20 border-l-4 border-primary">
-                        <div className="flex-shrink-0 bg-primary/10 h-8 w-8 rounded-full flex items-center justify-center text-primary font-bold">
-                          {idx + 1}
-                        </div>
-                        <p className="text-sm font-medium leading-relaxed">{insight}</p>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-32 bg-muted/10 rounded-3xl border-2 border-dashed border-muted text-center px-6">
-              <div className="bg-primary/10 p-6 rounded-full mb-6">
-                <Sparkles className="h-12 w-12 text-primary opacity-40" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">No Analysis Generated</h3>
-              <p className="text-muted-foreground max-w-sm mb-8">
-                Click the generate button to compare this month's spending against previous records and identify trends.
-              </p>
             </div>
           )}
         </div>
 
+        {/* Right Column: AI Risk Auditor */}
         <div className="xl:col-span-4 space-y-6">
-          <Card className="sticky top-24 shadow-xl border-none ring-1 ring-border overflow-hidden">
+          <Card className="sticky top-24 shadow-lg border-none ring-1 ring-border overflow-hidden">
             <div className="bg-orange-500/10 p-4 border-b border-orange-500/20">
               <CardTitle className="text-lg flex items-center gap-2 text-orange-700">
                 <AlertTriangle className="h-5 w-5" />
-                Risk & Anomaly Audit
+                AI Expenditure Audit
               </CardTitle>
             </div>
             <CardContent className="p-0">
               <div className="p-4 bg-muted/30 flex items-start gap-3 text-xs text-muted-foreground">
                 <Info className="h-4 w-4 mt-0.5 text-primary flex-shrink-0" />
-                <p>Select a recent expenditure to analyze if it deviates from historical college spending patterns.</p>
+                <p>Select an expense to audit its legitimacy against institutional patterns.</p>
               </div>
-              <ScrollArea className="h-[450px]">
-                <div className="p-4 space-y-3">
-                  {realExpenses && realExpenses.length > 0 ? (
-                    realExpenses.slice(0, 15).map((expense, idx) => (
+              <ScrollArea className="h-[400px]">
+                <div className="p-4 space-y-2">
+                  {expenses && expenses.length > 0 ? (
+                    expenses.slice(0, 10).map((expense, idx) => (
                       <button
                         key={idx}
                         onClick={() => handleAnalyzeAnomaly(idx)}
-                        className={`w-full text-left p-4 rounded-xl border transition-all hover:shadow-md ${
-                          selectedAnomalyIndex === idx ? 'border-primary bg-primary/5 ring-1 ring-primary shadow-inner' : 'border-border bg-card'
+                        className={`w-full text-left p-3 rounded-lg border transition-all ${
+                          selectedAnomalyIndex === idx ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'border-border bg-card'
                         }`}
                       >
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="font-bold text-xs uppercase tracking-wider text-muted-foreground">{expense.categoryId || 'General'}</span>
-                          <span className="text-sm font-bold text-foreground">KES {Number(expense.amount).toLocaleString()}</span>
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="font-bold text-[10px] uppercase text-muted-foreground">{expense.categoryId}</span>
+                          <span className="text-xs font-bold">KES {Number(expense.amount).toLocaleString()}</span>
                         </div>
-                        <p className="text-xs font-medium text-foreground line-clamp-2 mb-3">{expense.description}</p>
-                        <div className="flex items-center text-[10px] text-muted-foreground font-mono">
-                          <Calendar className="h-3.5 w-3.5 mr-1.5" />
-                          {expense.expenseDate}
-                        </div>
+                        <p className="text-[11px] font-medium line-clamp-1">{expense.description}</p>
                       </button>
                     ))
                   ) : (
-                    <div className="py-20 text-center">
-                      <p className="text-sm text-muted-foreground italic">No expense records found.</p>
-                    </div>
+                    <div className="py-20 text-center text-xs text-muted-foreground">No records to audit.</div>
                   )}
                 </div>
               </ScrollArea>
             </CardContent>
             {selectedAnomalyIndex !== null && (
-              <CardFooter className="bg-muted/30 p-6 border-t animate-in slide-in-from-right-4">
+              <CardFooter className="bg-muted/30 p-4 border-t">
                 {analyzingAnomaly ? (
-                  <div className="w-full space-y-3">
+                  <div className="w-full space-y-2">
                     <div className="flex items-center gap-2">
-                      <RefreshCcw className="h-4 w-4 animate-spin text-primary" />
-                      <span className="text-xs font-bold uppercase text-primary">Auditing record...</span>
+                      <RefreshCcw className="h-3 w-3 animate-spin text-primary" />
+                      <span className="text-[10px] font-bold uppercase text-primary">Running Audit...</span>
                     </div>
-                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-10 w-full" />
                   </div>
                 ) : anomalyResult ? (
-                  <div className="w-full space-y-4">
+                  <div className="w-full space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase text-muted-foreground">AI Assessment</span>
+                      <span className="text-[10px] font-bold uppercase text-muted-foreground">AI Assessment</span>
                       {anomalyResult.isUnusual ? (
-                        <Badge variant="destructive" className="animate-pulse">Anomalous</Badge>
+                        <Badge variant="destructive" className="h-5 text-[10px]">Anomalous</Badge>
                       ) : (
-                        <Badge variant="default" className="bg-green-600">Expected</Badge>
+                        <Badge variant="default" className="h-5 text-[10px] bg-green-600">Typical</Badge>
                       )}
                     </div>
-                    <div className="bg-background p-4 rounded-xl border-l-4 border-primary text-xs leading-relaxed font-medium italic shadow-sm">
+                    <p className="text-[11px] italic leading-relaxed text-foreground/80 bg-background p-2 rounded border">
                       "{anomalyResult.reason}"
-                    </div>
+                    </p>
                   </div>
                 ) : null}
               </CardFooter>

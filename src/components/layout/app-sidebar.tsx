@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -14,7 +15,8 @@ import {
   GraduationCap,
   FileText,
   CreditCard,
-  LogOut
+  LogOut,
+  FileBarChart
 } from "lucide-react"
 
 import {
@@ -74,8 +76,8 @@ const menuItems = [
     ],
   },
   {
-    title: "Insights",
-    icon: Sparkles,
+    title: "Financial Reports",
+    icon: FileBarChart,
     url: "/insights",
   },
 ]
