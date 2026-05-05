@@ -39,7 +39,9 @@ import {
   DollarSign,
   User,
   Wallet,
-  GraduationCap
+  GraduationCap,
+  Hash,
+  FileText
 } from "lucide-react"
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, serverTimestamp, doc } from "firebase/firestore"
@@ -82,7 +84,7 @@ export default function PaymentsPage() {
     if (paymentType === "Fee") {
       const selectedInvoice = (invoices || []).find(i => i.id === formData.invoiceId)
       if (!selectedInvoice) {
-        toast({ title: "Error", description: "Selected invoice not found.", variant: "destructive" })
+        toast({ title: "Validation Error", description: "Please select a student invoice.", variant: "destructive" })
         return
       }
 
@@ -127,7 +129,7 @@ export default function PaymentsPage() {
       });
     }
 
-    toast({ title: "Payment Recorded", description: `KES ${amount.toLocaleString()} has been logged successfully.` })
+    toast({ title: "Success", description: `Income of KES ${amount.toLocaleString()} recorded.` })
     setIsDialogOpen(false);
     setFormData({ invoiceId: "", amount: "", method: "M-Pesa", reference: "", receivedFrom: "", description: "" });
   };
@@ -154,9 +156,9 @@ export default function PaymentsPage() {
     }
   }, [payments])
 
-  const getStudentName = (id: string) => {
-    const s = (students || []).find(student => student.id === id)
-    return s ? `${s.firstName} ${s.lastName}` : "N/A"
+  const getStudentInfo = (studentId: string) => {
+    const s = (students || []).find(student => student.id === studentId)
+    return s ? { name: `${s.firstName} ${s.lastName}`, adm: s.id.substring(0, 8).toUpperCase() } : { name: "N/A", adm: "N/A" }
   }
 
   const isLoading = loadingPayments || loadingInvoices
@@ -165,43 +167,96 @@ export default function PaymentsPage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Financial Ledger</h1>
-          <p className="text-muted-foreground">Comprehensive record of all institutional income</p>
+          <h1 className="text-3xl font-bold tracking-tight">Institutional Ledger</h1>
+          <p className="text-muted-foreground">Manage and audit all college income sources</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" /> Export Ledger
+          <Button variant="outline" size="sm">
+            <Download className="mr-2 h-4 w-4" /> Export
           </Button>
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-primary/90 shadow-lg">
-                <Plus className="mr-2 h-4 w-4" /> Record Income
+              <Button className="bg-primary hover:bg-primary/90">
+                <Plus className="mr-2 h-4 w-4" /> Record New Income
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[550px]">
+            <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
-                <DialogTitle>Record New Income</DialogTitle>
-                <DialogDescription>Select the income category and provide transaction details.</DialogDescription>
+                <DialogTitle>Record Income</DialogTitle>
+                <DialogDescription>Choose a category to log student fees or other revenue.</DialogDescription>
               </DialogHeader>
-              <div className="grid gap-6 py-4">
-                <div className="space-y-2">
-                  <Label>Income Category</Label>
-                  <Tabs value={paymentType} onValueChange={(v: any) => setPaymentType(v)} className="w-full">
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="Fee" className="flex items-center gap-2">
-                        <GraduationCap className="h-4 w-4" /> Student Fee
-                      </TabsTrigger>
-                      <TabsTrigger value="Miscellaneous" className="flex items-center gap-2">
-                        <Wallet className="h-4 w-4" /> Miscellaneous
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </div>
+              <div className="grid gap-5 py-2">
+                <Tabs value={paymentType} onValueChange={(v: any) => setPaymentType(v)} className="w-full">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="Fee" className="flex items-center gap-2">
+                      <GraduationCap className="h-4 w-4" /> Student Fee
+                    </TabsTrigger>
+                    <TabsTrigger value="Miscellaneous" className="flex items-center gap-2">
+                      <Wallet className="h-4 w-4" /> Miscellaneous
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+
+                {paymentType === "Fee" ? (
+                  <div className="space-y-4 animate-in fade-in duration-200">
+                    <div className="space-y-2">
+                      <Label htmlFor="invoice">Select Student & Admission No.</Label>
+                      <Select onValueChange={(v) => setFormData({...formData, invoiceId: v})}>
+                        <SelectTrigger id="invoice" className="h-12">
+                          <SelectValue placeholder="Search by name or ADM number..." />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-[300px]">
+                          {(invoices || []).filter(i => i.status !== "Paid").map(i => {
+                            const info = getStudentInfo(i.studentId)
+                            return (
+                              <SelectItem key={i.id} value={i.id} className="py-3">
+                                <div className="flex flex-col">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-sm">{info.name}</span>
+                                    <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-mono">{info.adm}</span>
+                                  </div>
+                                  <span className="text-[11px] text-muted-foreground mt-0.5">
+                                    {i.invoiceNumber} • Outstanding: <span className="font-bold text-destructive">KES {Number(i.outstandingAmount).toLocaleString()}</span>
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            )
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4 animate-in fade-in duration-200">
+                    <div className="space-y-2">
+                      <Label htmlFor="payee">Source / Payer Name</Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input 
+                          id="payee" 
+                          placeholder="e.g. Canteen Contractor" 
+                          className="pl-9"
+                          value={formData.receivedFrom}
+                          onChange={(e) => setFormData({...formData, receivedFrom: e.target.value})}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="desc">Purpose</Label>
+                      <Input 
+                        id="desc" 
+                        placeholder="e.g. Monthly Rent Payment"
+                        value={formData.description}
+                        onChange={(e) => setFormData({...formData, description: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="amount">Amount Received (KES)</Label>
+                    <Label htmlFor="amount">Amount (KES)</Label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input 
@@ -214,7 +269,7 @@ export default function PaymentsPage() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="method">Payment Method</Label>
+                    <Label htmlFor="method">Method</Label>
                     <Select onValueChange={(v) => setFormData({...formData, method: v})} defaultValue="M-Pesa">
                       <SelectTrigger id="method">
                         <SelectValue />
@@ -229,67 +284,22 @@ export default function PaymentsPage() {
                   </div>
                 </div>
 
-                {paymentType === "Fee" ? (
-                  <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
-                    <Label htmlFor="invoice">Select Student & Invoice</Label>
-                    <Select onValueChange={(v) => setFormData({...formData, invoiceId: v})}>
-                      <SelectTrigger id="invoice" className="w-full h-12">
-                        <SelectValue placeholder="Choose an outstanding invoice..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(invoices || []).filter(i => i.status !== "Paid").map(i => (
-                          <SelectItem key={i.id} value={i.id}>
-                            <div className="flex flex-col">
-                              <span className="font-bold">{getStudentName(i.studentId)}</span>
-                              <span className="text-xs text-muted-foreground">
-                                {i.invoiceNumber} • Bal: KES {Number(i.outstandingAmount).toLocaleString()}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ) : (
-                  <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="payee">Received From (Source)</Label>
-                      <div className="relative">
-                        <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input 
-                          id="payee" 
-                          placeholder="e.g. Canteen Operator, Ministry of Education"
-                          className="pl-9"
-                          value={formData.receivedFrom}
-                          onChange={(e) => setFormData({...formData, receivedFrom: e.target.value})}
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="desc">Description / Purpose</Label>
-                      <Input 
-                        id="desc" 
-                        placeholder="e.g. Quarterly Rent Payment, Certificate Fee"
-                        value={formData.description}
-                        onChange={(e) => setFormData({...formData, description: e.target.value})}
-                      />
-                    </div>
-                  </div>
-                )}
-
                 <div className="space-y-2">
-                  <Label htmlFor="ref">Transaction Reference / Receipt No.</Label>
-                  <Input 
-                    id="ref" placeholder="e.g. QX789J0..."
-                    className="font-mono uppercase"
-                    value={formData.reference}
-                    onChange={(e) => setFormData({...formData, reference: e.target.value})}
-                  />
+                  <Label htmlFor="ref">Reference / Receipt No.</Label>
+                  <div className="relative">
+                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                      id="ref" placeholder="Transaction ID"
+                      className="pl-9 font-mono uppercase"
+                      value={formData.reference}
+                      onChange={(e) => setFormData({...formData, reference: e.target.value})}
+                    />
+                  </div>
                 </div>
               </div>
-              <DialogFooter>
-                <Button onClick={handleRecordPayment} className="w-full bg-primary h-12 text-lg">
-                  Finalize Income Entry
+              <DialogFooter className="mt-4">
+                <Button onClick={handleRecordPayment} className="w-full bg-primary h-11">
+                  Complete Transaction
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -298,73 +308,70 @@ export default function PaymentsPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="hover:shadow-md transition-shadow border-none ring-1 ring-border bg-gradient-to-br from-white to-green-50/30">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Total Fee Revenue</CardTitle>
-            <div className="bg-primary/10 p-2 rounded-lg text-primary">
-              <GraduationCap className="h-4 w-4" />
-            </div>
+        <Card className="border-none ring-1 ring-border shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-[10px] font-bold uppercase text-muted-foreground">Fee Revenue</CardTitle>
+            <GraduationCap className="h-4 w-4 text-primary" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">KES {totals.fees.toLocaleString()}</div>
-            <p className="text-[10px] text-muted-foreground mt-1">Direct student tuition income</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Tuition and related academic fees</p>
           </CardContent>
         </Card>
-        <Card className="hover:shadow-md transition-shadow border-none ring-1 ring-border bg-gradient-to-br from-white to-blue-50/30">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Miscellaneous Income</CardTitle>
-            <div className="bg-blue-100 p-2 rounded-lg text-blue-700">
-              <Wallet className="h-4 w-4" />
-            </div>
+        <Card className="border-none ring-1 ring-border shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-[10px] font-bold uppercase text-muted-foreground">Other Income</CardTitle>
+            <Wallet className="h-4 w-4 text-blue-600" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">KES {totals.misc.toLocaleString()}</div>
-            <p className="text-[10px] text-muted-foreground mt-1">Other institutional revenue</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Non-academic revenue streams</p>
           </CardContent>
         </Card>
-        <Card className="hover:shadow-md transition-shadow border-none ring-1 ring-border bg-primary text-primary-foreground shadow-lg">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider opacity-80">Total Liquidity</CardTitle>
-            <div className="bg-white/20 p-2 rounded-lg">
-              <CreditCard className="h-4 w-4" />
-            </div>
+        <Card className="border-none ring-1 ring-border shadow-sm bg-primary text-primary-foreground">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-[10px] font-bold uppercase opacity-80">Total Cash Inflow</CardTitle>
+            <CreditCard className="h-4 w-4 opacity-80" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">KES {totals.total.toLocaleString()}</div>
-            <p className="text-[10px] opacity-70 mt-1">Combined institutional cash flow</p>
+            <p className="text-[10px] opacity-70 mt-1">Consolidated institutional liquidity</p>
           </CardContent>
         </Card>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-        <Tabs defaultValue="All" className="w-full md:w-auto" onValueChange={setMethodFilter}>
-          <TabsList className="bg-muted/50 p-1">
-            <TabsTrigger value="All" className="px-4">All Sources</TabsTrigger>
-            <TabsTrigger value="M-Pesa">M-Pesa</TabsTrigger>
-            <TabsTrigger value="Bank Transfer">Bank</TabsTrigger>
-            <TabsTrigger value="Cash">Cash</TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        <div className="relative w-full md:w-80">
+        <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search student, source or reference..." 
-            className="pl-9 h-10 shadow-sm"
+            placeholder="Search student, ref or source..." 
+            className="pl-9 h-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+        <Select value={methodFilter} onValueChange={setMethodFilter}>
+          <SelectTrigger className="w-full md:w-[180px]">
+            <Filter className="mr-2 h-4 w-4" />
+            <SelectValue placeholder="Method" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All">All Methods</SelectItem>
+            <SelectItem value="M-Pesa">M-Pesa</SelectItem>
+            <SelectItem value="Bank Transfer">Bank</SelectItem>
+            <SelectItem value="Cash">Cash</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
-      <Card className="border-none shadow-sm ring-1 ring-border overflow-hidden">
+      <Card className="border-none ring-1 ring-border overflow-hidden shadow-sm">
         <CardContent className="p-0">
           <Table>
             <TableHeader className="bg-muted/30">
               <TableRow>
-                <TableHead>Date / Category</TableHead>
+                <TableHead>Date / Cat</TableHead>
                 <TableHead>Source / Student</TableHead>
-                <TableHead>Reference</TableHead>
+                <TableHead>ADM / Ref</TableHead>
                 <TableHead>Method</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
               </TableRow>
@@ -375,51 +382,53 @@ export default function PaymentsPage() {
                   <TableCell colSpan={5} className="h-48 text-center">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      <p className="text-sm text-muted-foreground">Auditing Ledger...</p>
+                      <p className="text-sm text-muted-foreground">Fetching records...</p>
                     </div>
                   </TableCell>
                 </TableRow>
               ) : filteredPayments.length > 0 ? (
-                filteredPayments.map((pay) => (
-                  <TableRow key={pay.id} className="hover:bg-muted/10 transition-colors group">
-                    <TableCell className="text-[11px] text-muted-foreground">
-                      <div className="flex flex-col">
-                        <span className="font-mono text-[10px] uppercase font-bold text-primary/70">
-                          {pay.type || 'Fee'}
-                        </span>
-                        <span>{new Date(pay.paymentDate).toLocaleDateString('en-KE', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col">
-                        <span className="font-bold text-sm">
-                          {pay.type === "Miscellaneous" ? (pay.receivedFrom || 'Unknown Source') : getStudentName(pay.studentId)}
-                        </span>
-                        <span className="text-[10px] text-muted-foreground italic">
-                          {pay.type === "Miscellaneous" ? pay.description : `Invoice: ${pay.invoiceId?.substring(0, 8)}`}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono text-[11px] uppercase tracking-tighter">{pay.transactionReference || 'N/A'}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="rounded-md font-normal bg-background">
-                        {pay.paymentMethod === "M-Pesa" && <CreditCard className="h-3 w-3 mr-1 inline" />}
-                        {pay.paymentMethod === "Bank Transfer" && <Landmark className="h-3 w-3 mr-1 inline" />}
-                        {pay.paymentMethod}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-black text-primary">
-                      KES {Number(pay.amount).toLocaleString()}
-                    </TableCell>
-                  </TableRow>
-                ))
+                filteredPayments.map((pay) => {
+                  const studentInfo = pay.studentId ? getStudentInfo(pay.studentId) : null
+                  return (
+                    <TableRow key={pay.id} className="hover:bg-muted/5 group">
+                      <TableCell className="text-[10px] text-muted-foreground">
+                        <div className="flex flex-col">
+                          <span className="font-bold uppercase text-primary/70">{pay.type}</span>
+                          <span>{new Date(pay.paymentDate).toLocaleDateString('en-KE', { day: '2-digit', month: 'short' })}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-bold text-sm">
+                            {pay.type === "Miscellaneous" ? pay.receivedFrom : studentInfo?.name}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground italic truncate max-w-[150px]">
+                            {pay.type === "Miscellaneous" ? pay.description : `Invoice Ref: ${pay.invoiceId?.substring(0, 8)}`}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-[10px]">
+                        <div className="flex flex-col">
+                          <span className="font-bold">{studentInfo?.adm || '---'}</span>
+                          <span className="text-muted-foreground uppercase">{pay.transactionReference || 'N/A'}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="text-[10px] font-normal rounded-md">
+                          {pay.paymentMethod}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-black text-primary">
+                        KES {Number(pay.amount).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
               ) : (
                 <TableRow>
                   <TableCell colSpan={5} className="h-40 text-center text-muted-foreground italic">
-                    <div className="flex flex-col items-center justify-center opacity-40">
-                      <History className="h-8 w-8 mb-2" />
-                      <p>No matching transactions found in the ledger.</p>
-                    </div>
+                    <History className="h-8 w-8 mb-2 mx-auto opacity-20" />
+                    <p>No transaction history found.</p>
                   </TableCell>
                 </TableRow>
               )}
