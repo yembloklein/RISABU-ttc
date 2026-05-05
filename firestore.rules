@@ -15,14 +15,6 @@ service cloud.firestore {
      * - User Data: Scoped to /users/{userId} where userId matches the Firebase Auth UID.
      * - Academic & Financial Data: Top-level collections (/programs, /students, /invoices, etc.)
      *   secured via internal staff roles or denormalized student UID fields.
-     *
-     * Key Security Decisions:
-     * - Admin/Staff roles are verified by checking for document existence in specific role paths.
-     * - Students have restricted access to their own profile, enrollments, and financial records
-     *   using 'studentFirebaseUid' fields directly on those documents.
-     * - All write operations for institutional data (programs, expenses, categories) are
-     *   restricted to authenticated Staff or Admin users.
-     * - Strict relational integrity is enforced on creation to ensure recorded data matches the actor.
      */
 
     // --- Helper Functions ---
@@ -35,6 +27,11 @@ service cloud.firestore {
     /** @description Checks if the user exists in the admin role collection. */
     function isAdmin() {
       return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    /** @description Checks if the user is the designated bootstrap admin email. */
+    function isBootstrapper() {
+      return isSignedIn() && request.auth.token.email == "clainyemblo@gmail.com";
     }
 
     /** @description Checks if the user exists in the staff role collection. */
@@ -54,7 +51,6 @@ service cloud.firestore {
 
     /**
      * @description Validates that the recordedBy field in the document matches the actor.
-     * @param {map} data The document data (e.g., resource.data or request.resource.data).
      */
     function isResourceRecorder(data) {
       return isSignedIn() && data.recordedByUserFirebaseUid == request.auth.uid;
@@ -62,7 +58,6 @@ service cloud.firestore {
 
     /**
      * @description Validates that the student field in the document matches the actor.
-     * @param {map} data The document data (e.g., resource.data).
      */
     function isResourceStudent(data) {
       return isSignedIn() && data.studentFirebaseUid == request.auth.uid;
@@ -70,13 +65,6 @@ service cloud.firestore {
 
     // --- Collection Rules ---
 
-    /**
-     * @description Access rules for User profiles. Users can manage their own, Admins manage all.
-     * @path /users/{userId}
-     * @allow (get) If user is owner or internal staff.
-     * @deny (write) If user is not the owner or an admin.
-     * @principle Path-based ownership and relational integrity.
-     */
     match /users/{userId} {
       allow get: if isOwner(userId) || isInternal();
       allow list: if isInternal();
@@ -85,48 +73,26 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    /**
-     * @description Admin role registry. Existence of UID here grants global Admin privileges.
-     * @path /roles_admin/{userId}
-     * @allow (get) If signed in (for role verification).
-     * @deny (list/write) If not an admin.
-     */
     match /roles_admin/{userId} {
       allow get: if isSignedIn();
       allow list: if isAdmin();
-      allow create, update, delete: if isAdmin();
+      // Allow the designated email to create their own admin doc if it doesn't exist
+      allow create: if isAdmin() || (isBootstrapper() && request.auth.uid == userId);
+      allow update, delete: if isAdmin();
     }
 
-    /**
-     * @description Staff role registry. Existence of UID here grants global Staff privileges.
-     * @path /roles_staff/{userId}
-     * @allow (get) If signed in (for role verification).
-     * @deny (list/write) If not an admin.
-     */
     match /roles_staff/{userId} {
       allow get: if isSignedIn();
       allow list: if isAdmin();
       allow create, update, delete: if isAdmin();
     }
 
-    /**
-     * @description Academic programs. Managed by staff/admins, readable by all authenticated users.
-     * @path /programs/{programId}
-     * @allow (read) All signed-in users.
-     * @deny (write) Any non-staff/admin user.
-     */
     match /programs/{programId} {
       allow get, list: if isSignedIn();
       allow create, update: if isInternal();
       allow delete: if isAdmin();
     }
 
-    /**
-     * @description Student profiles. Students can see their own; staff/admins manage all.
-     * @path /students/{studentId}
-     * @allow (get) If user's UID matches the student's firebaseUid.
-     * @deny (write) Non-staff/admin users.
-     */
     match /students/{studentId} {
       allow get: if isInternal() || (isSignedIn() && resource.data.firebaseUid == request.auth.uid);
       allow list: if isInternal();
@@ -134,24 +100,12 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    /**
-     * @description Enrollment records linking students to programs.
-     * @path /enrollments/{enrollmentId}
-     * @allow (read) If user is the enrolled student or staff.
-     * @deny (write) If not staff/admin.
-     */
     match /enrollments/{enrollmentId} {
       allow get, list: if isInternal() || isResourceStudent(resource.data);
       allow create, update: if isInternal();
       allow delete: if isAdmin();
     }
 
-    /**
-     * @description Financial invoices.
-     * @path /invoices/{invoiceId}
-     * @allow (read) If user is the student on the invoice or staff.
-     * @deny (write) Non-staff users.
-     */
     match /invoices/{invoiceId} {
       allow get, list: if isInternal() || isResourceStudent(resource.data);
       allow create: if isInternal() && request.resource.data.recordedByUserFirebaseUid == request.auth.uid;
@@ -159,12 +113,6 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    /**
-     * @description Payment records.
-     * @path /payments/{paymentId}
-     * @allow (read) Student viewing their payments or staff auditing.
-     * @deny (write) Non-staff.
-     */
     match /payments/{paymentId} {
       allow get, list: if isInternal() || isResourceStudent(resource.data);
       allow create: if isInternal() && request.resource.data.recordedByUserFirebaseUid == request.auth.uid;
@@ -172,24 +120,12 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    /**
-     * @description Categories for college expenses.
-     * @path /expenseCategories/{categoryId}
-     * @allow (read) All internal staff.
-     * @deny (read) Students.
-     */
     match /expenseCategories/{categoryId} {
       allow get, list: if isInternal();
       allow create, update: if isInternal();
       allow delete: if isAdmin();
     }
 
-    /**
-     * @description Institutional expenses.
-     * @path /expenses/{expenseId}
-     * @allow (read) Staff and Admins.
-     * @deny (write) If not the staff member who recorded it (except admins).
-     */
     match /expenses/{expenseId} {
       allow get, list: if isInternal();
       allow create: if isInternal() && request.resource.data.recordedByUserFirebaseUid == request.auth.uid;

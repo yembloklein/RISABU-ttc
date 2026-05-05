@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { GraduationCap, Loader2, Key } from "lucide-react"
-import { useAuth, useUser, initiateAnonymousSignIn, initiateEmailSignIn } from "@/firebase"
+import { GraduationCap, Loader2, Key, UserPlus, LogIn } from "lucide-react"
+import { useAuth, useUser, initiateAnonymousSignIn, initiateEmailSignIn, initiateEmailSignUp } from "@/firebase"
 
 export default function LoginPage() {
+  const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -24,14 +25,18 @@ export default function LoginPage() {
     }
   }, [user, router])
 
-  const handleEmailSignIn = async (e: React.FormEvent) => {
+  const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
     try {
-      initiateEmailSignIn(auth, email, password)
+      if (isSignUp) {
+        initiateEmailSignUp(auth, email, password)
+      } else {
+        initiateEmailSignIn(auth, email, password)
+      }
     } catch (err: any) {
-      setError(err.message || "Failed to sign in")
+      setError(err.message || "Authentication failed")
       setLoading(false)
     }
   }
@@ -56,11 +61,13 @@ export default function LoginPage() {
           </div>
           <div>
             <CardTitle className="text-2xl font-bold">Risabu Connect</CardTitle>
-            <CardDescription>Sign in to access the College ERP</CardDescription>
+            <CardDescription>
+              {isSignUp ? "Create an account to get started" : "Sign in to access the College ERP"}
+            </CardDescription>
           </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleEmailSignIn} className="space-y-4">
+          <form onSubmit={handleEmailAuth} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
               <Input 
@@ -86,9 +93,29 @@ export default function LoginPage() {
             </div>
             {error && <p className="text-xs text-destructive font-medium bg-destructive/10 p-2 rounded">{error}</p>}
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={loading}>
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sign In"}
+              {loading ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : isSignUp ? (
+                <>
+                  <UserPlus className="mr-2 h-4 w-4" /> Create Account
+                </>
+              ) : (
+                <>
+                  <LogIn className="mr-2 h-4 w-4" /> Sign In
+                </>
+              )}
             </Button>
           </form>
+
+          <div className="mt-4 text-center">
+            <button 
+              type="button" 
+              className="text-sm text-primary hover:underline font-medium"
+              onClick={() => setIsSignUp(!isSignUp)}
+            >
+              {isSignUp ? "Already have an account? Sign In" : "Need an account? Sign Up"}
+            </button>
+          </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-4 border-t pt-6 bg-muted/20">
           <div className="relative w-full">

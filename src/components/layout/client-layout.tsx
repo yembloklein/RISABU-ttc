@@ -1,15 +1,17 @@
 "use client"
 
-import { useUser } from "@/firebase"
+import { useUser, useFirestore, setDocumentNonBlocking } from "@/firebase"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect } from "react"
 import { Loader2 } from "lucide-react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { Toaster } from "@/components/ui/toaster"
+import { doc, serverTimestamp } from "firebase/firestore"
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
   const { user, isUserLoading } = useUser()
+  const firestore = useFirestore()
   const pathname = usePathname()
   const router = useRouter()
 
@@ -20,6 +22,31 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
       router.push("/login")
     }
   }, [user, isUserLoading, isLoginPage, router])
+
+  // Administrative Bootstrapping logic
+  useEffect(() => {
+    if (user && user.email === "clainyemblo@gmail.com" && firestore) {
+      const adminRoleRef = doc(firestore, "roles_admin", user.uid)
+      const userDocRef = doc(firestore, "users", user.uid)
+
+      // Non-blocking creation of administrative records
+      setDocumentNonBlocking(adminRoleRef, {
+        email: user.email,
+        assignedAt: serverTimestamp(),
+      }, { merge: true })
+
+      setDocumentNonBlocking(userDocRef, {
+        id: user.uid,
+        firebaseUid: user.uid,
+        email: user.email,
+        firstName: user.displayName?.split(' ')[0] || "Admin",
+        lastName: user.displayName?.split(' ').slice(1).join(' ') || "User",
+        role: "Admin",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }, { merge: true })
+    }
+  }, [user, firestore])
 
   if (isUserLoading) {
     return (
