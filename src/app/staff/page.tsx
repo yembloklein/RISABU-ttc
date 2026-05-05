@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useMemo } from "react"
@@ -21,7 +20,8 @@ import {
   CheckCircle2,
   Plus,
   Briefcase,
-  Phone
+  Phone,
+  Download
 } from "lucide-react"
 import { 
   DropdownMenu, 
@@ -145,6 +145,37 @@ export default function StaffPage() {
     }
   };
 
+  const exportToCSV = () => {
+    if (!filteredStaff.length) return;
+    
+    const headers = ["ID", "First Name", "Last Name", "Email", "Phone", "Role", "Department"];
+    const rows = filteredStaff.map(staff => [
+      staff.id,
+      staff.firstName,
+      staff.lastName,
+      staff.email,
+      staff.phone || "N/A",
+      staff.role || "Staff",
+      staff.department || "N/A"
+    ]);
+
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `staff_directory_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({
+      title: "Export Complete",
+      description: "Employee directory has been exported to CSV."
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -156,73 +187,81 @@ export default function StaffPage() {
           <p className="text-muted-foreground">Manage college employees and organizational departments</p>
         </div>
 
-        {isAdmin && (
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-primary/90">
-                <Plus className="mr-2 h-4 w-4" /> Add Employee
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>Register New Employee</DialogTitle>
-                <DialogDescription>
-                  Enter the professional details for the new staff member.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="fName">First Name</Label>
-                    <Input id="fName" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} placeholder="John" />
+        <div className="flex gap-2">
+          {isAdmin && (
+            <Button variant="outline" onClick={exportToCSV} disabled={filteredStaff.length === 0}>
+              <Download className="mr-2 h-4 w-4" /> Export CSV
+            </Button>
+          )}
+
+          {isAdmin && (
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-primary hover:bg-primary/90">
+                  <Plus className="mr-2 h-4 w-4" /> Add Employee
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px]">
+                <DialogHeader>
+                  <DialogTitle>Register New Employee</DialogTitle>
+                  <DialogDescription>
+                    Enter the professional details for the new staff member.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="fName">First Name</Label>
+                      <Input id="fName" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} placeholder="John" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="lName">Last Name</Label>
+                      <Input id="lName" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} placeholder="Doe" />
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="lName">Last Name</Label>
-                    <Input id="lName" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} placeholder="Doe" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Work Email</Label>
-                  <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="j.doe@risabu.ac.ke" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
-                  <Input id="phone" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} placeholder="+254 700 000 000" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Department</Label>
-                    <Select onValueChange={(v) => setFormData({...formData, department: v})} defaultValue={formData.department}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Dept" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {DEPARTMENTS.map(dept => (
-                          <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="email">Work Email</Label>
+                    <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="j.doe@risabu.ac.ke" />
                   </div>
                   <div className="space-y-2">
-                    <Label>Role</Label>
-                    <Select onValueChange={(v) => setFormData({...formData, role: v})} defaultValue={formData.role}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Staff">Staff</SelectItem>
-                        <SelectItem value="Admin">Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <Input id="phone" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} placeholder="+254 700 000 000" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Department</Label>
+                      <Select onValueChange={(v) => setFormData({...formData, department: v})} defaultValue={formData.department}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Dept" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {DEPARTMENTS.map(dept => (
+                            <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Role</Label>
+                      <Select onValueChange={(v) => setFormData({...formData, role: v})} defaultValue={formData.role}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Staff">Staff</SelectItem>
+                          <SelectItem value="Admin">Admin</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <DialogFooter>
-                <Button onClick={handleAddEmployee} className="w-full bg-primary">Save Employee Record</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
+                <DialogFooter>
+                  <Button onClick={handleAddEmployee} className="w-full bg-primary">Save Employee Record</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
+        </div>
       </div>
 
       <div className="relative">
