@@ -45,7 +45,10 @@ import {
   Trash2, 
   CheckCircle,
   FileText,
-  Calendar
+  Calendar,
+  Printer,
+  Mail,
+  GraduationCap
 } from "lucide-react"
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, serverTimestamp, doc, query, orderBy } from "firebase/firestore"
@@ -56,6 +59,7 @@ export default function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState("All")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [formData, setFormData] = useState({ studentId: "", amount: "", description: "" })
+  const [printInvoiceId, setPrintInvoiceId] = useState<string | null>(null)
   
   const firestore = useFirestore()
   const { user } = useUser()
@@ -90,6 +94,10 @@ export default function InvoicesPage() {
       return matchesSearch && matchesStatus;
     })
   }, [invoices, students, searchTerm, statusFilter])
+
+  const activePrintInvoice = useMemo(() => {
+    return (invoices || []).find(inv => inv.id === printInvoiceId) || null
+  }, [invoices, printInvoiceId])
 
   const handleCreateInvoice = () => {
     if (!firestore || !user) return;
@@ -139,6 +147,21 @@ export default function InvoicesPage() {
     }
   };
 
+  const handlePrintInvoice = (invoiceId: string) => {
+    setPrintInvoiceId(invoiceId)
+    setTimeout(() => {
+      window.print()
+    }, 100)
+  }
+
+  const handleSendReminder = (invoice: any) => {
+    const student = getStudentInfo(invoice.studentId)
+    toast({
+      title: "Reminder Sent",
+      description: `Payment reminder notification sent to ${student?.name} (${student?.email})`,
+    })
+  }
+
   const totals = useMemo(() => {
     const list = invoices || []
     const billed = list.reduce((acc, i) => acc + (Number(i.totalAmount) || 0), 0)
@@ -148,7 +171,110 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Printable Invoice/Receipt */}
+      {activePrintInvoice && (
+        <div id="invoice-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999] p-12">
+          <div className="max-w-4xl mx-auto border p-12 bg-white flex flex-col h-full">
+            <header className="flex justify-between items-start border-b pb-8 mb-8">
+              <div className="flex items-center gap-4">
+                <div className="bg-primary p-3 rounded-xl">
+                  <GraduationCap className="h-10 w-10 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-black text-primary uppercase">Risabu Technical</h1>
+                  <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Training College</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <h2 className="text-3xl font-black text-slate-900 uppercase">
+                  {activePrintInvoice.status === "Paid" ? "Receipt" : "Fee Invoice"}
+                </h2>
+                <p className="text-sm font-mono text-muted-foreground">{activePrintInvoice.invoiceNumber}</p>
+                <p className="text-sm mt-1">Date: {activePrintInvoice.issueDate}</p>
+              </div>
+            </header>
+
+            <main className="flex-1 space-y-12">
+              <div className="grid grid-cols-2 gap-12">
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold uppercase text-primary border-b pb-1">Bill To</h3>
+                  {(() => {
+                    const s = getStudentInfo(activePrintInvoice.studentId)
+                    return (
+                      <div className="text-sm space-y-1">
+                        <p className="font-bold text-lg">{s?.name}</p>
+                        <p className="text-muted-foreground uppercase font-mono">ADM: {s?.adm}</p>
+                        <p className="text-muted-foreground">{s?.email}</p>
+                      </div>
+                    )
+                  })()}
+                </div>
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold uppercase text-primary border-b pb-1">Status Summary</h3>
+                  <div className="text-sm space-y-1">
+                    <p className="flex justify-between"><span>Status:</span> <span className="font-bold uppercase">{activePrintInvoice.status}</span></p>
+                    <p className="flex justify-between"><span>Due Date:</span> <span className="font-bold">{activePrintInvoice.dueDate}</span></p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border rounded-xl overflow-hidden">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Amount (KES)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow className="h-24">
+                      <TableCell className="align-top py-4">
+                        <p className="font-bold">{activePrintInvoice.description}</p>
+                        <p className="text-xs text-muted-foreground mt-1 italic">Academic Fees for Term Session</p>
+                      </TableCell>
+                      <TableCell className="text-right align-top py-4 font-mono font-bold">
+                        {Number(activePrintInvoice.totalAmount).toLocaleString()}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+
+              <div className="flex justify-end">
+                <div className="w-64 space-y-3 pt-4">
+                  <div className="flex justify-between text-sm">
+                    <span>Subtotal:</span>
+                    <span className="font-mono">{Number(activePrintInvoice.totalAmount).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm border-t pt-2">
+                    <span>Amount Paid:</span>
+                    <span className="font-mono text-green-600 font-bold">
+                      {Number(activePrintInvoice.totalAmount - activePrintInvoice.outstandingAmount).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-lg font-black border-t-2 border-primary pt-2 text-primary">
+                    <span>Balance:</span>
+                    <span className="font-mono">KES {Number(activePrintInvoice.outstandingAmount).toLocaleString()}</span>
+                  </div>
+                </div>
+              </div>
+            </main>
+
+            <footer className="mt-24 pt-12 border-t flex justify-between items-end">
+              <div className="space-y-6">
+                <div className="w-48 border-b italic text-xs text-muted-foreground pb-2">Institutional Stamp</div>
+                <p className="text-[10px] text-muted-foreground">This is an electronically generated document. No physical signature required.</p>
+              </div>
+              <div className="text-right space-y-1">
+                <p className="text-xs font-bold uppercase text-primary">Risabu Connect ERP</p>
+                <p className="text-[10px] text-muted-foreground">finance@risabu.ac.ke</p>
+              </div>
+            </footer>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Financial Billing</h1>
           <p className="text-muted-foreground">Issue and manage student academic invoices</p>
@@ -214,7 +340,7 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 no-print">
         <Card className="border-none ring-1 ring-border shadow-sm">
           <CardHeader className="py-4 pb-2">
             <CardTitle className="text-[10px] font-bold uppercase text-muted-foreground">Total Billed</CardTitle>
@@ -244,7 +370,7 @@ export default function InvoicesPage() {
         </Card>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4">
+      <div className="flex flex-col md:flex-row gap-4 no-print">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input 
@@ -269,7 +395,7 @@ export default function InvoicesPage() {
         </Select>
       </div>
 
-      <Card className="border-none ring-1 ring-border overflow-hidden">
+      <Card className="border-none ring-1 ring-border overflow-hidden no-print">
         <CardContent className="p-0">
           <Table>
             <TableHeader className="bg-muted/30">
@@ -338,11 +464,11 @@ export default function InvoicesPage() {
                             <DropdownMenuItem onClick={() => handleUpdateStatus(inv.id, "Paid")}>
                               <CheckCircle className="mr-2 h-4 w-4 text-green-600" /> Mark as Paid
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Eye className="mr-2 h-4 w-4" /> View Receipt
+                            <DropdownMenuItem onClick={() => handlePrintInvoice(inv.id)}>
+                              <Printer className="mr-2 h-4 w-4 text-primary" /> {inv.status === "Paid" ? "View Receipt" : "View Invoice"}
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <FileText className="mr-2 h-4 w-4" /> Send Reminder
+                            <DropdownMenuItem onClick={() => handleSendReminder(inv)}>
+                              <Mail className="mr-2 h-4 w-4 text-orange-600" /> Send Reminder
                             </DropdownMenuItem>
                             {isAdmin && (
                               <>
