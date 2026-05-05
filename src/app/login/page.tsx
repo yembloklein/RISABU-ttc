@@ -14,7 +14,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { user, isUserLoading } = useUser()
+  const { user } = useUser()
   const auth = useAuth()
   const router = useRouter()
 
@@ -38,15 +38,13 @@ export default function LoginPage() {
 
   const handleGuestSignIn = () => {
     setLoading(true)
-    initiateAnonymousSignIn(auth)
-  }
-
-  if (isUserLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
+    setError(null)
+    try {
+      initiateAnonymousSignIn(auth)
+    } catch (err: any) {
+      setError("Demo access is temporarily unavailable")
+      setLoading(false)
+    }
   }
 
   return (
@@ -72,6 +70,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
             <div className="space-y-2">
@@ -82,9 +81,10 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                disabled={loading}
               />
             </div>
-            {error && <p className="text-xs text-destructive mt-1">{error}</p>}
+            {error && <p className="text-xs text-destructive font-medium bg-destructive/10 p-2 rounded">{error}</p>}
             <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={loading}>
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sign In"}
             </Button>
