@@ -308,19 +308,27 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Payment",
       "type": "object",
-      "description": "Records a payment made by a student towards an invoice.",
+      "description": "Records a payment made by a student towards an invoice or general income.",
       "properties": {
         "id": {
           "type": "string",
           "description": "Unique identifier for the Payment entity."
         },
+        "type": {
+          "type": "string",
+          "description": "Categorizes the payment ('Fee' or 'Miscellaneous')."
+        },
         "invoiceId": {
           "type": "string",
-          "description": "Reference to the Invoice this payment is applied to. (Relationship: Invoice 1:N Payment)"
+          "description": "Reference to the Invoice (Optional for Misc income)."
         },
         "studentId": {
           "type": "string",
-          "description": "Reference to the Student who made the payment. (Relationship: Student 1:N Payment)"
+          "description": "Reference to the Student (Optional for Misc income)."
+        },
+        "receivedFrom": {
+          "type": "string",
+          "description": "Entity or person paying if not a student."
         },
         "paymentDate": {
           "type": "string",
@@ -333,15 +341,15 @@
         },
         "paymentMethod": {
           "type": "string",
-          "description": "The method used for the payment (e.g., 'Cash', 'Bank Transfer', 'Mobile Money', 'Card')."
+          "description": "The method used for the payment (e.g., 'Cash', 'Bank Transfer', 'M-Pesa')."
         },
         "transactionReference": {
           "type": "string",
-          "description": "A unique reference number for the payment transaction, if available."
+          "description": "A unique reference number for the payment transaction."
         },
         "recordedByUserId": {
           "type": "string",
-          "description": "Reference to the User who recorded this payment. (Relationship: User 1:N Payment)"
+          "description": "Reference to the User who recorded this payment."
         },
         "createdAt": {
           "type": "string",
@@ -350,14 +358,13 @@
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp when the payment record was last updated.",
+          "description": "Timestamp when the user record was last updated.",
           "format": "date-time"
         }
       },
       "required": [
         "id",
-        "invoiceId",
-        "studentId",
+        "type",
         "paymentDate",
         "amount",
         "paymentMethod",
