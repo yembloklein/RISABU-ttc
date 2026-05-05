@@ -15,8 +15,7 @@ import {
   FileText,
   CreditCard,
   LogOut,
-  ShieldCheck,
-  LineChart
+  ShieldCheck
 } from "lucide-react"
 
 import {
@@ -60,11 +59,6 @@ const menuItems = [
     title: "Staff",
     icon: ShieldCheck,
     url: "/staff",
-  },
-  {
-    title: "Audit & Strategy",
-    icon: LineChart,
-    url: "/insights",
   },
   {
     title: "Finance",
