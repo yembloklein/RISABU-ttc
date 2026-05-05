@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useMemo } from "react"
@@ -83,12 +84,24 @@ export default function AdmissionsPage() {
       
       const matchesTab = activeTab === "All" || app.admissionStatus === activeTab;
       
-      // We generally only show non-enrolled students in the admissions pipeline
       const isNotEnrolled = app.admissionStatus !== "Enrolled";
       
       return matchesSearch && matchesTab && isNotEnrolled;
     })
   }, [students, searchTerm, activeTab]);
+
+  const generateAdmissionNumber = () => {
+    const currentYear = new Date().getFullYear();
+    const enrolledThisYear = (students || []).filter(s => 
+      s.admissionStatus === "Enrolled" && 
+      s.admissionNumber?.endsWith(`/${currentYear}`)
+    );
+    
+    const nextSerial = enrolledThisYear.length + 1;
+    const paddedSerial = nextSerial.toString().padStart(3, '0');
+    
+    return `RTTC/${paddedSerial}/${currentYear}`;
+  };
 
   const handleCreateApplication = () => {
     if (!studentsRef) return;
@@ -122,13 +135,24 @@ export default function AdmissionsPage() {
   const handleStatusUpdate = (studentId: string, status: string) => {
     if (!firestore) return;
     const docRef = doc(firestore, "students", studentId);
-    updateDocumentNonBlocking(docRef, {
+    
+    const updateData: any = {
       admissionStatus: status,
       updatedAt: serverTimestamp(),
-    });
+    };
+
+    if (status === "Enrolled") {
+      const student = (students || []).find(s => s.id === studentId);
+      if (student && !student.admissionNumber) {
+        updateData.admissionNumber = generateAdmissionNumber();
+        updateData.status = "Active"; // Initial status for enrolled students
+      }
+    }
+
+    updateDocumentNonBlocking(docRef, updateData);
     toast({ 
       title: "Status Updated", 
-      description: `Student marked as ${status}.` 
+      description: `Student marked as ${status}. ${updateData.admissionNumber ? `ADM: ${updateData.admissionNumber}` : ''}` 
     });
   };
 
@@ -190,7 +214,7 @@ export default function AdmissionsPage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Admissions Hub</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Admissions Hub</h1>
           <p className="text-muted-foreground">Manage the enrollment funnel for prospective students</p>
         </div>
         
@@ -299,7 +323,7 @@ export default function AdmissionsPage() {
         </div>
       </div>
 
-      <Card>
+      <Card className="border-none ring-1 ring-border shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <Tabs defaultValue="All" className="w-full md:w-auto" onValueChange={setActiveTab}>

@@ -78,7 +78,6 @@ export default function FeesPage() {
       return
     }
 
-    // Record Fee Payment
     addDocumentNonBlocking(paymentsRef, {
       type: "Fee",
       invoiceId: formData.invoiceId,
@@ -93,7 +92,6 @@ export default function FeesPage() {
       updatedAt: serverTimestamp(),
     });
 
-    // Update invoice outstanding balance
     const invoiceDocRef = doc(firestore, "invoices", formData.invoiceId)
     const newOutstanding = Math.max(0, Number(selectedInvoice.outstandingAmount) - amount)
     
@@ -114,7 +112,8 @@ export default function FeesPage() {
       .filter(p => {
         const student = (students || []).find(s => s.id === p.studentId)
         const studentName = student ? `${student.firstName} ${student.lastName}` : ""
-        const searchStr = (p.transactionReference || "") + studentName + (p.invoiceId || "")
+        const adm = student?.admissionNumber || ""
+        const searchStr = (p.transactionReference || "") + studentName + adm + (p.invoiceId || "")
         
         const matchesSearch = searchStr.toLowerCase().includes(searchTerm.toLowerCase())
         const matchesMethod = methodFilter === "All" || p.paymentMethod === methodFilter
@@ -136,7 +135,7 @@ export default function FeesPage() {
 
   const getStudentInfo = (studentId: string) => {
     const s = (students || []).find(student => student.id === studentId)
-    return s ? { name: `${s.firstName} ${s.lastName}`, adm: s.id.substring(0, 8).toUpperCase() } : { name: "N/A", adm: "N/A" }
+    return s ? { name: `${s.firstName} ${s.lastName}`, adm: s.admissionNumber || s.id.substring(0, 8).toUpperCase() } : { name: "N/A", adm: "N/A" }
   }
 
   const isLoading = loadingPayments || loadingInvoices
@@ -192,7 +191,7 @@ export default function FeesPage() {
                               <div className="flex flex-col gap-0.5">
                                 <div className="flex items-center gap-2">
                                   <span className="font-bold text-sm">{info.name}</span>
-                                  <Badge variant="secondary" className="text-[9px] h-4 px-1 font-mono">{info.adm}</Badge>
+                                  <Badge variant="secondary" className="text-[9px] h-4 px-1 font-mono font-bold text-primary">{info.adm}</Badge>
                                 </div>
                                 <div className="flex justify-between items-center w-full pr-6">
                                   <span className="text-[10px] text-muted-foreground">{i.invoiceNumber}</span>
@@ -355,7 +354,7 @@ export default function FeesPage() {
                       </TableCell>
                       <TableCell className="font-mono text-[10px]">
                         <div className="flex flex-col">
-                          <span className="font-bold">{studentInfo?.adm || '---'}</span>
+                          <span className="font-bold text-primary">{studentInfo?.adm || '---'}</span>
                           <span className="text-muted-foreground uppercase">{pay.transactionReference || 'N/A'}</span>
                         </div>
                       </TableCell>

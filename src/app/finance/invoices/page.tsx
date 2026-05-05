@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
@@ -83,7 +84,7 @@ export default function InvoicesPage() {
 
   const getStudentInfo = (studentId: string) => {
     const s = (students || []).find(student => student.id === studentId)
-    return s ? { ...s, name: `${s.firstName} ${s.lastName}`, adm: s.id.substring(0, 8).toUpperCase(), email: s.contactEmail } : null
+    return s ? { ...s, name: `${s.firstName} ${s.lastName}`, adm: s.admissionNumber || s.id.substring(0, 8).toUpperCase(), email: s.contactEmail } : null
   }
 
   const filteredInvoices = useMemo(() => {
@@ -101,7 +102,6 @@ export default function InvoicesPage() {
     })
   }, [invoices, students, searchTerm, statusFilter])
 
-  // Calculation Logic for Auto-Billing
   const billingContext = useMemo(() => {
     if (!formData.studentId || !students || !programs || !invoices) return null;
 
@@ -125,12 +125,10 @@ export default function InvoicesPage() {
     };
   }, [formData.studentId, students, programs, invoices]);
 
-  // Handle student selection to auto-populate the amount
   const handleStudentSelect = (studentId: string) => {
     setFormData(prev => ({ ...prev, studentId }));
   };
 
-  // Effect to update amount when billing context changes
   useEffect(() => {
     if (billingContext && billingContext.balanceLeftToInvoice > 0) {
       setFormData(prev => ({ 
@@ -217,7 +215,6 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Printable Invoice/Receipt */}
       {activePrintInvoice && (
         <div id="invoice-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999] p-8">
           <div className="max-w-4xl mx-auto bg-white flex flex-col h-full relative border-[8px] border-primary/10 p-12">
@@ -358,7 +355,6 @@ export default function InvoicesPage() {
         </div>
       )}
 
-      {/* Main UI */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Financial Billing</h1>
@@ -391,7 +387,7 @@ export default function InvoicesPage() {
                     <SelectContent>
                       {(students || []).filter(s => s.admissionStatus === "Enrolled").map(s => (
                         <SelectItem key={s.id} value={s.id}>
-                          {s.firstName} {s.lastName} ({s.id.substring(0, 8).toUpperCase()})
+                          {s.firstName} {s.lastName} ({s.admissionNumber || s.id.substring(0, 8).toUpperCase()})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -551,7 +547,7 @@ export default function InvoicesPage() {
                       <TableCell>
                         <div className="flex flex-col">
                           <span className="font-bold text-sm">{student?.name || 'Unknown'}</span>
-                          <span className="text-[10px] text-muted-foreground font-mono uppercase">{student?.adm || 'N/A'}</span>
+                          <span className="text-[10px] text-muted-foreground font-mono uppercase font-bold text-primary">{student?.adm || 'N/A'}</span>
                         </div>
                       </TableCell>
                       <TableCell className="text-sm">{inv.description}</TableCell>

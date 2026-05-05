@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState, useMemo } from "react"
@@ -63,7 +64,6 @@ export default function StudentsPage() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
   const [printMode, setPrintMode] = useState<'id' | 'certificate' | null>(null)
   
-  // Edit State
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editFormData, setEditFormData] = useState<any>({
     firstName: "",
@@ -74,7 +74,8 @@ export default function StudentsPage() {
     appliedCourse: "",
     gender: "",
     dateOfBirth: "",
-    status: ""
+    status: "",
+    admissionNumber: ""
   })
 
   const firestore = useFirestore()
@@ -88,7 +89,6 @@ export default function StudentsPage() {
 
   const { data: students, isLoading } = useCollection(studentsRef);
 
-  // Derive the active student from the real-time list
   const activeStudent = useMemo(() => {
     return (students || []).find(s => s.id === selectedStudentId) || null;
   }, [students, selectedStudentId]);
@@ -101,6 +101,7 @@ export default function StudentsPage() {
         stu.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         stu.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (stu.appliedCourse && stu.appliedCourse.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (stu.admissionNumber && stu.admissionNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
         stu.id.toLowerCase().includes(searchTerm.toLowerCase());
       
       const currentStatus = stu.status || "Active";
@@ -134,7 +135,8 @@ export default function StudentsPage() {
       appliedCourse: student.appliedCourse || "",
       gender: student.gender || "",
       dateOfBirth: student.dateOfBirth || "",
-      status: student.status || "Active"
+      status: student.status || "Active",
+      admissionNumber: student.admissionNumber || ""
     })
     setIsEditDialogOpen(true)
   }
@@ -150,7 +152,7 @@ export default function StudentsPage() {
     
     toast({
       title: "Profile Updated",
-      description: "The student record has been successfully updated in Firestore.",
+      description: "The student record has been successfully updated.",
     });
     
     setIsEditDialogOpen(false);
@@ -174,7 +176,6 @@ export default function StudentsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Printable ID Card Component */}
       {activeStudent && printMode === 'id' && (
         <div id="id-card-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999]">
           <div className="flex items-center justify-center h-screen bg-white">
@@ -214,7 +215,7 @@ export default function StudentsPage() {
                   <div className="flex gap-4 mt-auto">
                     <div>
                       <span className="text-[6px] text-primary font-bold uppercase block tracking-wider">Reg. No</span>
-                      <span className="text-[9px] font-mono font-bold block text-slate-900">{activeStudent.id.substring(0, 8).toUpperCase()}</span>
+                      <span className="text-[9px] font-mono font-bold block text-slate-900">{activeStudent.admissionNumber || activeStudent.id.substring(0, 8).toUpperCase()}</span>
                     </div>
                     <div>
                       <span className="text-[6px] text-primary font-bold uppercase block tracking-wider">Issue Date</span>
@@ -235,7 +236,6 @@ export default function StudentsPage() {
         </div>
       )}
 
-      {/* Printable Graduation Certificate Component */}
       {activeStudent && printMode === 'certificate' && (
         <div id="certificate-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999]">
           <div className="w-[11in] h-[8.5in] border-[12px] border-primary p-1 bg-white relative">
@@ -253,11 +253,6 @@ export default function StudentsPage() {
                     <h2 className="text-2xl font-bold text-slate-600 uppercase tracking-[0.3em]">Training College</h2>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 justify-center">
-                  <div className="h-[2px] bg-primary/20 flex-1 max-w-[150px]"></div>
-                  <span className="text-xs font-bold text-primary uppercase tracking-[0.4em] px-4">Quality Education for All</span>
-                  <div className="h-[2px] bg-primary/20 flex-1 max-w-[150px]"></div>
-                </div>
               </header>
 
               <main className="space-y-10 flex-1 flex flex-col justify-center w-full max-w-4xl">
@@ -267,7 +262,6 @@ export default function StudentsPage() {
                     <h3 className="text-7xl font-black text-slate-900 py-6 tracking-tight relative z-10">
                       {activeStudent.firstName} {activeStudent.lastName}
                     </h3>
-                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-3/4 h-1 bg-primary/10 rounded-full"></div>
                   </div>
                 </div>
 
@@ -279,21 +273,12 @@ export default function StudentsPage() {
                     </h4>
                   </div>
                 </div>
-
-                <div className="flex flex-col items-center gap-3">
-                  <span className="text-lg text-slate-400 italic font-serif">Given this day of {new Date().toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                  <div className="flex items-center gap-2">
-                    <Badge className="px-8 py-2.5 text-xl rounded-full bg-primary text-white border-none font-black shadow-lg">
-                      CLASS OF {new Date().getFullYear()}
-                    </Badge>
-                  </div>
-                </div>
               </main>
 
               <footer className="w-full flex justify-around items-end pt-12">
                 <div className="flex flex-col items-center gap-3">
                   <div className="w-56 border-b-4 border-primary/20 h-16 flex items-end justify-center pb-2 italic text-slate-400">
-                    <span className="font-mono text-[10px] opacity-40 uppercase tracking-[0.2em]">{activeStudent.id.substring(0, 12)}</span>
+                    <span className="font-mono text-[10px] opacity-40 uppercase tracking-[0.2em]">{activeStudent.admissionNumber || activeStudent.id}</span>
                   </div>
                   <span className="text-sm font-black text-primary uppercase tracking-[0.2em]">Registrar</span>
                 </div>
@@ -303,9 +288,6 @@ export default function StudentsPage() {
                     <div className="w-32 h-32 border-2 border-dashed border-primary/30 rounded-full flex items-center justify-center">
                       <FileBadge className="h-20 w-20 text-primary/40" />
                     </div>
-                  </div>
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary/10 font-black text-2xl uppercase -rotate-12 pointer-events-none text-center leading-none">
-                    OFFICIAL<br/>INSTITUTIONAL<br/>SEAL
                   </div>
                 </div>
 
@@ -321,7 +303,7 @@ export default function StudentsPage() {
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
         <div>
-          <h1 className="text-3xl font-bold">Student Directory</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Student Directory</h1>
           <p className="text-muted-foreground">Manage and track the academic progress of all enrolled students</p>
         </div>
       </div>
@@ -340,7 +322,7 @@ export default function StudentsPage() {
           <div className="relative flex-1 md:w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
-              placeholder="Search name, ID or course..." 
+              placeholder="Search name, ADM or course..." 
               className="pl-10 h-9"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -372,7 +354,9 @@ export default function StudentsPage() {
                     </Avatar>
                     <div className="flex-1">
                       <CardTitle className="text-lg font-bold leading-none mb-1">{student.firstName} {student.lastName}</CardTitle>
-                      <CardDescription className="font-mono text-[10px] uppercase tracking-wider">{student.id.substring(0, 8)}</CardDescription>
+                      <CardDescription className="font-mono text-[10px] uppercase tracking-wider text-primary font-bold">
+                        {student.admissionNumber || student.id.substring(0, 8)}
+                      </CardDescription>
                     </div>
                   </div>
                   
@@ -423,7 +407,6 @@ export default function StudentsPage() {
                     } className="rounded-md">
                       {student.status || "Active"}
                     </Badge>
-                    <Badge variant="outline" className="bg-muted/30">Year 1</Badge>
                   </div>
 
                   <div className="grid grid-cols-2 gap-y-3 gap-x-2 text-sm">
@@ -468,7 +451,7 @@ export default function StudentsPage() {
                             </Avatar>
                             <div>
                               <SheetTitle className="text-2xl font-bold">{activeStudent?.firstName} {activeStudent?.lastName}</SheetTitle>
-                              <SheetDescription className="font-mono text-xs">Student ID: {activeStudent?.id}</SheetDescription>
+                              <SheetDescription className="font-mono text-sm font-bold text-primary">ADM: {activeStudent?.admissionNumber || activeStudent?.id}</SheetDescription>
                               <Badge className="mt-2">{activeStudent?.status || "Active"}</Badge>
                             </div>
                           </div>
@@ -515,8 +498,8 @@ export default function StudentsPage() {
                                 <p className="font-medium">{activeStudent?.admissionDate}</p>
                               </div>
                               <div>
-                                <label className="text-xs text-muted-foreground block">Academic Year</label>
-                                <p className="font-medium">2024 - 2025</p>
+                                <label className="text-xs text-muted-foreground block">Admission Number</label>
+                                <p className="font-bold text-primary">{activeStudent?.admissionNumber || "Pending"}</p>
                               </div>
                             </div>
                           </section>
@@ -571,7 +554,7 @@ export default function StudentsPage() {
               <UserX className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
               <h3 className="text-lg font-semibold">No students found</h3>
               <p className="text-muted-foreground text-sm max-w-xs mx-auto mt-1">
-                We couldn't find any enrolled students matching your search criteria or the selected status filter.
+                We couldn't find any enrolled students matching your search criteria.
               </p>
               {activeTab !== "All" && (
                 <Button variant="link" onClick={() => setActiveTab("All")} className="mt-2 text-primary">
@@ -583,13 +566,11 @@ export default function StudentsPage() {
         </div>
       )}
 
-      {/* Edit Student Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-          <DialogContent>
+        <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Edit Student Record</DialogTitle>
-            <DialogDescription>Update the professional and personal information for this student.</DialogDescription>
+            <DialogDescription>Update the information for this student.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-6 py-4">
             <div className="grid grid-cols-2 gap-4">
@@ -613,69 +594,13 @@ export default function StudentsPage() {
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-email">Contact Email</Label>
+                <Label htmlFor="edit-adm">Admission Number</Label>
                 <Input 
-                  id="edit-email" 
-                  type="email" 
-                  value={editFormData.contactEmail} 
-                  onChange={(e) => setEditFormData({...editFormData, contactEmail: e.target.value})}
+                  id="edit-adm" 
+                  value={editFormData.admissionNumber} 
+                  onChange={(e) => setEditFormData({...editFormData, admissionNumber: e.target.value})}
+                  className="font-mono"
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-phone">Contact Phone</Label>
-                <Input 
-                  id="edit-phone" 
-                  value={editFormData.contactPhone} 
-                  onChange={(e) => setEditFormData({...editFormData, contactPhone: e.target.value})}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="edit-address">Physical Address</Label>
-              <Input 
-                id="edit-address" 
-                value={editFormData.address} 
-                onChange={(e) => setEditFormData({...editFormData, address: e.target.value})}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="edit-course">Course Program</Label>
-                <Input 
-                  id="edit-course" 
-                  value={editFormData.appliedCourse} 
-                  onChange={(e) => setEditFormData({...editFormData, appliedCourse: e.target.value})}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-dob">Date of Birth</Label>
-                <Input 
-                  id="edit-dob" 
-                  type="date"
-                  value={editFormData.dateOfBirth} 
-                  onChange={(e) => setEditFormData({...editFormData, dateOfBirth: e.target.value})}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Gender</Label>
-                <Select 
-                  onValueChange={(v) => setEditFormData({...editFormData, gender: v})} 
-                  value={editFormData.gender}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select Gender" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Male">Male</SelectItem>
-                    <SelectItem value="Female">Female</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Academic Status</Label>
@@ -695,12 +620,31 @@ export default function StudentsPage() {
                 </Select>
               </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">Contact Email</Label>
+                <Input 
+                  id="edit-email" 
+                  type="email" 
+                  value={editFormData.contactEmail} 
+                  onChange={(e) => setEditFormData({...editFormData, contactEmail: e.target.value})}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-phone">Contact Phone</Label>
+                <Input 
+                  id="edit-phone" 
+                  value={editFormData.contactPhone} 
+                  onChange={(e) => setEditFormData({...editFormData, contactPhone: e.target.value})}
+                />
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
             <Button onClick={handleSaveEdit} className="bg-primary">Save Changes</Button>
           </DialogFooter>
-          </DialogContent>
         </DialogContent>
       </Dialog>
     </div>
