@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
@@ -32,7 +31,7 @@ import {
   DropdownMenuLabel, 
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
-} from "@/dropdown-menu"
+} from "@/components/ui/dropdown-menu"
 import { 
   Search, 
   FilePlus, 
