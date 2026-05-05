@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useMemo } from "react"
@@ -39,7 +38,8 @@ import {
   Filter,
   DollarSign,
   User,
-  Wallet
+  Wallet,
+  GraduationCap
 } from "lucide-react"
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, serverTimestamp, doc } from "firebase/firestore"
