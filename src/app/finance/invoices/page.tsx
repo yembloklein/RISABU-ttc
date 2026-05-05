@@ -47,7 +47,10 @@ import {
   Calendar,
   Printer,
   Mail,
-  GraduationCap
+  GraduationCap,
+  BadgeCheck,
+  Building2,
+  MailQuestion
 } from "lucide-react"
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, serverTimestamp, doc, query, orderBy } from "firebase/firestore"
@@ -170,68 +173,97 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Printable Invoice/Receipt */}
+      {/* Printable Invoice/Receipt Redesign */}
       {activePrintInvoice && (
-        <div id="invoice-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999] p-12">
-          <div className="max-w-4xl mx-auto border p-12 bg-white flex flex-col h-full">
-            <header className="flex justify-between items-start border-b pb-8 mb-8">
-              <div className="flex items-center gap-4">
-                <div className="bg-primary p-3 rounded-xl">
-                  <GraduationCap className="h-10 w-10 text-white" />
+        <div id="invoice-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999] p-8">
+          <div className="max-w-4xl mx-auto bg-white flex flex-col h-full relative border-[8px] border-primary/10 p-12">
+            {/* Watermark for Paid */}
+            {activePrintInvoice.status === "Paid" && (
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-12 opacity-[0.03] pointer-events-none select-none">
+                <span className="text-[180px] font-black text-primary leading-none">PAID</span>
+              </div>
+            )}
+
+            <header className="flex justify-between items-start border-b-2 border-primary pb-8 mb-10">
+              <div className="flex items-center gap-5">
+                <div className="bg-primary p-4 rounded-2xl shadow-lg">
+                  <GraduationCap className="h-12 w-12 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-black text-primary uppercase">Risabu Connect</h1>
-                  <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Training College</p>
+                  <h1 className="text-3xl font-black text-primary leading-tight uppercase">Risabu Technical</h1>
+                  <p className="text-lg font-bold text-slate-500 uppercase tracking-[0.2em] leading-none">Training College</p>
+                  <p className="text-[10px] text-muted-foreground mt-2 uppercase font-medium">Empowering Excellence through Vocational Education</p>
                 </div>
               </div>
               <div className="text-right">
-                <h2 className="text-3xl font-black text-slate-900 uppercase">
-                  {activePrintInvoice.status === "Paid" ? "Receipt" : "Fee Invoice"}
-                </h2>
-                <p className="text-sm font-mono text-muted-foreground">{activePrintInvoice.invoiceNumber}</p>
-                <p className="text-sm mt-1">Date: {activePrintInvoice.issueDate}</p>
+                <div className="inline-block bg-primary px-6 py-2 rounded-lg mb-4">
+                  <h2 className="text-xl font-black text-white uppercase tracking-wider">
+                    {activePrintInvoice.status === "Paid" ? "Official Receipt" : "Fee Invoice"}
+                  </h2>
+                </div>
+                <div className="space-y-1 text-sm">
+                  <p className="font-mono text-primary font-bold">{activePrintInvoice.invoiceNumber}</p>
+                  <p className="text-muted-foreground">Date: {activePrintInvoice.issueDate}</p>
+                </div>
               </div>
             </header>
 
             <main className="flex-1 space-y-12">
               <div className="grid grid-cols-2 gap-12">
                 <div className="space-y-4">
-                  <h3 className="text-xs font-bold uppercase text-primary border-b pb-1">Bill To</h3>
+                  <div className="flex items-center gap-2 border-b border-primary/20 pb-1">
+                    <User className="h-3.5 w-3.5 text-primary" />
+                    <h3 className="text-[10px] font-bold uppercase text-primary tracking-widest">Student Information</h3>
+                  </div>
                   {(() => {
                     const s = getStudentInfo(activePrintInvoice.studentId)
                     return (
-                      <div className="text-sm space-y-1">
-                        <p className="font-bold text-lg">{s?.name}</p>
-                        <p className="text-muted-foreground uppercase font-mono">ADM: {s?.adm}</p>
+                      <div className="text-sm space-y-1 bg-primary/[0.02] p-4 rounded-xl border border-primary/10">
+                        <p className="font-black text-xl text-slate-900">{s?.name}</p>
+                        <p className="text-primary font-mono font-bold uppercase tracking-wider">ADM: {s?.adm}</p>
                         <p className="text-muted-foreground">{s?.email}</p>
                       </div>
                     )
                   })()}
                 </div>
                 <div className="space-y-4">
-                  <h3 className="text-xs font-bold uppercase text-primary border-b pb-1">Status Summary</h3>
-                  <div className="text-sm space-y-1">
-                    <p className="flex justify-between"><span>Status:</span> <span className="font-bold uppercase">{activePrintInvoice.status}</span></p>
-                    <p className="flex justify-between"><span>Due Date:</span> <span className="font-bold">{activePrintInvoice.dueDate}</span></p>
+                  <div className="flex items-center gap-2 border-b border-primary/20 pb-1">
+                    <Building2 className="h-3.5 w-3.5 text-primary" />
+                    <h3 className="text-[10px] font-bold uppercase text-primary tracking-widest">Account Summary</h3>
+                  </div>
+                  <div className="text-sm space-y-2 bg-primary/[0.02] p-4 rounded-xl border border-primary/10">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Status:</span>
+                      <Badge className={`uppercase font-bold text-[10px] ${activePrintInvoice.status === "Paid" ? "bg-primary" : "bg-destructive"}`}>
+                        {activePrintInvoice.status}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Due Date:</span>
+                      <span className="font-bold text-slate-700">{activePrintInvoice.dueDate}</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="border rounded-xl overflow-hidden">
+              <div className="rounded-2xl border-2 border-primary/10 overflow-hidden shadow-sm">
                 <Table>
-                  <TableHeader className="bg-muted/50">
-                    <TableRow>
-                      <TableHead>Description</TableHead>
-                      <TableHead className="text-right">Amount (KES)</TableHead>
+                  <TableHeader className="bg-primary">
+                    <TableRow className="hover:bg-primary border-none">
+                      <TableHead className="text-white font-bold uppercase text-xs">Academic Fee Description</TableHead>
+                      <TableHead className="text-right text-white font-bold uppercase text-xs">Amount (KES)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    <TableRow className="h-24">
-                      <TableCell className="align-top py-4">
-                        <p className="font-bold">{activePrintInvoice.description}</p>
-                        <p className="text-xs text-muted-foreground mt-1 italic">Academic Fees for Term Session</p>
+                    <TableRow className="h-32">
+                      <TableCell className="align-top py-6">
+                        <p className="font-black text-lg text-primary">{activePrintInvoice.description}</p>
+                        <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
+                          Standard institutional charges for the current academic session. 
+                          Includes tuition, facility use, and administrative levies.
+                        </p>
                       </TableCell>
-                      <TableCell className="text-right align-top py-4 font-mono font-bold">
+                      <TableCell className="text-right align-top py-6 font-mono text-xl font-black text-slate-900">
                         {Number(activePrintInvoice.totalAmount).toLocaleString()}
                       </TableCell>
                     </TableRow>
@@ -239,19 +271,19 @@ export default function InvoicesPage() {
                 </Table>
               </div>
 
-              <div className="flex justify-end">
-                <div className="w-64 space-y-3 pt-4">
-                  <div className="flex justify-between text-sm">
-                    <span>Subtotal:</span>
+              <div className="flex justify-end pt-4">
+                <div className="w-80 space-y-4 bg-primary/[0.03] p-6 rounded-2xl border-2 border-primary/10">
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>Total Billable Amount:</span>
                     <span className="font-mono">{Number(activePrintInvoice.totalAmount).toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between text-sm border-t pt-2">
-                    <span>Amount Paid:</span>
-                    <span className="font-mono text-green-600 font-bold">
-                      {Number(activePrintInvoice.totalAmount - activePrintInvoice.outstandingAmount).toLocaleString()}
+                  <div className="flex justify-between text-sm font-bold text-primary">
+                    <span>Amount Received:</span>
+                    <span className="font-mono">
+                      KES {Number(activePrintInvoice.totalAmount - activePrintInvoice.outstandingAmount).toLocaleString()}
                     </span>
                   </div>
-                  <div className="flex justify-between text-lg font-black border-t-2 border-primary pt-2 text-primary">
+                  <div className="flex justify-between text-2xl font-black border-t-2 border-primary pt-4 text-primary">
                     <span>Balance:</span>
                     <span className="font-mono">KES {Number(activePrintInvoice.outstandingAmount).toLocaleString()}</span>
                   </div>
@@ -259,20 +291,31 @@ export default function InvoicesPage() {
               </div>
             </main>
 
-            <footer className="mt-24 pt-12 border-t flex justify-between items-end">
+            <footer className="mt-20 pt-10 border-t-2 border-primary/20 flex justify-between items-end">
               <div className="space-y-6">
-                <div className="w-48 border-b italic text-xs text-muted-foreground pb-2">Institutional Stamp</div>
-                <p className="text-[10px] text-muted-foreground">This is an electronically generated document. No physical signature required.</p>
+                <div className="relative">
+                  <div className="w-64 border-b-2 border-dashed border-primary/30 h-16"></div>
+                  <span className="text-[10px] font-bold uppercase text-primary tracking-widest block mt-2">Finance Department Seal</span>
+                </div>
+                <div className="flex items-center gap-2 text-[10px] text-muted-foreground font-medium bg-muted/50 p-2 rounded-md">
+                   <BadgeCheck className="h-3.5 w-3.5 text-primary" />
+                   <span>Digitally Authenticated Document - Risabu Connect Ledger System</span>
+                </div>
               </div>
-              <div className="text-right space-y-1">
-                <p className="text-xs font-bold uppercase text-primary">Risabu Connect College</p>
-                <p className="text-[10px] text-muted-foreground">finance@risabu.ac.ke</p>
+              <div className="text-right space-y-2">
+                <p className="text-sm font-black uppercase text-primary">Risabu Technical Training College</p>
+                <div className="text-[10px] text-muted-foreground space-y-1">
+                  <p>Main Campus, P.O. Box 1234 - 00100</p>
+                  <p>Email: finance@risabu.ac.ke</p>
+                  <p>Website: www.risabu.ac.ke</p>
+                </div>
               </div>
             </footer>
           </div>
         </div>
       )}
 
+      {/* Main UI */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Financial Billing</h1>
