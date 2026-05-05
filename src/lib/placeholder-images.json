@@ -1,3 +1,22 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "college-hero",
+      "description": "Risabu Technical Training College Main Building",
+      "imageUrl": "https://picsum.photos/seed/college/1200/600",
+      "imageHint": "college building"
+    },
+    {
+      "id": "student-avatar-1",
+      "description": "Student Profile Placeholder",
+      "imageUrl": "https://picsum.photos/seed/student1/200/200",
+      "imageHint": "student portrait"
+    },
+    {
+      "id": "student-avatar-2",
+      "description": "Student Profile Placeholder",
+      "imageUrl": "https://picsum.photos/seed/student2/200/200",
+      "imageHint": "student portrait"
+    }
+  ]
 }
