@@ -67,9 +67,16 @@
 }
 
 @media print {
+  @page {
+    margin: 0;
+  }
+  
   body {
     background-color: white !important;
+    margin: 0;
+    padding: 0;
   }
+  
   .no-print, 
   [data-sidebar="sidebar"], 
   header, 
@@ -79,14 +86,18 @@
   [role="dialog"] {
     display: none !important;
   }
+  
   main {
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
   }
+  
   .print\:block {
     display: block !important;
   }
+  
+  #invoice-print-container,
   #id-card-print-container,
   #certificate-print-container {
     display: block !important;
@@ -95,12 +106,12 @@
     top: 0;
     width: 100%;
     height: 100%;
+    margin: 0;
+    padding: 0;
   }
 
   #certificate-print-container {
     background: white;
-    padding: 40px;
-    height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
