@@ -60,7 +60,7 @@ import { toast } from "@/hooks/use-toast"
 export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [activeTab, setActiveTab] = useState("Active")
-  const [selectedStudent, setSelectedStudent] = useState<any>(null)
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
   const [printMode, setPrintMode] = useState<'id' | 'certificate' | null>(null)
   
   // Edit State
@@ -88,9 +88,13 @@ export default function StudentsPage() {
 
   const { data: students, isLoading } = useCollection(studentsRef);
 
+  // Derive the active student from the real-time list
+  const activeStudent = useMemo(() => {
+    return (students || []).find(s => s.id === selectedStudentId) || null;
+  }, [students, selectedStudentId]);
+
   const filteredStudents = useMemo(() => {
     return (students || []).filter(stu => {
-      // We only show enrolled students in the directory
       if (stu.admissionStatus !== "Enrolled") return false;
 
       const matchesSearch = 
@@ -120,7 +124,7 @@ export default function StudentsPage() {
   };
 
   const handleOpenEditDialog = (student: any) => {
-    setSelectedStudent(student)
+    setSelectedStudentId(student.id)
     setEditFormData({
       firstName: student.firstName || "",
       lastName: student.lastName || "",
@@ -136,9 +140,9 @@ export default function StudentsPage() {
   }
 
   const handleSaveEdit = () => {
-    if (!firestore || !selectedStudent) return;
+    if (!firestore || !selectedStudentId) return;
     
-    const docRef = doc(firestore, "students", selectedStudent.id);
+    const docRef = doc(firestore, "students", selectedStudentId);
     updateDocumentNonBlocking(docRef, {
       ...editFormData,
       updatedAt: serverTimestamp(),
@@ -153,7 +157,7 @@ export default function StudentsPage() {
   };
 
   const handlePrintID = (student: any) => {
-    setSelectedStudent(student);
+    setSelectedStudentId(student.id);
     setPrintMode('id');
     setTimeout(() => {
       window.print();
@@ -161,7 +165,7 @@ export default function StudentsPage() {
   };
 
   const handlePrintCertificate = (student: any) => {
-    setSelectedStudent(student);
+    setSelectedStudentId(student.id);
     setPrintMode('certificate');
     setTimeout(() => {
       window.print();
@@ -171,7 +175,7 @@ export default function StudentsPage() {
   return (
     <div className="space-y-6">
       {/* Printable ID Card Component */}
-      {selectedStudent && printMode === 'id' && (
+      {activeStudent && printMode === 'id' && (
         <div id="id-card-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999]">
           <div className="flex items-center justify-center h-screen bg-white">
             <div className="w-[3.375in] h-[2.125in] border-[3px] border-primary rounded-xl overflow-hidden flex flex-col relative bg-white shadow-none">
@@ -191,7 +195,7 @@ export default function StudentsPage() {
               <div className="flex p-3 gap-4 flex-1 pl-4">
                 <div className="w-20 h-24 bg-muted rounded-lg overflow-hidden border-2 border-primary/20 shadow-sm">
                   <img 
-                    src={`https://picsum.photos/seed/${selectedStudent.id}/200/200`} 
+                    src={`https://picsum.photos/seed/${activeStudent.id}/200/200`} 
                     alt="Photo" 
                     className="w-full h-full object-cover"
                   />
@@ -199,22 +203,22 @@ export default function StudentsPage() {
                 <div className="flex flex-col flex-1 gap-1 py-1">
                   <div className="mb-1">
                     <span className="text-[6px] text-primary font-bold uppercase block tracking-wider">Full Name</span>
-                    <span className="text-sm font-bold leading-tight block text-slate-900">{selectedStudent.firstName} {selectedStudent.lastName}</span>
+                    <span className="text-sm font-bold leading-tight block text-slate-900">{activeStudent.firstName} {activeStudent.lastName}</span>
                   </div>
                   <div>
                     <span className="text-[6px] text-primary font-bold uppercase block tracking-wider">Program of Study</span>
                     <span className="text-[9px] font-semibold leading-tight block truncate max-w-[130px] text-slate-700">
-                      {selectedStudent.appliedCourse || "General Studies"}
+                      {activeStudent.appliedCourse || "General Studies"}
                     </span>
                   </div>
                   <div className="flex gap-4 mt-auto">
                     <div>
                       <span className="text-[6px] text-primary font-bold uppercase block tracking-wider">Reg. No</span>
-                      <span className="text-[9px] font-mono font-bold block text-slate-900">{selectedStudent.id.substring(0, 8).toUpperCase()}</span>
+                      <span className="text-[9px] font-mono font-bold block text-slate-900">{activeStudent.id.substring(0, 8).toUpperCase()}</span>
                     </div>
                     <div>
                       <span className="text-[6px] text-primary font-bold uppercase block tracking-wider">Issue Date</span>
-                      <span className="text-[9px] font-bold block text-slate-900">{selectedStudent.admissionDate}</span>
+                      <span className="text-[9px] font-bold block text-slate-900">{activeStudent.admissionDate}</span>
                     </div>
                   </div>
                 </div>
@@ -232,11 +236,10 @@ export default function StudentsPage() {
       )}
 
       {/* Printable Graduation Certificate Component */}
-      {selectedStudent && printMode === 'certificate' && (
+      {activeStudent && printMode === 'certificate' && (
         <div id="certificate-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999]">
           <div className="w-[11in] h-[8.5in] border-[12px] border-primary p-1 bg-white relative">
             <div className="w-full h-full border-[2px] border-primary p-12 flex flex-col items-center justify-between text-center relative overflow-hidden">
-              {/* Decorative Corner Accents */}
               <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 -mr-32 -mt-32 rounded-full"></div>
               <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/5 -ml-32 -mb-32 rounded-full"></div>
               
@@ -262,7 +265,7 @@ export default function StudentsPage() {
                   <span className="text-2xl font-serif italic text-primary/70">This is to certify that</span>
                   <div className="relative inline-block w-full">
                     <h3 className="text-7xl font-black text-slate-900 py-6 tracking-tight relative z-10">
-                      {selectedStudent.firstName} {selectedStudent.lastName}
+                      {activeStudent.firstName} {activeStudent.lastName}
                     </h3>
                     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-3/4 h-1 bg-primary/10 rounded-full"></div>
                   </div>
@@ -272,7 +275,7 @@ export default function StudentsPage() {
                   <span className="text-xl font-medium text-slate-500 uppercase tracking-widest">has successfully fulfilled the prescribed requirements for the award of</span>
                   <div className="bg-primary/5 py-8 px-16 rounded-3xl border-2 border-primary/20 inline-block shadow-inner">
                     <h4 className="text-4xl font-black text-primary uppercase tracking-tight">
-                      {selectedStudent.appliedCourse || "Professional Certification"}
+                      {activeStudent.appliedCourse || "Professional Certification"}
                     </h4>
                   </div>
                 </div>
@@ -290,7 +293,7 @@ export default function StudentsPage() {
               <footer className="w-full flex justify-around items-end pt-12">
                 <div className="flex flex-col items-center gap-3">
                   <div className="w-56 border-b-4 border-primary/20 h-16 flex items-end justify-center pb-2 italic text-slate-400">
-                    <span className="font-mono text-[10px] opacity-40 uppercase tracking-[0.2em]">{selectedStudent.id.substring(0, 12)}</span>
+                    <span className="font-mono text-[10px] opacity-40 uppercase tracking-[0.2em]">{activeStudent.id.substring(0, 12)}</span>
                   </div>
                   <span className="text-sm font-black text-primary uppercase tracking-[0.2em]">Registrar</span>
                 </div>
@@ -382,7 +385,7 @@ export default function StudentsPage() {
                     <DropdownMenuContent align="end" className="w-48">
                       <DropdownMenuLabel>Actions</DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => setSelectedStudent(student)}>
+                      <DropdownMenuItem onClick={() => setSelectedStudentId(student.id)}>
                         <UserCircle className="mr-2 h-4 w-4" /> View Full Profile
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleOpenEditDialog(student)}>
@@ -445,13 +448,13 @@ export default function StudentsPage() {
                   </div>
 
                   <div className="pt-2 border-t">
-                    <Sheet onOpenChange={(open) => { if(!open) setSelectedStudent(null) }}>
+                    <Sheet onOpenChange={(open) => { if(!open) setSelectedStudentId(null) }}>
                       <SheetTrigger asChild>
                         <Button 
                           variant="secondary" 
                           size="sm" 
                           className="w-full text-xs"
-                          onClick={() => setSelectedStudent(student)}
+                          onClick={() => setSelectedStudentId(student.id)}
                         >
                           Quick View Details
                         </Button>
@@ -460,13 +463,13 @@ export default function StudentsPage() {
                         <SheetHeader className="pb-6">
                           <div className="flex items-center gap-4">
                             <Avatar className="h-20 w-20 border-4 border-primary/10">
-                              <AvatarImage src={`https://picsum.photos/seed/${selectedStudent?.id}/200/200`} />
-                              <AvatarFallback className="text-xl">{selectedStudent?.firstName?.[0]}{selectedStudent?.lastName?.[0]}</AvatarFallback>
+                              <AvatarImage src={`https://picsum.photos/seed/${activeStudent?.id}/200/200`} />
+                              <AvatarFallback className="text-xl">{activeStudent?.firstName?.[0]}{activeStudent?.lastName?.[0]}</AvatarFallback>
                             </Avatar>
                             <div>
-                              <SheetTitle className="text-2xl font-bold">{selectedStudent?.firstName} {selectedStudent?.lastName}</SheetTitle>
-                              <SheetDescription className="font-mono text-xs">Student ID: {selectedStudent?.id}</SheetDescription>
-                              <Badge className="mt-2">{selectedStudent?.status || "Active"}</Badge>
+                              <SheetTitle className="text-2xl font-bold">{activeStudent?.firstName} {activeStudent?.lastName}</SheetTitle>
+                              <SheetDescription className="font-mono text-xs">Student ID: {activeStudent?.id}</SheetDescription>
+                              <Badge className="mt-2">{activeStudent?.status || "Active"}</Badge>
                             </div>
                           </div>
                         </SheetHeader>
@@ -480,19 +483,19 @@ export default function StudentsPage() {
                             <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-xl text-sm">
                               <div>
                                 <label className="text-xs text-muted-foreground block">Full Name</label>
-                                <p className="font-medium">{selectedStudent?.firstName} {selectedStudent?.lastName}</p>
+                                <p className="font-medium">{activeStudent?.firstName} {activeStudent?.lastName}</p>
                               </div>
                               <div>
                                 <label className="text-xs text-muted-foreground block">Date of Birth</label>
-                                <p className="font-medium">{selectedStudent?.dateOfBirth || "12-05-2002"}</p>
+                                <p className="font-medium">{activeStudent?.dateOfBirth || "Not Recorded"}</p>
                               </div>
                               <div>
                                 <label className="text-xs text-muted-foreground block">Gender</label>
-                                <p className="font-medium">{selectedStudent?.gender || "Not Specified"}</p>
+                                <p className="font-medium">{activeStudent?.gender || "Not Specified"}</p>
                               </div>
                               <div>
                                 <label className="text-xs text-muted-foreground block">Address</label>
-                                <p className="font-medium">{selectedStudent?.address || "Mombasa Road, Nairobi"}</p>
+                                <p className="font-medium">{activeStudent?.address || "Nairobi, Kenya"}</p>
                               </div>
                             </div>
                           </section>
@@ -505,11 +508,11 @@ export default function StudentsPage() {
                             <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-xl text-sm">
                               <div className="col-span-2">
                                 <label className="text-xs text-muted-foreground block">Enrolled Course</label>
-                                <p className="font-medium">{selectedStudent?.appliedCourse || "Diploma in Graphics Design"}</p>
+                                <p className="font-medium">{activeStudent?.appliedCourse || "General Studies"}</p>
                               </div>
                               <div>
                                 <label className="text-xs text-muted-foreground block">Admission Date</label>
-                                <p className="font-medium">{selectedStudent?.admissionDate}</p>
+                                <p className="font-medium">{activeStudent?.admissionDate}</p>
                               </div>
                               <div>
                                 <label className="text-xs text-muted-foreground block">Academic Year</label>
@@ -526,35 +529,31 @@ export default function StudentsPage() {
                             <div className="space-y-3 bg-muted/30 p-4 rounded-xl text-sm">
                               <div className="flex items-center justify-between">
                                 <span className="text-muted-foreground">Primary Email</span>
-                                <span className="font-medium">{selectedStudent?.contactEmail}</span>
+                                <span className="font-medium">{activeStudent?.contactEmail}</span>
                               </div>
                               <div className="flex items-center justify-between">
                                 <span className="text-muted-foreground">Phone Number</span>
-                                <span className="font-medium">{selectedStudent?.contactPhone || "+254 700 000000"}</span>
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">Emergency Contact</span>
-                                <span className="font-medium">Parent/Guardian</span>
+                                <span className="font-medium">{activeStudent?.contactPhone || "N/A"}</span>
                               </div>
                             </div>
                           </section>
                           
                           <div className="flex flex-col gap-2 pt-6">
                             <div className="flex gap-2">
-                              <Button className="flex-1 bg-primary" onClick={() => handlePrintID(selectedStudent)}>
+                              <Button className="flex-1 bg-primary" onClick={() => handlePrintID(activeStudent)}>
                                 <Printer className="h-4 w-4 mr-2" />
                                 Print ID Card
                               </Button>
                               <Button 
                                 variant="outline" 
                                 className="flex-1"
-                                onClick={() => handleOpenEditDialog(selectedStudent)}
+                                onClick={() => handleOpenEditDialog(activeStudent)}
                               >
                                 Edit Records
                               </Button>
                             </div>
-                            {selectedStudent?.status === "Graduated" && (
-                              <Button className="w-full bg-accent hover:bg-accent/90" onClick={() => handlePrintCertificate(selectedStudent)}>
+                            {activeStudent?.status === "Graduated" && (
+                              <Button className="w-full bg-accent hover:bg-accent/90" onClick={() => handlePrintCertificate(activeStudent)}>
                                 <Award className="h-4 w-4 mr-2" />
                                 Print Graduation Certificate
                               </Button>

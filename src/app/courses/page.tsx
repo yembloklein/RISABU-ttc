@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -39,7 +39,7 @@ const INITIAL_COURSES = [
 export default function CoursesPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingCourse, setEditingCourse] = useState<any>(null)
+  const [editingCourseId, setEditingCourseId] = useState<string | null>(null)
   const [formData, setFormData] = useState({ name: "", tuitionFee: "", durationMonths: "", description: "" })
   
   const firestore = useFirestore()
@@ -49,13 +49,15 @@ export default function CoursesPage() {
   const programsRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "programs") : null, [firestore, user])
   const { data: programs, isLoading } = useCollection(programsRef)
 
-  const filteredPrograms = (programs || []).filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const filteredPrograms = useMemo(() => {
+    return (programs || []).filter(p => 
+      p.name.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  }, [programs, searchTerm]);
 
   const handleOpenDialog = (course: any = null) => {
     if (course) {
-      setEditingCourse(course)
+      setEditingCourseId(course.id)
       setFormData({
         name: course.name,
         tuitionFee: course.tuitionFee.toString(),
@@ -63,7 +65,7 @@ export default function CoursesPage() {
         description: course.description || ""
       })
     } else {
-      setEditingCourse(null)
+      setEditingCourseId(null)
       setFormData({ name: "", tuitionFee: "", durationMonths: "", description: "" })
     }
     setIsDialogOpen(true)
@@ -80,8 +82,8 @@ export default function CoursesPage() {
       updatedAt: serverTimestamp(),
     }
 
-    if (editingCourse) {
-      const docRef = doc(firestore!, "programs", editingCourse.id)
+    if (editingCourseId) {
+      const docRef = doc(firestore!, "programs", editingCourseId)
       updateDocumentNonBlocking(docRef, data)
     } else {
       addDocumentNonBlocking(programsRef, {
@@ -133,7 +135,7 @@ export default function CoursesPage() {
               </DialogTrigger>
               <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
-                  <DialogTitle>{editingCourse ? "Edit Course" : "Add New Course"}</DialogTitle>
+                  <DialogTitle>{editingCourseId ? "Edit Course" : "Add New Course"}</DialogTitle>
                   <DialogDescription>
                     Fill in the details for the academic program.
                   </DialogDescription>
@@ -180,7 +182,7 @@ export default function CoursesPage() {
                 </div>
                 <DialogFooter>
                   <Button onClick={handleSaveCourse} className="bg-primary">
-                    {editingCourse ? "Update Course" : "Create Course"}
+                    {editingCourseId ? "Update Course" : "Create Course"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
