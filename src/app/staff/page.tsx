@@ -20,7 +20,8 @@ import {
   Lock,
   CheckCircle2,
   Plus,
-  Briefcase
+  Briefcase,
+  Phone
 } from "lucide-react"
 import { 
   DropdownMenu, 
@@ -59,7 +60,14 @@ const DEPARTMENTS = [
 export default function StaffPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [formData, setFormData] = useState({ firstName: "", lastName: "", email: "", role: "Staff", department: "Administration" })
+  const [formData, setFormData] = useState({ 
+    firstName: "", 
+    lastName: "", 
+    email: "", 
+    phone: "",
+    role: "Staff", 
+    department: "Administration" 
+  })
   
   const firestore = useFirestore()
   const { user } = useUser()
@@ -78,7 +86,8 @@ export default function StaffPage() {
         u.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.lastName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.department?.toLowerCase().includes(searchTerm.toLowerCase());
+        u.department?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        u.phone?.includes(searchTerm);
       
       return matchesSearch;
     }).sort((a, b) => (a.role === "Admin" ? -1 : 1));
@@ -92,7 +101,6 @@ export default function StaffPage() {
       return;
     }
 
-    // Use email as a temporary ID prefix if UID isn't available yet
     const tempId = `pre-${Date.now()}`;
     const userDocRef = doc(firestore, "users", tempId);
 
@@ -101,18 +109,16 @@ export default function StaffPage() {
       firstName: formData.firstName,
       lastName: formData.lastName,
       email: formData.email,
+      phone: formData.phone,
       role: formData.role,
       department: formData.department,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }, { merge: true });
 
-    // If assigned as staff, also pre-seed roles_staff if needed (usually handled on login)
-    // but for manual records, we just want the profile visible.
-
     toast({ title: "Employee Added", description: `${formData.firstName} has been recorded in the directory.` });
     setIsCreateOpen(false);
-    setFormData({ firstName: "", lastName: "", email: "", role: "Staff", department: "Administration" });
+    setFormData({ firstName: "", lastName: "", email: "", phone: "", role: "Staff", department: "Administration" });
   };
 
   const handleUpdateRole = (userId: string, newRole: string) => {
@@ -179,6 +185,10 @@ export default function StaffPage() {
                   <Label htmlFor="email">Work Email</Label>
                   <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="j.doe@risabu.ac.ke" />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number</Label>
+                  <Input id="phone" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} placeholder="+254 700 000 000" />
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Department</Label>
@@ -218,7 +228,7 @@ export default function StaffPage() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input 
-          placeholder="Search staff by name, email or department..." 
+          placeholder="Search staff by name, email, phone or department..." 
           className="pl-10 h-10"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -278,9 +288,17 @@ export default function StaffPage() {
                 </CardHeader>
 
                 <CardContent className="pt-4 space-y-3">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Briefcase className="h-4 w-4 text-primary/60" />
-                    <span>{staff.department || "No Dept. Assigned"}</span>
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Briefcase className="h-4 w-4 text-primary/60" />
+                      <span>{staff.department || "No Dept. Assigned"}</span>
+                    </div>
+                    {staff.phone && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Phone className="h-4 w-4 text-primary/60" />
+                        <span>{staff.phone}</span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center justify-between">
                     <Badge variant={staff.role === "Admin" ? "default" : "secondary"} className="rounded-md px-2 py-0.5 text-[10px] uppercase font-bold tracking-tight">
