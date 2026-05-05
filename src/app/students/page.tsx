@@ -176,70 +176,84 @@ export default function StudentsPage() {
       {/* Printable Graduation Certificate Component */}
       {selectedStudent && printMode === 'certificate' && (
         <div id="certificate-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999]">
-          <div className="w-[11in] h-[8.5in] border-[12px] border-primary p-12 bg-white flex flex-col items-center justify-between text-center relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 -mr-32 -mt-32 rounded-full"></div>
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/5 -ml-32 -mb-32 rounded-full"></div>
-            
-            <header className="space-y-4">
-              <div className="flex items-center justify-center gap-4">
-                <div className="bg-primary p-4 rounded-xl shadow-lg">
-                  <GraduationCap className="h-12 w-12 text-white" />
-                </div>
-                <div className="text-left">
-                  <h1 className="text-4xl font-black text-primary uppercase tracking-tighter">Risabu Technical</h1>
-                  <h2 className="text-2xl font-bold text-slate-700 uppercase tracking-widest -mt-1">Training College</h2>
-                </div>
-              </div>
-              <div className="w-full h-1 bg-primary/20 rounded-full mx-auto max-w-2xl"></div>
-            </header>
-
-            <main className="space-y-10 flex-1 flex flex-col justify-center">
-              <div className="space-y-2">
-                <span className="text-xl font-bold italic text-primary/60 uppercase tracking-widest">This is to certify that</span>
-                <h3 className="text-6xl font-black text-slate-900 py-4 decoration-primary decoration-4 underline-offset-8">
-                  {selectedStudent.firstName} {selectedStudent.lastName}
-                </h3>
-              </div>
-
-              <div className="space-y-4">
-                <span className="text-xl font-medium text-slate-600">has successfully fulfilled the requirements for the award of</span>
-                <div className="bg-primary/5 py-6 px-12 rounded-2xl border-2 border-primary/10 inline-block">
-                  <h4 className="text-4xl font-black text-primary uppercase tracking-tight">
-                    {selectedStudent.appliedCourse || "Professional Certification"}
-                  </h4>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-center gap-2">
-                <span className="text-lg text-slate-500 italic">Given this day of {new Date().toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                <Badge className="px-6 py-2 text-lg rounded-full bg-primary/10 text-primary border-primary/20 font-bold">
-                  Class of {new Date().getFullYear()}
-                </Badge>
-              </div>
-            </main>
-
-            <footer className="w-full flex justify-around items-end pt-12">
-              <div className="flex flex-col items-center gap-2">
-                <div className="w-48 border-b-2 border-slate-300 h-12 flex items-center justify-center italic text-slate-400">
-                  <span className="font-mono text-xs opacity-30 uppercase tracking-[0.2em]">{selectedStudent.id.substring(0, 12)}</span>
-                </div>
-                <span className="text-sm font-bold text-slate-600 uppercase tracking-widest">Registrar</span>
-              </div>
+          <div className="w-[11in] h-[8.5in] border-[12px] border-primary p-1 bg-white relative">
+            <div className="w-full h-full border-[2px] border-primary p-12 flex flex-col items-center justify-between text-center relative overflow-hidden">
+              {/* Decorative Corner Accents */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 -mr-32 -mt-32 rounded-full"></div>
+              <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/5 -ml-32 -mb-32 rounded-full"></div>
               
-              <div className="relative">
-                <div className="w-32 h-32 border-4 border-primary/20 rounded-full flex items-center justify-center">
-                   <FileBadge className="h-16 w-16 text-primary/30" />
+              <header className="space-y-6 w-full">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="bg-primary p-5 rounded-2xl shadow-xl border-4 border-white">
+                    <GraduationCap className="h-14 w-14 text-white" />
+                  </div>
+                  <div className="space-y-1">
+                    <h1 className="text-5xl font-black text-primary uppercase tracking-tighter">Risabu Technical</h1>
+                    <h2 className="text-2xl font-bold text-slate-600 uppercase tracking-[0.3em]">Training College</h2>
+                  </div>
                 </div>
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary/10 font-black text-xl uppercase rotate-45 pointer-events-none">
-                  OFFICIAL SEAL
+                <div className="flex items-center gap-4 justify-center">
+                  <div className="h-[2px] bg-primary/20 flex-1 max-w-[150px]"></div>
+                  <span className="text-xs font-bold text-primary uppercase tracking-[0.4em] px-4">Quality Education for All</span>
+                  <div className="h-[2px] bg-primary/20 flex-1 max-w-[150px]"></div>
                 </div>
-              </div>
+              </header>
 
-              <div className="flex flex-col items-center gap-2">
-                <div className="w-48 border-b-2 border-slate-300 h-12"></div>
-                <span className="text-sm font-bold text-slate-600 uppercase tracking-widest">Principal</span>
-              </div>
-            </footer>
+              <main className="space-y-10 flex-1 flex flex-col justify-center w-full max-w-4xl">
+                <div className="space-y-3">
+                  <span className="text-2xl font-serif italic text-primary/70">This is to certify that</span>
+                  <div className="relative inline-block w-full">
+                    <h3 className="text-7xl font-black text-slate-900 py-6 tracking-tight relative z-10">
+                      {selectedStudent.firstName} {selectedStudent.lastName}
+                    </h3>
+                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 w-3/4 h-1 bg-primary/10 rounded-full"></div>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <span className="text-xl font-medium text-slate-500 uppercase tracking-widest">has successfully fulfilled the prescribed requirements for the award of</span>
+                  <div className="bg-primary/5 py-8 px-16 rounded-3xl border-2 border-primary/20 inline-block shadow-inner">
+                    <h4 className="text-4xl font-black text-primary uppercase tracking-tight">
+                      {selectedStudent.appliedCourse || "Professional Certification"}
+                    </h4>
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-center gap-3">
+                  <span className="text-lg text-slate-400 italic font-serif">Given this day of {new Date().toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+                  <div className="flex items-center gap-2">
+                    <Badge className="px-8 py-2.5 text-xl rounded-full bg-primary text-white border-none font-black shadow-lg">
+                      CLASS OF {new Date().getFullYear()}
+                    </Badge>
+                  </div>
+                </div>
+              </main>
+
+              <footer className="w-full flex justify-around items-end pt-12">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-56 border-b-4 border-primary/20 h-16 flex items-end justify-center pb-2 italic text-slate-400">
+                    <span className="font-mono text-[10px] opacity-40 uppercase tracking-[0.2em]">{selectedStudent.id.substring(0, 12)}</span>
+                  </div>
+                  <span className="text-sm font-black text-primary uppercase tracking-[0.2em]">Registrar</span>
+                </div>
+                
+                <div className="relative group">
+                  <div className="w-40 h-40 border-[6px] border-primary/10 rounded-full flex items-center justify-center bg-primary/[0.02]">
+                    <div className="w-32 h-32 border-2 border-dashed border-primary/30 rounded-full flex items-center justify-center">
+                      <FileBadge className="h-20 w-20 text-primary/40" />
+                    </div>
+                  </div>
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-primary/10 font-black text-2xl uppercase -rotate-12 pointer-events-none text-center leading-none">
+                    OFFICIAL<br/>INSTITUTIONAL<br/>SEAL
+                  </div>
+                </div>
+
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-56 border-b-4 border-primary/20 h-16"></div>
+                  <span className="text-sm font-black text-primary uppercase tracking-[0.2em]">Principal</span>
+                </div>
+              </footer>
+            </div>
           </div>
         </div>
       )}
