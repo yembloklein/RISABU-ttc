@@ -21,7 +21,8 @@ import {
   BookOpen,
   CheckCircle2,
   Clock,
-  UserX
+  UserX,
+  Printer
 } from "lucide-react"
 import { 
   Sheet, 
@@ -91,16 +92,79 @@ export default function StudentsPage() {
     });
   };
 
+  const handlePrintID = () => {
+    window.print();
+  };
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Printable ID Card Component (Hidden in UI, visible on Print) */}
+      {selectedStudent && (
+        <div id="id-card-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999]">
+          <div className="flex items-center justify-center h-screen bg-white">
+            <div className="w-[3.375in] h-[2.125in] border-2 border-primary rounded-xl overflow-hidden flex flex-col relative bg-white shadow-none">
+              {/* Card Header */}
+              <div className="bg-primary p-2 flex items-center gap-2">
+                <div className="bg-white p-1 rounded-md">
+                  <GraduationCap className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold text-white uppercase leading-none">Risabu Technical</span>
+                  <span className="text-[8px] text-white/80 leading-none">Training College</span>
+                </div>
+              </div>
+              
+              {/* Card Body */}
+              <div className="flex p-3 gap-3 flex-1">
+                <div className="w-20 h-24 bg-muted rounded-md overflow-hidden border">
+                  <img 
+                    src={`https://picsum.photos/seed/${selectedStudent.id}/200/200`} 
+                    alt="Photo" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="flex flex-col flex-1 gap-1">
+                  <div className="mb-1">
+                    <span className="text-[7px] text-muted-foreground uppercase block">Student Name</span>
+                    <span className="text-sm font-bold leading-tight block">{selectedStudent.firstName} {selectedStudent.lastName}</span>
+                  </div>
+                  <div>
+                    <span className="text-[7px] text-muted-foreground uppercase block">Course</span>
+                    <span className="text-[10px] font-medium leading-tight block truncate max-w-[120px]">
+                      {selectedStudent.appliedCourse || "General Studies"}
+                    </span>
+                  </div>
+                  <div className="flex gap-4 mt-auto">
+                    <div>
+                      <span className="text-[7px] text-muted-foreground uppercase block">ID Number</span>
+                      <span className="text-[9px] font-mono font-bold block">{selectedStudent.id.substring(0, 8).toUpperCase()}</span>
+                    </div>
+                    <div>
+                      <span className="text-[7px] text-muted-foreground uppercase block">Admitted</span>
+                      <span className="text-[9px] font-bold block">{selectedStudent.admissionDate}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card Footer */}
+              <div className="border-t px-3 py-1 flex justify-between items-center bg-muted/20">
+                <span className="text-[7px] font-medium text-muted-foreground italic">Authorized Institutional ID</span>
+                <div className="w-16 h-4 border-b border-black/30"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 no-print">
         <div>
           <h1 className="text-3xl font-bold">Student Directory</h1>
           <p className="text-muted-foreground">Manage and track the academic progress of all enrolled students</p>
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+      <div className="flex flex-col md:flex-row gap-4 items-center justify-between no-print">
         <Tabs defaultValue="Active" className="w-full md:w-auto" onValueChange={setActiveTab}>
           <TabsList className="bg-muted/50">
             <TabsTrigger value="Active">Active</TabsTrigger>
@@ -127,12 +191,12 @@ export default function StudentsPage() {
       </div>
 
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-24">
+        <div className="flex flex-col items-center justify-center py-24 no-print">
           <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
           <p className="text-muted-foreground animate-pulse">Retrieving student records...</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 no-print">
           {filteredStudents.length > 0 ? (
             filteredStudents.map((student) => (
               <Card key={student.id} className="group hover:border-primary/50 transition-all duration-300 shadow-sm hover:shadow-md">
@@ -214,7 +278,7 @@ export default function StudentsPage() {
                   </div>
 
                   <div className="pt-2 border-t">
-                    <Sheet>
+                    <Sheet onOpenChange={(open) => { if(!open) setSelectedStudent(null) }}>
                       <SheetTrigger asChild>
                         <Button 
                           variant="secondary" 
@@ -309,7 +373,10 @@ export default function StudentsPage() {
                           </section>
                           
                           <div className="flex gap-2 pt-6">
-                            <Button className="flex-1 bg-primary">Print ID Card</Button>
+                            <Button className="flex-1 bg-primary" onClick={handlePrintID}>
+                              <Printer className="h-4 w-4 mr-2" />
+                              Print ID Card
+                            </Button>
                             <Button variant="outline" className="flex-1">Edit Records</Button>
                           </div>
                         </div>
@@ -320,7 +387,7 @@ export default function StudentsPage() {
               </Card>
             ))
           ) : (
-            <div className="col-span-full py-24 text-center bg-muted/20 rounded-2xl border-2 border-dashed">
+            <div className="col-span-full py-24 text-center bg-muted/20 rounded-2xl border-2 border-dashed no-print">
               <UserX className="h-12 w-12 mx-auto text-muted-foreground/30 mb-4" />
               <h3 className="text-lg font-semibold">No students found</h3>
               <p className="text-muted-foreground text-sm max-w-xs mx-auto mt-1">
