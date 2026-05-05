@@ -2,12 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { GraduationCap, Loader2, Key, UserPlus, LogIn } from "lucide-react"
-import { useAuth, useUser, initiateAnonymousSignIn, initiateEmailSignIn, initiateEmailSignUp } from "@/firebase"
+import { GraduationCap, Loader2, UserPlus, LogIn } from "lucide-react"
+import { useAuth, useUser, initiateEmailSignIn, initiateEmailSignUp } from "@/firebase"
 
 export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false)
@@ -37,17 +37,6 @@ export default function LoginPage() {
       }
     } catch (err: any) {
       setError(err.message || "Authentication failed")
-      setLoading(false)
-    }
-  }
-
-  const handleGuestSignIn = () => {
-    setLoading(true)
-    setError(null)
-    try {
-      initiateAnonymousSignIn(auth)
-    } catch (err: any) {
-      setError("Demo access is temporarily unavailable")
       setLoading(false)
     }
   }
@@ -117,19 +106,6 @@ export default function LoginPage() {
             </button>
           </div>
         </CardContent>
-        <CardFooter className="flex flex-col gap-4 border-t pt-6 bg-muted/20">
-          <div className="relative w-full">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-muted px-2 text-muted-foreground">Demo Access</span>
-            </div>
-          </div>
-          <Button variant="outline" className="w-full" onClick={handleGuestSignIn} disabled={loading}>
-            <Key className="mr-2 h-4 w-4" /> Sign in as Guest Admin
-          </Button>
-        </CardFooter>
       </Card>
     </div>
   )
