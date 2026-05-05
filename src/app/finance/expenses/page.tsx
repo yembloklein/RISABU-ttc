@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from "react"
@@ -36,9 +37,9 @@ export default function ExpensesPage() {
   const { user } = useUser()
   
   const expensesRef = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !user) return null;
     return collection(firestore, "expenses");
-  }, [firestore]);
+  }, [firestore, user]);
 
   const { data: expenses, isLoading } = useCollection(expensesRef);
 

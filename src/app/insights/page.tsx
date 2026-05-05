@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from "react"
@@ -19,7 +20,7 @@ import { adminFinancialTrendSummary, type AdminFinancialTrendSummaryOutput } fro
 import { adminUnusualExpenseDetection, type AdminUnusualExpenseDetectionOutput } from "@/ai/flows/admin-unusual-expense-detection"
 import { Skeleton } from "@/components/ui/skeleton"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { useFirestore, useCollection, useMemoFirebase } from "@/firebase"
+import { useFirestore, useCollection, useMemoFirebase, useUser } from "@/firebase"
 import { collection } from "firebase/firestore"
 
 export default function AIInsightsPage() {
@@ -30,7 +31,13 @@ export default function AIInsightsPage() {
   const [analyzingAnomaly, setAnalyzingAnomaly] = useState(false)
 
   const firestore = useFirestore()
-  const expensesRef = useMemoFirebase(() => firestore ? collection(firestore, "expenses") : null, [firestore])
+  const { user } = useUser()
+  
+  const expensesRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return collection(firestore, "expenses");
+  }, [firestore, user]);
+  
   const { data: realExpenses } = useCollection(expensesRef)
 
   const handleGenerateSummary = async () => {

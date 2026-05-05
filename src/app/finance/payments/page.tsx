@@ -1,3 +1,4 @@
+
 "use client"
 
 import { useState } from "react"
@@ -36,8 +37,8 @@ export default function PaymentsPage() {
   const firestore = useFirestore()
   const { user } = useUser()
 
-  const paymentsRef = useMemoFirebase(() => firestore ? collection(firestore, "payments") : null, [firestore])
-  const invoicesRef = useMemoFirebase(() => firestore ? collection(firestore, "invoices") : null, [firestore])
+  const paymentsRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "payments") : null, [firestore, user])
+  const invoicesRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "invoices") : null, [firestore, user])
   
   const { data: payments, isLoading } = useCollection(paymentsRef)
   const { data: invoices } = useCollection(invoicesRef)
