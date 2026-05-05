@@ -6,15 +6,8 @@ service cloud.firestore {
      * Risabu Connect ERP Security Rules
      *
      * Philosophy:
-     * This ruleset implements a robust Role-Based Access Control (RBAC) system for a technical training college ERP.
-     * It prioritizes authorization independence by using dedicated role collections and denormalized
-     * user identifiers (Firebase UIDs) to avoid excessive cross-document lookups.
-     *
-     * Data Structure:
-     * - Global Roles: Managed in /roles_admin and /roles_staff collections.
-     * - User Data: Scoped to /users/{userId} where userId matches the Firebase Auth UID.
-     * - Academic & Financial Data: Top-level collections (/programs, /students, /invoices, etc.)
-     *   secured via internal staff roles or denormalized student UID fields.
+     * - Super Admin: Strictly limited to clainyemblo@gmail.com.
+     * - Authorization Independence: Role-based access controlled via dedicated collections.
      */
 
     // --- Helper Functions ---
@@ -24,14 +17,14 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    /** @description Checks if the user exists in the admin role collection. */
-    function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    /** @description Checks if the user is the designated super admin. */
+    function isSuperAdmin() {
+      return isSignedIn() && request.auth.token.email == "clainyemblo@gmail.com";
     }
 
-    /** @description Checks if the user is the designated bootstrap admin email. */
-    function isBootstrapper() {
-      return isSignedIn() && request.auth.token.email == "clainyemblo@gmail.com";
+    /** @description Checks if the user exists in the admin role collection. */
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)) && isSuperAdmin();
     }
 
     /** @description Checks if the user exists in the staff role collection. */
@@ -49,16 +42,12 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    /**
-     * @description Validates that the recordedBy field in the document matches the actor.
-     */
+    /** @description Validates that the recordedBy field in the document matches the actor. */
     function isResourceRecorder(data) {
       return isSignedIn() && data.recordedByUserFirebaseUid == request.auth.uid;
     }
 
-    /**
-     * @description Validates that the student field in the document matches the actor.
-     */
+    /** @description Validates that the student field in the document matches the actor. */
     function isResourceStudent(data) {
       return isSignedIn() && data.studentFirebaseUid == request.auth.uid;
     }
@@ -76,15 +65,16 @@ service cloud.firestore {
     match /roles_admin/{userId} {
       allow get: if isSignedIn();
       allow list: if isAdmin();
-      // Allow the designated email to create their own admin doc if it doesn't exist
-      allow create: if isAdmin() || (isBootstrapper() && request.auth.uid == userId);
-      allow update, delete: if isAdmin();
+      // Only the designated email can create its own admin record
+      allow create: if isSuperAdmin() && request.auth.uid == userId;
+      allow update, delete: if isSuperAdmin();
     }
 
     match /roles_staff/{userId} {
       allow get: if isSignedIn();
       allow list: if isAdmin();
-      allow create, update, delete: if isAdmin();
+      allow create: if isSignedIn(); // Users bootstrap their own staff record
+      allow update, delete: if isAdmin();
     }
 
     match /programs/{programId} {
@@ -109,14 +99,14 @@ service cloud.firestore {
     match /invoices/{invoiceId} {
       allow get, list: if isInternal() || isResourceStudent(resource.data);
       allow create: if isInternal() && request.resource.data.recordedByUserFirebaseUid == request.auth.uid;
-      allow update: if isInternal() && request.resource.data.recordedByUserFirebaseUid == resource.data.recordedByUserFirebaseUid;
+      allow update: if isInternal() && (isAdmin() || isResourceRecorder(resource.data));
       allow delete: if isAdmin();
     }
 
     match /payments/{paymentId} {
       allow get, list: if isInternal() || isResourceStudent(resource.data);
       allow create: if isInternal() && request.resource.data.recordedByUserFirebaseUid == request.auth.uid;
-      allow update: if isInternal() && request.resource.data.recordedByUserFirebaseUid == resource.data.recordedByUserFirebaseUid;
+      allow update: if isInternal() && (isAdmin() || isResourceRecorder(resource.data));
       allow delete: if isAdmin();
     }
 

@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useUser, useFirestore, setDocumentNonBlocking } from "@/firebase"
@@ -24,12 +23,12 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
     }
   }, [user, isUserLoading, isLoginPage, router])
 
-  // Administrative Bootstrapping logic
+  // Strict Administrative Bootstrapping logic
   useEffect(() => {
     if (user && firestore) {
       const userDocRef = doc(firestore, "users", user.uid)
       
-      // Auto-bootstrap Admin Role for specific email
+      // ONLY clainyemblo@gmail.com gets Admin role
       if (user.email === "clainyemblo@gmail.com") {
         const adminRoleRef = doc(firestore, "roles_admin", user.uid)
         setDocumentNonBlocking(adminRoleRef, {
@@ -41,30 +40,30 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
           id: user.uid,
           firebaseUid: user.uid,
           email: user.email,
-          firstName: user.displayName?.split(' ')[0] || "Admin",
-          lastName: user.displayName?.split(' ').slice(1).join(' ') || "User",
+          firstName: user.displayName?.split(' ')[0] || "Super",
+          lastName: user.displayName?.split(' ').slice(1).join(' ') || "Admin",
           role: "Admin",
-          createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
         }, { merge: true })
       } 
-      // Auto-bootstrap Staff Role for Guest/Other users to ensure app visibility
+      // All other accounts are automatically Staff
       else {
         const staffRoleRef = doc(firestore, "roles_staff", user.uid)
         setDocumentNonBlocking(staffRoleRef, {
-          email: user.email || "guest@risabu.ac.ke",
+          email: user.email || "staff@risabu.ac.ke",
           assignedAt: serverTimestamp(),
         }, { merge: true })
 
         setDocumentNonBlocking(userDocRef, {
           id: user.uid,
           firebaseUid: user.uid,
-          email: user.email || "guest@risabu.ac.ke",
-          firstName: "Guest",
-          lastName: "Staff",
+          email: user.email || "staff@risabu.ac.ke",
+          firstName: user.displayName?.split(' ')[0] || "College",
+          lastName: user.displayName?.split(' ').slice(1).join(' ') || "Staff",
           role: "Staff",
-          createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
         }, { merge: true })
       }
     }
@@ -111,11 +110,13 @@ export function ClientLayout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex items-center gap-4">
             <div className="flex flex-col items-end">
-              <span className="text-sm font-medium">{user?.displayName || user?.email?.split('@')[0] || 'Admin User'}</span>
-              <span className="text-xs text-muted-foreground">{user?.isAnonymous ? 'Guest Staff' : 'Authorized User'}</span>
+              <span className="text-sm font-medium">{user?.displayName || user?.email?.split('@')[0] || 'College User'}</span>
+              <span className="text-xs text-muted-foreground">
+                {user?.email === "clainyemblo@gmail.com" ? 'Super Admin' : 'Authorized Staff'}
+              </span>
             </div>
             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-              {(user?.displayName?.[0] || user?.email?.[0] || 'A').toUpperCase()}
+              {(user?.displayName?.[0] || user?.email?.[0] || 'U').toUpperCase()}
             </div>
           </div>
         </header>
