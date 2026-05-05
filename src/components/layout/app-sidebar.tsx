@@ -68,9 +68,9 @@ const menuItems = [
         url: "/finance/invoices",
       },
       {
-        title: "Payments",
+        title: "Fees",
         icon: CreditCard,
-        url: "/finance/payments",
+        url: "/finance/fees",
       },
       {
         title: "Expenses",

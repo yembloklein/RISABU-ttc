@@ -49,7 +49,7 @@ export default function Dashboard() {
   const stats = useMemo(() => {
     const enrolled = (students || []).filter(s => s.admissionStatus === "Enrolled")
     const pending = (students || []).filter(s => s.admissionStatus === "Applied" || s.admissionStatus === "Approved")
-    const revenue = (payments || []).reduce((acc, p) => acc + (Number(p.amount) || 0), 0)
+    const revenue = (payments || []).filter(p => p.type === "Fee").reduce((acc, p) => acc + (Number(p.amount) || 0), 0)
     const outstanding = (invoices || []).reduce((acc, i) => acc + (Number(i.outstandingAmount) || 0), 0)
     const totalBilled = (invoices || []).reduce((acc, i) => acc + (Number(i.totalAmount) || 0), 0)
     const collectionRate = totalBilled > 0 ? (revenue / totalBilled) * 100 : 0
@@ -102,7 +102,7 @@ export default function Dashboard() {
       bg: "bg-primary/10",
     },
     {
-      title: "Collected Revenue",
+      title: "Fee Revenue",
       value: `KES ${stats.totalRevenue.toLocaleString()}`,
       description: `${stats.collectionRate}% collection rate`,
       icon: Wallet,
@@ -110,7 +110,7 @@ export default function Dashboard() {
       bg: "bg-accent/10",
     },
     {
-      title: "Arrears",
+      title: "Fee Arrears",
       value: `KES ${stats.totalOutstanding.toLocaleString()}`,
       description: "Immediate follow-up req.",
       icon: Clock,
@@ -257,7 +257,7 @@ export default function Dashboard() {
               <p className="text-xs opacity-90">Manage financial records or record a new student payment instantly.</p>
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="secondary" size="sm" className="text-xs h-8" asChild>
-                  <a href="/finance/payments">Record Pay</a>
+                  <a href="/finance/fees">Record Fee</a>
                 </Button>
                 <Button variant="secondary" size="sm" className="text-xs h-8" asChild>
                   <a href="/admissions">Add Student</a>
