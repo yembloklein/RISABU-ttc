@@ -28,6 +28,10 @@
           "type": "string",
           "description": "The last name of the user."
         },
+        "phone": {
+          "type": "string",
+          "description": "The contact phone number of the employee."
+        },
         "role": {
           "type": "string",
           "description": "The assigned role of the user within the ERP system (e.g., 'Admin', 'Staff')."
@@ -459,8 +463,7 @@
   },
   "auth": {
     "providers": [
-      "password",
-      "anonymous"
+      "password"
     ]
   },
   "firestore": {
@@ -472,7 +475,7 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores individual user profiles. The 'userId' is the Firebase Authentication UID. This path ensures direct, secure access to a user's own profile data based on their authenticated UID."
+          "description": "Stores individual user profiles."
         }
       },
       {
@@ -482,7 +485,7 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Dedicated collection for administrative roles. The existence of a document here (where 'userId' is a Firebase UID) grants 'Admin' permissions. This provides authorization independence for global role checks."
+          "description": "Grants Admin permissions."
         }
       },
       {
@@ -492,7 +495,7 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Dedicated collection for staff roles. The existence of a document here (where 'userId' is a Firebase UID) grants 'Staff' permissions. This provides authorization independence for global role checks."
+          "description": "Grants Staff permissions."
         }
       },
       {
@@ -502,7 +505,7 @@
           "schema": {
             "$ref": "#/backend/entities/Program"
           },
-          "description": "Stores academic programs offered by the college. Managed by Staff/Admins."
+          "description": "Stores academic programs."
         }
       },
       {
@@ -512,17 +515,7 @@
           "schema": {
             "$ref": "#/backend/entities/Student"
           },
-          "description": "Stores student profiles. Includes denormalized 'firebaseUid' for direct student self-access authorization if the student is a system user."
-        }
-      },
-      {
-        "path": "/enrollments/{enrollmentId}",
-        "definition": {
-          "entityName": "Enrollment",
-          "schema": {
-            "$ref": "#/backend/entities/Enrollment"
-          },
-          "description": "Stores student enrollments in programs. Includes denormalized 'studentFirebaseUid' for authorization independence, allowing students to access their own enrollment records."
+          "description": "Stores student profiles and admissions."
         }
       },
       {
@@ -532,7 +525,7 @@
           "schema": {
             "$ref": "#/backend/entities/Invoice"
           },
-          "description": "Stores financial invoices issued to students. Includes denormalized 'studentFirebaseUid' for student self-access and 'recordedByUserFirebaseUid' for staff ownership/auditing, ensuring authorization independence."
+          "description": "Stores financial invoices."
         }
       },
       {
@@ -542,17 +535,7 @@
           "schema": {
             "$ref": "#/backend/entities/Payment"
           },
-          "description": "Stores payment records made by students. Includes denormalized 'studentFirebaseUid' for student self-access and 'recordedByUserFirebaseUid' for staff ownership/auditing, ensuring authorization independence."
-        }
-      },
-      {
-        "path": "/expenseCategories/{categoryId}",
-        "definition": {
-          "entityName": "ExpenseCategory",
-          "schema": {
-            "$ref": "#/backend/entities/ExpenseCategory"
-          },
-          "description": "Stores categories for institutional expenses. Managed by Staff/Admins."
+          "description": "Stores payment records."
         }
       },
       {
@@ -562,10 +545,10 @@
           "schema": {
             "$ref": "#/backend/entities/Expense"
           },
-          "description": "Stores individual institutional expenses. Includes denormalized 'recordedByUserFirebaseUid' for staff ownership/auditing, ensuring authorization independence."
+          "description": "Stores individual institutional expenses."
         }
       }
     ],
-    "reasoning": "The Firestore structure for Risabu Connect ERP prioritizes security, scalability, and debuggability through strict adherence to the CORE DESIGN PRINCIPLES and DESIGN STRATEGY MANDATES. \n\n**Authorization Independence (CRITICAL) & QAPs (Rules are not Filters):**\n1.  **Dedicated Role Collections:** Global roles ('Admin', 'Staff') are implemented using dedicated collections: `/roles_admin/{userId}` and `/roles_staff/{userId}`. The mere existence of a document in these collections, where `userId` is the authenticated user's Firebase UID (`request.auth.uid`), grants the corresponding role. This completely eliminates the need for `get()` calls to the `/users` collection to determine a user's role, making role-based authorization atomic, highly performant, and immune to issues in batched writes or transactions. This directly supports QAPs by allowing rules to grant read/write access based on an explicit, easily verifiable role, rather than attempting to filter results based on complex logic.\n2.  **Denormalized `firebaseUid` for Ownership/Responsibility:** To prevent `get()` calls when checking ownership or responsibility for specific documents, critical `firebaseUid` references are denormalized into the relevant documents:\n    *   `Student` documents (`/students/{studentId}`) will include a `firebaseUid` field if the student is also a Firebase user, allowing a student to directly access their own profile.\n    *   `Enrollment` documents (`/enrollments/{enrollmentId}`) will include `studentFirebaseUid` to enable students to view their own enrollments without accessing the `Student` document first.\n    *   `Invoice` documents (`/invoices/{invoiceId}`) will include `studentFirebaseUid` (for student self-service) and `recordedByUserFirebaseUid` (for staff ownership/auditing, ensuring authorization independence).\n    *   `Payment` documents (`/payments/{paymentId}`) will include `studentFirebaseUid` and `recordedByUserFirebaseUid` for similar reasons as invoices.\n    *   `Expense` documents (`/expenses/{expenseId}`) will include `recordedByUserFirebaseUid` to allow the recording staff member to manage their own expenses, and for admins to oversee all.\n    This denormalization ensures that security rules can perform direct attribute checks (`resource.data.studentFirebaseUid == request.auth.uid` or `resource.data.recordedByUserFirebaseUid == request.auth.uid`) without cross-document reads. For `list` operations, this allows secure, query-based filtering where the client provides the `firebaseUid` in the query, and the rule verifies that the queried `firebaseUid` matches `request.auth.uid`.\n\n**Structural Segregation (Homogeneous Security Posture):**\nEach primary collection (e.g., `/programs`, `/students`, `/expenseCategories`) is designed to contain documents that share a similar security posture. This means that rules applied at the collection level are simpler and more consistent. For instance, all documents in `/programs` can be managed by 'Staff' and 'Admin' roles, while individual `invoices` can be read by the associated student AND managed by 'Staff'/'Admin'. This approach moves complexity from granular rule logic to structural organization, improving clarity and debuggability.\n\n**Access Modeling & Data Clarity:**\n*   **Path-Based Ownership:** `/users/{userId}` uses the Firebase UID directly as the document ID, making `request.auth.uid` checks trivial for user-specific data.\n*   **Clear References:** Relationships between entities (e.g., `Enrollment` to `Student` and `Program`) are maintained through `id` fields (e.g., `studentId`, `programId`), while authorization context is provided by the denormalized `firebaseUid` fields.\n*   **Explicit State Modeling:** Entities like `Student` (`admissionStatus`), `Enrollment` (`status`), and `Invoice` (`status`) explicitly use a single `status` field, promoting predictable data states.\n*   **Radical Consistency:** Wildcards are descriptive (e.g., `{programId}`), and standard fields like `createdAt`, `updatedAt` are used consistently.\n\nThis robust design ensures that security rules will be concise, understandable, and highly performant, enabling scalable and debuggable backend operations for Risabu Connect ERP."
+    "reasoning": "The Firestore structure ensures atomic authorization checks and real-time operational persistence."
   }
 }
