@@ -37,17 +37,28 @@ import {
   User,
   Wallet,
   GraduationCap,
-  Hash
+  Hash,
+  Sparkles,
+  RefreshCcw,
+  CheckCircle2,
+  AlertCircle
 } from "lucide-react"
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, serverTimestamp, doc } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
+import { parseTransaction, type ParseTransactionOutput } from "@/ai/flows/payment-parser"
 
 export default function PaymentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [methodFilter, setMethodFilter] = useState("All")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [paymentType, setPaymentType] = useState<"Fee" | "Miscellaneous">("Fee")
+  
+  // AI Parsing States
+  const [rawText, setRawText] = useState("")
+  const [isParsing, setIsParsing] = useState(false)
+  const [parsedData, setParsedData] = useState<ParseTransactionOutput | null>(null)
+
   const [formData, setFormData] = useState({ 
     invoiceId: "", 
     amount: "", 
@@ -84,7 +95,6 @@ export default function PaymentsPage() {
         return
       }
 
-      // Record Fee Payment
       addDocumentNonBlocking(paymentsRef, {
         type: "Fee",
         invoiceId: formData.invoiceId,
@@ -99,7 +109,6 @@ export default function PaymentsPage() {
         updatedAt: serverTimestamp(),
       });
 
-      // Update invoice outstanding balance
       const invoiceDocRef = doc(firestore, "invoices", formData.invoiceId)
       const newOutstanding = Math.max(0, Number(selectedInvoice.outstandingAmount) - amount)
       
@@ -109,7 +118,6 @@ export default function PaymentsPage() {
         updatedAt: serverTimestamp()
       })
     } else {
-      // Record Miscellaneous Payment
       addDocumentNonBlocking(paymentsRef, {
         type: "Miscellaneous",
         amount: amount,
@@ -127,7 +135,54 @@ export default function PaymentsPage() {
 
     toast({ title: "Success", description: `Income of KES ${amount.toLocaleString()} recorded.` })
     setIsDialogOpen(false);
-    setFormData({ invoiceId: "", amount: "", method: "M-Pesa", reference: "", receivedFrom: "", description: "" });
+    setFormData({ invoiceId: "", amount: "", method: "M-Pesa", reference: "" , receivedFrom: "", description: ""});
+    setParsedData(null);
+    setRawText("");
+  };
+
+  const handleParseText = async () => {
+    if (!rawText.trim()) return;
+    setIsParsing(true);
+    setParsedData(null);
+    
+    try {
+      const result = await parseTransaction({ rawText });
+      setParsedData(result);
+      
+      // Auto-fill basic fields
+      setFormData(prev => ({
+        ...prev,
+        amount: result.amount.toString(),
+        reference: result.reference,
+        method: result.provider === "M-Pesa" ? "M-Pesa" : "Bank Transfer",
+        receivedFrom: result.payerName
+      }));
+
+      // Intelligent Student Matching Logic
+      const matchedStudent = (students || []).find(s => {
+        const fullName = `${s.firstName} ${s.lastName}`.toLowerCase();
+        return fullName.includes(result.payerName.toLowerCase()) || 
+               result.payerName.toLowerCase().includes(fullName);
+      });
+
+      if (matchedStudent) {
+        const matchedInvoice = (invoices || []).find(i => 
+          i.studentId === matchedStudent.id && i.status !== "Paid"
+        );
+        
+        if (matchedInvoice) {
+          setFormData(prev => ({ ...prev, invoiceId: matchedInvoice.id }));
+          toast({ 
+            title: "AI Match Found", 
+            description: `Matched to ${matchedStudent.firstName} ${matchedStudent.lastName} (${matchedInvoice.invoiceNumber})` 
+          });
+        }
+      }
+    } catch (error) {
+      toast({ title: "Parsing Error", description: "Could not read transaction text.", variant: "destructive" });
+    } finally {
+      setIsParsing(false);
+    }
   };
 
   const filteredPayments = useMemo(() => {
@@ -154,7 +209,7 @@ export default function PaymentsPage() {
 
   const getStudentInfo = (studentId: string) => {
     const s = (students || []).find(student => student.id === studentId)
-    return s ? { name: `${s.firstName} ${s.lastName}`, adm: s.id.substring(0, 8).toUpperCase() } : { name: "N/A", adm: "N/A" }
+    return s ? { name: `${s.firstName} ${s.lastName}`, adm: s.admissionNumber || s.id.substring(0, 8).toUpperCase() } : { name: "N/A", adm: "N/A" }
   }
 
   const isLoading = loadingPayments || loadingInvoices
@@ -181,14 +236,36 @@ export default function PaymentsPage() {
                 <Plus className="mr-2 h-4 w-4" /> Record New Income
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>Record Income</DialogTitle>
-                <DialogDescription>Choose a category to log student fees or other revenue.</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-5 py-4">
+            <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden">
+              <div className="bg-primary/5 p-6 border-b border-primary/10">
+                <DialogTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  Smart Income Logger
+                </DialogTitle>
+                <DialogDescription className="mt-1">
+                  Paste M-Pesa or Bank confirmation text below to auto-fill the record.
+                </DialogDescription>
+                
+                <div className="mt-4 flex gap-2">
+                  <Input 
+                    placeholder="Paste transaction text here..." 
+                    value={rawText}
+                    onChange={(e) => setRawText(e.target.value)}
+                    className="bg-background"
+                  />
+                  <Button 
+                    onClick={handleParseText} 
+                    disabled={isParsing || !rawText.trim()}
+                    className="bg-primary"
+                  >
+                    {isParsing ? <RefreshCcw className="h-4 w-4 animate-spin" /> : "AI Sync"}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="p-6">
                 <Tabs value={paymentType} onValueChange={(v: any) => setPaymentType(v)} className="w-full">
-                  <TabsList className="grid w-full grid-cols-2">
+                  <TabsList className="grid w-full grid-cols-2 mb-6">
                     <TabsTrigger value="Fee" className="flex items-center gap-2">
                       <GraduationCap className="h-4 w-4" /> Student Fee
                     </TabsTrigger>
@@ -198,120 +275,100 @@ export default function PaymentsPage() {
                   </TabsList>
                 </Tabs>
 
-                {paymentType === "Fee" ? (
-                  <div className="space-y-4 animate-in fade-in duration-300">
-                    <div className="space-y-2">
-                      <Label htmlFor="invoice">Select Student & Admission No.</Label>
-                      <Select onValueChange={(v) => setFormData({...formData, invoiceId: v})}>
-                        <SelectTrigger id="invoice" className="w-full h-11 border-muted-foreground/20">
-                          <SelectValue placeholder="Choose student to credit..." />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-[300px]">
-                          {loadingInvoices ? (
-                            <div className="flex items-center justify-center py-6">
-                              <Loader2 className="h-5 w-5 animate-spin text-primary" />
-                            </div>
-                          ) : pendingInvoices.length === 0 ? (
-                            <div className="p-4 text-center text-xs text-muted-foreground italic">
-                              No pending invoices found.
-                            </div>
-                          ) : (
-                            pendingInvoices.map(i => {
-                              const info = getStudentInfo(i.studentId)
-                              return (
-                                <SelectItem key={i.id} value={i.id} className="py-3 border-b last:border-0 cursor-pointer">
-                                  <div className="flex flex-col gap-0.5">
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-bold text-sm">{info.name}</span>
-                                      <Badge variant="secondary" className="text-[9px] h-4 px-1 font-mono">{info.adm}</Badge>
-                                    </div>
-                                    <div className="flex justify-between items-center w-full pr-6">
-                                      <span className="text-[10px] text-muted-foreground">{i.invoiceNumber}</span>
-                                      <span className="text-[10px] font-bold text-destructive">Due: KES {Number(i.outstandingAmount).toLocaleString()}</span>
-                                    </div>
-                                  </div>
-                                </SelectItem>
-                              )
-                            })
-                          )}
-                        </SelectContent>
-                      </Select>
+                <div className="grid gap-5">
+                  {paymentType === "Fee" ? (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="invoice">Target Student Invoice</Label>
+                        <Select onValueChange={(v) => setFormData({...formData, invoiceId: v})} value={formData.invoiceId}>
+                          <SelectTrigger id="invoice" className="w-full h-11 border-muted-foreground/20">
+                            <SelectValue placeholder="Match to student..." />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[300px]">
+                            {loadingInvoices ? (
+                              <div className="flex items-center justify-center py-6">
+                                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                              </div>
+                            ) : (
+                              pendingInvoices.map(i => {
+                                const info = getStudentInfo(i.studentId)
+                                return (
+                                  <SelectItem key={i.id} value={i.id}>
+                                    {info.name} - {i.invoiceNumber} (KES {Number(i.outstandingAmount).toLocaleString()})
+                                  </SelectItem>
+                                )
+                              })
+                            )}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4 animate-in fade-in duration-300">
-                    <div className="space-y-2">
-                      <Label htmlFor="payee">Source / Payer Name</Label>
-                      <div className="relative">
-                        <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="payee">Payer / Source Name</Label>
                         <Input 
                           id="payee" 
-                          placeholder="e.g. Canteen Contractor" 
-                          className="pl-9 h-11 border-muted-foreground/20"
+                          placeholder="e.g. JOHN DOE" 
+                          className="h-11"
                           value={formData.receivedFrom}
                           onChange={(e) => setFormData({...formData, receivedFrom: e.target.value})}
                         />
                       </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="desc">Description</Label>
+                        <Input 
+                          id="desc" 
+                          placeholder="e.g. Canteen Rent"
+                          className="h-11"
+                          value={formData.description}
+                          onChange={(e) => setFormData({...formData, description: e.target.value})}
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="desc">Purpose</Label>
-                      <Input 
-                        id="desc" 
-                        placeholder="e.g. Monthly Rent Payment"
-                        className="h-11 border-muted-foreground/20"
-                        value={formData.description}
-                        onChange={(e) => setFormData({...formData, description: e.target.value})}
-                      />
-                    </div>
-                  </div>
-                )}
+                  )}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="amount">Amount (KES)</Label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="amount">Amount (KES)</Label>
                       <Input 
                         id="amount" type="number" 
                         placeholder="0.00"
-                        className="pl-9 h-11 border-muted-foreground/20"
+                        className="h-11 font-bold"
                         value={formData.amount}
                         onChange={(e) => setFormData({...formData, amount: e.target.value})}
                       />
                     </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="method">Method</Label>
+                      <Select onValueChange={(v) => setFormData({...formData, method: v})} value={formData.method}>
+                        <SelectTrigger id="method" className="h-11">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="M-Pesa">M-Pesa</SelectItem>
+                          <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                          <SelectItem value="Cash">Cash</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="method">Method</Label>
-                    <Select onValueChange={(v) => setFormData({...formData, method: v})} defaultValue="M-Pesa">
-                      <SelectTrigger id="method" className="h-11 border-muted-foreground/20">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="M-Pesa">M-Pesa</SelectItem>
-                        <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                        <SelectItem value="Cash">Cash</SelectItem>
-                        <SelectItem value="Card">Card</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="ref">Reference / Receipt No.</Label>
-                  <div className="relative">
-                    <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <div className="space-y-2">
+                    <Label htmlFor="ref">Transaction Reference</Label>
                     <Input 
-                      id="ref" placeholder="Transaction ID"
-                      className="pl-9 font-mono uppercase h-11 border-muted-foreground/20"
+                      id="ref" placeholder="Reference ID"
+                      className="font-mono uppercase h-11"
                       value={formData.reference}
                       onChange={(e) => setFormData({...formData, reference: e.target.value})}
                     />
                   </div>
                 </div>
               </div>
-              <DialogFooter className="mt-2">
-                <Button onClick={handleRecordPayment} className="w-full bg-primary h-12 text-md font-semibold shadow-lg">
-                  Confirm & Process Income
+
+              <DialogFooter className="bg-muted/30 p-4 border-t">
+                <Button onClick={handleRecordPayment} className="w-full bg-primary h-12 text-md font-bold shadow-lg">
+                  Confirm & Finalize Log
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -327,7 +384,7 @@ export default function PaymentsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">KES {totals.fees.toLocaleString()}</div>
-            <p className="text-[10px] text-muted-foreground mt-1">Tuition and related academic fees</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Tuition and academic fees</p>
           </CardContent>
         </Card>
         <Card className="border-none ring-1 ring-border shadow-sm">
@@ -337,13 +394,13 @@ export default function PaymentsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">KES {totals.misc.toLocaleString()}</div>
-            <p className="text-[10px] text-muted-foreground mt-1">Non-academic revenue streams</p>
+            <p className="text-[10px] text-muted-foreground mt-1">Non-academic streams</p>
           </CardContent>
         </Card>
         <Card className="border-none ring-1 ring-border shadow-sm bg-primary text-primary-foreground">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-[10px] font-bold uppercase opacity-80">Total Cash Inflow</CardTitle>
-            <CreditCard className="h-4 w-4 opacity-80" />
+            <CardTitle className="text-[10px] font-bold uppercase opacity-80">Total Inflow</CardTitle>
+            <CheckCircle2 className="h-4 w-4 opacity-80" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">KES {totals.total.toLocaleString()}</div>
@@ -415,7 +472,7 @@ export default function PaymentsPage() {
                             {pay.type === "Miscellaneous" ? pay.receivedFrom : studentInfo?.name}
                           </span>
                           <span className="text-[10px] text-muted-foreground italic truncate max-w-[150px]">
-                            {pay.type === "Miscellaneous" ? pay.description : `Invoice Ref: ${pay.invoiceId?.substring(0, 8)}`}
+                            {pay.type === "Miscellaneous" ? pay.description : `Invoice: ${pay.invoiceId?.substring(0, 8)}`}
                           </span>
                         </div>
                       </TableCell>
