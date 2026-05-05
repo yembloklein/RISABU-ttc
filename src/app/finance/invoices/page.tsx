@@ -206,6 +206,42 @@ export default function InvoicesPage() {
     })
   }
 
+  const exportToCSV = () => {
+    if (!filteredInvoices.length) return;
+
+    const headers = ["Invoice Number", "Issue Date", "Due Date", "Student Name", "Admission No", "Description", "Total Amount (KES)", "Outstanding (KES)", "Status"];
+    const rows = filteredInvoices.map(inv => {
+      const student = getStudentInfo(inv.studentId);
+      return [
+        inv.invoiceNumber,
+        inv.issueDate,
+        inv.dueDate,
+        student?.name || "N/A",
+        student?.adm || "N/A",
+        `"${inv.description.replace(/"/g, '""')}"`,
+        inv.totalAmount,
+        inv.outstandingAmount,
+        inv.status
+      ];
+    });
+
+    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `invoices_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast({
+      title: "Export Complete",
+      description: "Billing records have been exported to CSV."
+    });
+  };
+
   const totals = useMemo(() => {
     const list = invoices || []
     const billed = list.reduce((acc, i) => acc + (Number(i.totalAmount) || 0), 0)
@@ -361,7 +397,7 @@ export default function InvoicesPage() {
           <p className="text-muted-foreground">Issue and manage student academic invoices</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={exportToCSV} disabled={filteredInvoices.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Export CSV
           </Button>
           
