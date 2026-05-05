@@ -102,55 +102,64 @@ export default function StudentsPage() {
       {selectedStudent && (
         <div id="id-card-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999]">
           <div className="flex items-center justify-center h-screen bg-white">
-            <div className="w-[3.375in] h-[2.125in] border-2 border-primary rounded-xl overflow-hidden flex flex-col relative bg-white shadow-none">
+            <div className="w-[3.375in] h-[2.125in] border-[3px] border-primary rounded-xl overflow-hidden flex flex-col relative bg-white shadow-none">
+              {/* Green Sidebar Accent */}
+              <div className="absolute left-0 top-0 bottom-0 w-2 bg-primary"></div>
+              
               {/* Card Header */}
-              <div className="bg-primary p-2 flex items-center gap-2">
-                <div className="bg-white p-1 rounded-md">
+              <div className="bg-primary p-2 flex items-center gap-3 pl-4">
+                <div className="bg-white p-1 rounded-md shadow-sm">
                   <GraduationCap className="h-4 w-4 text-primary" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-bold text-white uppercase leading-none">Risabu Technical</span>
-                  <span className="text-[8px] text-white/80 leading-none">Training College</span>
+                  <span className="text-[10px] font-bold text-white uppercase leading-none tracking-tight">Risabu Technical</span>
+                  <span className="text-[8px] text-white/90 leading-none font-medium">Training College</span>
+                </div>
+                <div className="ml-auto">
+                   <span className="text-[7px] font-bold text-white/50 uppercase">Student ID</span>
                 </div>
               </div>
               
               {/* Card Body */}
-              <div className="flex p-3 gap-3 flex-1">
-                <div className="w-20 h-24 bg-muted rounded-md overflow-hidden border">
+              <div className="flex p-3 gap-4 flex-1 pl-4">
+                <div className="w-20 h-24 bg-muted rounded-lg overflow-hidden border-2 border-primary/20 shadow-sm">
                   <img 
                     src={`https://picsum.photos/seed/${selectedStudent.id}/200/200`} 
                     alt="Photo" 
                     className="w-full h-full object-cover"
                   />
                 </div>
-                <div className="flex flex-col flex-1 gap-1">
+                <div className="flex flex-col flex-1 gap-1 py-1">
                   <div className="mb-1">
-                    <span className="text-[7px] text-muted-foreground uppercase block">Student Name</span>
-                    <span className="text-sm font-bold leading-tight block">{selectedStudent.firstName} {selectedStudent.lastName}</span>
+                    <span className="text-[6px] text-primary font-bold uppercase block tracking-wider">Full Name</span>
+                    <span className="text-sm font-bold leading-tight block text-slate-900">{selectedStudent.firstName} {selectedStudent.lastName}</span>
                   </div>
                   <div>
-                    <span className="text-[7px] text-muted-foreground uppercase block">Course</span>
-                    <span className="text-[10px] font-medium leading-tight block truncate max-w-[120px]">
+                    <span className="text-[6px] text-primary font-bold uppercase block tracking-wider">Program of Study</span>
+                    <span className="text-[9px] font-semibold leading-tight block truncate max-w-[130px] text-slate-700">
                       {selectedStudent.appliedCourse || "General Studies"}
                     </span>
                   </div>
                   <div className="flex gap-4 mt-auto">
                     <div>
-                      <span className="text-[7px] text-muted-foreground uppercase block">ID Number</span>
-                      <span className="text-[9px] font-mono font-bold block">{selectedStudent.id.substring(0, 8).toUpperCase()}</span>
+                      <span className="text-[6px] text-primary font-bold uppercase block tracking-wider">Reg. No</span>
+                      <span className="text-[9px] font-mono font-bold block text-slate-900">{selectedStudent.id.substring(0, 8).toUpperCase()}</span>
                     </div>
                     <div>
-                      <span className="text-[7px] text-muted-foreground uppercase block">Admitted</span>
-                      <span className="text-[9px] font-bold block">{selectedStudent.admissionDate}</span>
+                      <span className="text-[6px] text-primary font-bold uppercase block tracking-wider">Issue Date</span>
+                      <span className="text-[9px] font-bold block text-slate-900">{selectedStudent.admissionDate}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Card Footer */}
-              <div className="border-t px-3 py-1 flex justify-between items-center bg-muted/20">
-                <span className="text-[7px] font-medium text-muted-foreground italic">Authorized Institutional ID</span>
-                <div className="w-16 h-4 border-b border-black/30"></div>
+              <div className="border-t border-primary/10 px-4 py-1.5 flex justify-between items-center bg-primary/[0.03]">
+                <span className="text-[6px] font-bold text-primary/60 italic">Official Institutional Identity Card</span>
+                <div className="flex flex-col items-end">
+                   <div className="w-16 h-4 border-b border-primary/30"></div>
+                   <span className="text-[5px] text-primary/40 font-bold uppercase mt-0.5">Authorized Signature</span>
+                </div>
               </div>
             </div>
           </div>
