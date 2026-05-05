@@ -32,7 +32,7 @@ import {
   DropdownMenuLabel, 
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu"
+} from "@/dropdown-menu"
 import { 
   Search, 
   FilePlus, 
@@ -41,7 +41,6 @@ import {
   MoreVertical, 
   Loader2, 
   User, 
-  Eye, 
   Trash2, 
   CheckCircle, 
   FileText, 
@@ -51,8 +50,6 @@ import {
   GraduationCap, 
   BadgeCheck, 
   Building2, 
-  Info, 
-  Calculator,
   Wallet
 } from "lucide-react"
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from "@/firebase"
@@ -196,7 +193,14 @@ export default function InvoicesPage() {
     setTimeout(() => {
       window.print()
     }, 100)
-  }
+  };
+
+  const handlePrintList = () => {
+    setPrintInvoiceId(null);
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  };
 
   const handleSendReminder = (invoice: any) => {
     const student = getStudentInfo(invoice.studentId)
@@ -204,7 +208,7 @@ export default function InvoicesPage() {
       title: "Reminder Sent",
       description: `Payment reminder notification sent to ${student?.name} (${student?.email})`,
     })
-  }
+  };
 
   const exportToCSV = () => {
     if (!filteredInvoices.length) return;
@@ -251,6 +255,7 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-6">
+      {/* Individual Printable Invoice Container */}
       {activePrintInvoice && (
         <div id="invoice-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999] p-8">
           <div className="max-w-4xl mx-auto bg-white flex flex-col h-full relative border-[8px] border-primary/10 p-12">
@@ -397,6 +402,9 @@ export default function InvoicesPage() {
           <p className="text-muted-foreground">Issue and manage student academic invoices</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handlePrintList}>
+            <Printer className="mr-2 h-4 w-4" /> Print Report
+          </Button>
           <Button variant="outline" size="sm" onClick={exportToCSV} disabled={filteredInvoices.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Export CSV
           </Button>
@@ -545,7 +553,8 @@ export default function InvoicesPage() {
         </Select>
       </div>
 
-      <Card className="border-none ring-1 ring-border overflow-hidden no-print">
+      {/* Main Table View */}
+      <Card className="border-none ring-1 ring-border overflow-hidden">
         <CardContent className="p-0">
           <Table>
             <TableHeader className="bg-muted/30">
@@ -556,7 +565,7 @@ export default function InvoicesPage() {
                 <TableHead className="text-right">Total (KES)</TableHead>
                 <TableHead className="text-right">Balance</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-[50px]"></TableHead>
+                <TableHead className="w-[50px] no-print"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -601,7 +610,7 @@ export default function InvoicesPage() {
                           {inv.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="no-print">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="ghost" size="icon" className="h-8 w-8">
