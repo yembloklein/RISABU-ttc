@@ -1,0 +1,567 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user within the Risabu Connect ERP system, linked to an external authentication system and assigned a specific role.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "firebaseUid": {
+          "type": "string",
+          "description": "Unique ID from the external Firebase Authentication system, linking this user profile to an authenticated account."
+        },
+        "email": {
+          "type": "string",
+          "description": "The primary email address of the user.",
+          "format": "email"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The first name of the user."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the user."
+        },
+        "role": {
+          "type": "string",
+          "description": "The assigned role of the user within the ERP system (e.g., 'Admin', 'Staff', 'Student')."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the user record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the user record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "firebaseUid",
+        "email",
+        "firstName",
+        "lastName",
+        "role",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Program": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Program",
+      "type": "object",
+      "description": "Represents an academic program or course offered by Risabu Technical Training College.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Program entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The official name of the academic program or course."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description of the program, including its objectives and content."
+        },
+        "durationMonths": {
+          "type": "number",
+          "description": "The typical duration of the program in months."
+        },
+        "tuitionFee": {
+          "type": "number",
+          "description": "The base tuition fee for the program."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the program record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the program record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "durationMonths",
+        "tuitionFee",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Student": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Student",
+      "type": "object",
+      "description": "Represents a student enrolled or applying to Risabu Technical Training College.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Student entity."
+        },
+        "firstName": {
+          "type": "string",
+          "description": "The first name of the student."
+        },
+        "lastName": {
+          "type": "string",
+          "description": "The last name of the student."
+        },
+        "dateOfBirth": {
+          "type": "string",
+          "description": "The student's date of birth.",
+          "format": "date"
+        },
+        "gender": {
+          "type": "string",
+          "description": "The student's gender."
+        },
+        "contactEmail": {
+          "type": "string",
+          "description": "The primary contact email address for the student.",
+          "format": "email"
+        },
+        "contactPhone": {
+          "type": "string",
+          "description": "The primary contact phone number for the student."
+        },
+        "address": {
+          "type": "string",
+          "description": "The student's physical address."
+        },
+        "admissionDate": {
+          "type": "string",
+          "description": "The date the student was admitted to the college.",
+          "format": "date"
+        },
+        "admissionStatus": {
+          "type": "string",
+          "description": "The current status of the student's admission (e.g., 'Applied', 'Accepted', 'Enrolled', 'Rejected', 'Deferred')."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the student record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the student record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "firstName",
+        "lastName",
+        "dateOfBirth",
+        "contactEmail",
+        "admissionDate",
+        "admissionStatus",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Enrollment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Enrollment",
+      "type": "object",
+      "description": "Represents a student's enrollment in a specific academic program for a particular period.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Enrollment entity."
+        },
+        "studentId": {
+          "type": "string",
+          "description": "Reference to the Student. (Relationship: Student 1:N Enrollment)"
+        },
+        "programId": {
+          "type": "string",
+          "description": "Reference to the Program. (Relationship: Program 1:N Enrollment)"
+        },
+        "enrollmentDate": {
+          "type": "string",
+          "description": "The date the student officially enrolled in the program.",
+          "format": "date"
+        },
+        "academicYear": {
+          "type": "string",
+          "description": "The academic year for which the student is enrolled (e.g., '2023-2024')."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current status of the enrollment (e.g., 'Active', 'Completed', 'Withdrawn', 'Suspended')."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the enrollment record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the enrollment record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "studentId",
+        "programId",
+        "enrollmentDate",
+        "academicYear",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Invoice": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Invoice",
+      "type": "object",
+      "description": "Represents a financial invoice issued to a student for tuition, fees, or other charges.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Invoice entity."
+        },
+        "studentId": {
+          "type": "string",
+          "description": "Reference to the Student to whom the invoice is issued. (Relationship: Student 1:N Invoice)"
+        },
+        "enrollmentId": {
+          "type": "string",
+          "description": "Reference to the Enrollment related to this invoice, if applicable. (Relationship: Enrollment 1:N Invoice)"
+        },
+        "invoiceNumber": {
+          "type": "string",
+          "description": "A unique, human-readable invoice number."
+        },
+        "issueDate": {
+          "type": "string",
+          "description": "The date the invoice was issued.",
+          "format": "date"
+        },
+        "dueDate": {
+          "type": "string",
+          "description": "The date by which the invoice payment is due.",
+          "format": "date"
+        },
+        "totalAmount": {
+          "type": "number",
+          "description": "The total amount due on the invoice."
+        },
+        "outstandingAmount": {
+          "type": "number",
+          "description": "The remaining amount outstanding on the invoice."
+        },
+        "status": {
+          "type": "string",
+          "description": "The current payment status of the invoice (e.g., 'Issued', 'Partially Paid', 'Paid', 'Overdue', 'Cancelled')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief description of what the invoice is for (e.g., 'Tuition Fee - Fall 2024')."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the invoice record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the invoice record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "studentId",
+        "invoiceNumber",
+        "issueDate",
+        "dueDate",
+        "totalAmount",
+        "outstandingAmount",
+        "status",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Payment": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Payment",
+      "type": "object",
+      "description": "Records a payment made by a student towards an invoice.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Payment entity."
+        },
+        "invoiceId": {
+          "type": "string",
+          "description": "Reference to the Invoice this payment is applied to. (Relationship: Invoice 1:N Payment)"
+        },
+        "studentId": {
+          "type": "string",
+          "description": "Reference to the Student who made the payment. (Relationship: Student 1:N Payment)"
+        },
+        "paymentDate": {
+          "type": "string",
+          "description": "The date the payment was received.",
+          "format": "date-time"
+        },
+        "amount": {
+          "type": "number",
+          "description": "The amount of the payment made."
+        },
+        "paymentMethod": {
+          "type": "string",
+          "description": "The method used for the payment (e.g., 'Cash', 'Bank Transfer', 'Mobile Money', 'Card')."
+        },
+        "transactionReference": {
+          "type": "string",
+          "description": "A unique reference number for the payment transaction, if available."
+        },
+        "recordedByUserId": {
+          "type": "string",
+          "description": "Reference to the User who recorded this payment. (Relationship: User 1:N Payment)"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the payment record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the payment record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "invoiceId",
+        "studentId",
+        "paymentDate",
+        "amount",
+        "paymentMethod",
+        "recordedByUserId",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ExpenseCategory": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ExpenseCategory",
+      "type": "object",
+      "description": "Defines categories for college expenses to facilitate organization and reporting.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the ExpenseCategory entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the expense category (e.g., 'Salaries', 'Utilities', 'Office Supplies', 'Maintenance')."
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the expense category."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the expense category record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the expense category record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Expense": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Expense",
+      "type": "object",
+      "description": "Records an individual institutional expense incurred by Risabu Technical Training College.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Expense entity."
+        },
+        "categoryId": {
+          "type": "string",
+          "description": "Reference to the ExpenseCategory this expense belongs to. (Relationship: ExpenseCategory 1:N Expense)"
+        },
+        "description": {
+          "type": "string",
+          "description": "A detailed description of the expense."
+        },
+        "amount": {
+          "type": "number",
+          "description": "The monetary amount of the expense."
+        },
+        "expenseDate": {
+          "type": "string",
+          "description": "The date when the expense was incurred or paid.",
+          "format": "date"
+        },
+        "receiptUrl": {
+          "type": "string",
+          "description": "An optional URL or path to a scanned copy of the expense receipt.",
+          "format": "uri"
+        },
+        "recordedByUserId": {
+          "type": "string",
+          "description": "Reference to the User who recorded this expense. (Relationship: User 1:N Expense)"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the expense record was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp when the expense record was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "categoryId",
+        "description",
+        "amount",
+        "expenseDate",
+        "recordedByUserId",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores individual user profiles. The 'userId' is the Firebase Authentication UID. This path ensures direct, secure access to a user's own profile data based on their authenticated UID."
+        }
+      },
+      {
+        "path": "/roles_admin/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Dedicated collection for administrative roles. The existence of a document here (where 'userId' is a Firebase UID) grants 'Admin' permissions. This provides authorization independence for global role checks."
+        }
+      },
+      {
+        "path": "/roles_staff/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Dedicated collection for staff roles. The existence of a document here (where 'userId' is a Firebase UID) grants 'Staff' permissions. This provides authorization independence for global role checks."
+        }
+      },
+      {
+        "path": "/programs/{programId}",
+        "definition": {
+          "entityName": "Program",
+          "schema": {
+            "$ref": "#/backend/entities/Program"
+          },
+          "description": "Stores academic programs offered by the college. Managed by Staff/Admins."
+        }
+      },
+      {
+        "path": "/students/{studentId}",
+        "definition": {
+          "entityName": "Student",
+          "schema": {
+            "$ref": "#/backend/entities/Student"
+          },
+          "description": "Stores student profiles. Includes denormalized 'firebaseUid' for direct student self-access authorization if the student is a system user."
+        }
+      },
+      {
+        "path": "/enrollments/{enrollmentId}",
+        "definition": {
+          "entityName": "Enrollment",
+          "schema": {
+            "$ref": "#/backend/entities/Enrollment"
+          },
+          "description": "Stores student enrollments in programs. Includes denormalized 'studentFirebaseUid' for authorization independence, allowing students to access their own enrollment records."
+        }
+      },
+      {
+        "path": "/invoices/{invoiceId}",
+        "definition": {
+          "entityName": "Invoice",
+          "schema": {
+            "$ref": "#/backend/entities/Invoice"
+          },
+          "description": "Stores financial invoices issued to students. Includes denormalized 'studentFirebaseUid' for student self-access and 'recordedByUserFirebaseUid' for staff ownership/auditing, ensuring authorization independence."
+        }
+      },
+      {
+        "path": "/payments/{paymentId}",
+        "definition": {
+          "entityName": "Payment",
+          "schema": {
+            "$ref": "#/backend/entities/Payment"
+          },
+          "description": "Stores payment records made by students. Includes denormalized 'studentFirebaseUid' for student self-access and 'recordedByUserFirebaseUid' for staff ownership/auditing, ensuring authorization independence."
+        }
+      },
+      {
+        "path": "/expenseCategories/{categoryId}",
+        "definition": {
+          "entityName": "ExpenseCategory",
+          "schema": {
+            "$ref": "#/backend/entities/ExpenseCategory"
+          },
+          "description": "Stores categories for institutional expenses. Managed by Staff/Admins."
+        }
+      },
+      {
+        "path": "/expenses/{expenseId}",
+        "definition": {
+          "entityName": "Expense",
+          "schema": {
+            "$ref": "#/backend/entities/Expense"
+          },
+          "description": "Stores individual institutional expenses. Includes denormalized 'recordedByUserFirebaseUid' for staff ownership/auditing, ensuring authorization independence."
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure for Risabu Connect ERP prioritizes security, scalability, and debuggability through strict adherence to the CORE DESIGN PRINCIPLES and DESIGN STRATEGY MANDATES. \n\n**Authorization Independence (CRITICAL) & QAPs (Rules are not Filters):**\n1.  **Dedicated Role Collections:** Global roles ('Admin', 'Staff') are implemented using dedicated collections: `/roles_admin/{userId}` and `/roles_staff/{userId}`. The mere existence of a document in these collections, where `userId` is the authenticated user's Firebase UID (`request.auth.uid`), grants the corresponding role. This completely eliminates the need for `get()` calls to the `/users` collection to determine a user's role, making role-based authorization atomic, highly performant, and immune to issues in batched writes or transactions. This directly supports QAPs by allowing rules to grant read/write access based on an explicit, easily verifiable role, rather than attempting to filter results based on complex logic.\n2.  **Denormalized `firebaseUid` for Ownership/Responsibility:** To prevent `get()` calls when checking ownership or responsibility for specific documents, critical `firebaseUid` references are denormalized into the relevant documents:\n    *   `Student` documents (`/students/{studentId}`) will include a `firebaseUid` field if the student is also a Firebase user, allowing a student to directly access their own profile.\n    *   `Enrollment` documents (`/enrollments/{enrollmentId}`) will include `studentFirebaseUid` to enable students to view their own enrollments without accessing the `Student` document first.\n    *   `Invoice` documents (`/invoices/{invoiceId}`) will include `studentFirebaseUid` (for student self-service) and `recordedByUserFirebaseUid` (for staff auditing/management of invoices they created).\n    *   `Payment` documents (`/payments/{paymentId}`) will include `studentFirebaseUid` and `recordedByUserFirebaseUid` for similar reasons as invoices.\n    *   `Expense` documents (`/expenses/{expenseId}`) will include `recordedByUserFirebaseUid` to allow the recording staff member to manage their own expenses, and for admins to oversee all.\n    This denormalization ensures that security rules can perform direct attribute checks (`resource.data.studentFirebaseUid == request.auth.uid` or `resource.data.recordedByUserFirebaseUid == request.auth.uid`) without cross-document reads. For `list` operations, this allows secure, query-based filtering where the client provides the `firebaseUid` in the query, and the rule verifies that the queried `firebaseUid` matches `request.auth.uid`.\n\n**Structural Segregation (Homogeneous Security Posture):**\nEach primary collection (e.g., `/programs`, `/students`, `/expenseCategories`) is designed to contain documents that share a similar security posture. This means that rules applied at the collection level are simpler and more consistent. For instance, all documents in `/programs` can be managed by 'Staff' and 'Admin' roles, while individual `invoices` can be read by the associated student AND managed by 'Staff'/'Admin'. This approach moves complexity from granular rule logic to structural organization, improving clarity and debuggability.\n\n**Access Modeling & Data Clarity:**\n*   **Path-Based Ownership:** `/users/{userId}` uses the Firebase UID directly as the document ID, making `request.auth.uid` checks trivial for user-specific data.\n*   **Clear References:** Relationships between entities (e.g., `Enrollment` to `Student` and `Program`) are maintained through `id` fields (e.g., `studentId`, `programId`), while authorization context is provided by the denormalized `firebaseUid` fields.\n*   **Explicit State Modeling:** Entities like `Student` (`admissionStatus`), `Enrollment` (`status`), and `Invoice` (`status`) explicitly use a single `status` field, promoting predictable data states.\n*   **Radical Consistency:** Wildcards are descriptive (e.g., `{programId}`), and standard fields like `createdAt`, `updatedAt` are used consistently.\n\nThis robust design ensures that security rules will be concise, understandable, and highly performant, enabling scalable and debuggable backend operations for Risabu Connect ERP."
+  }
+}
