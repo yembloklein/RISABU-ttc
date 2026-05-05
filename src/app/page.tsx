@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useMemo } from "react"
@@ -97,8 +96,8 @@ export default function Dashboard() {
       value: stats.totalStudents.toLocaleString(),
       description: "Active Scholars",
       icon: Users,
-      color: "text-blue-600",
-      bg: "bg-blue-50",
+      color: "text-primary",
+      bg: "bg-primary/5",
     },
     {
       title: "Pending Applicants",
@@ -113,16 +112,16 @@ export default function Dashboard() {
       value: `KES ${stats.totalRevenue.toLocaleString()}`,
       description: `${stats.collectionRate}% Collect Rate`,
       icon: Wallet,
-      color: "text-accent",
-      bg: "bg-accent/10",
+      color: "text-primary",
+      bg: "bg-primary/5",
     },
     {
       title: "Revenue/Expense Ratio",
       value: `${stats.sustainabilityRatio}x`,
       description: "Financial Sustainability",
       icon: Activity,
-      color: "text-purple-600",
-      bg: "bg-purple-50",
+      color: "text-primary",
+      bg: "bg-primary/5",
     },
   ]
 

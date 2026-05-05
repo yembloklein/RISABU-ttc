@@ -192,7 +192,7 @@ export default function CoursesPage() {
       </div>
 
       {!isAdmin && (
-        <div className="bg-blue-50 border border-blue-200 text-blue-700 p-4 rounded-lg flex items-center gap-3">
+        <div className="bg-primary/5 border border-primary/20 text-primary p-4 rounded-lg flex items-center gap-3">
           <Info className="h-5 w-5" />
           <p className="text-sm font-medium">Viewing as Staff. Only the Super Admin can add or edit courses.</p>
         </div>
@@ -242,7 +242,7 @@ export default function CoursesPage() {
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button 
-                            size="icon" variant="ghost" className="h-8 w-8 text-blue-600"
+                            size="icon" variant="ghost" className="h-8 w-8 text-primary"
                             onClick={() => handleOpenDialog(p)}
                           >
                             <Edit2 className="h-4 w-4" />
