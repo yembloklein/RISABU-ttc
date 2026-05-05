@@ -1,4 +1,3 @@
-
 "use client"
 
 import { useState, useMemo } from "react"
@@ -26,6 +25,13 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select"
+import { 
   Search, 
   Plus, 
   Download, 
@@ -36,7 +42,8 @@ import {
   Filter, 
   UserPlus,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  BookOpen
 } from "lucide-react"
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, doc, serverTimestamp } from "firebase/firestore"
@@ -58,7 +65,13 @@ export default function AdmissionsPage() {
     return collection(firestore, "students");
   }, [firestore, user]);
 
+  const programsRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return collection(firestore, "programs");
+  }, [firestore, user]);
+
   const { data: students, isLoading } = useCollection(studentsRef);
+  const { data: programs, isLoading: isLoadingPrograms } = useCollection(programsRef);
 
   const filteredApplications = useMemo(() => {
     return (students || []).filter(app => {
@@ -80,10 +93,10 @@ export default function AdmissionsPage() {
   const handleCreateApplication = () => {
     if (!studentsRef) return;
     
-    if (!formData.firstName || !formData.lastName || !formData.email) {
+    if (!formData.firstName || !formData.lastName || !formData.email || !formData.course) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields.",
+        description: "Please fill in all required fields, including the target course.",
         variant: "destructive"
       });
       return;
@@ -248,11 +261,38 @@ export default function AdmissionsPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="course">Applied Course</Label>
-                  <Input id="course" value={formData.course} onChange={(e) => setFormData({...formData, course: e.target.value})} placeholder="e.g. Graphics Design" />
+                  <Select 
+                    onValueChange={(v) => setFormData({...formData, course: v})}
+                    value={formData.course}
+                  >
+                    <SelectTrigger className="w-full h-10 border-muted-foreground/20">
+                      <SelectValue placeholder="Select target course..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {isLoadingPrograms ? (
+                        <div className="flex items-center justify-center py-4">
+                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        </div>
+                      ) : (programs || []).length > 0 ? (
+                        programs?.map((program) => (
+                          <SelectItem key={program.id} value={program.name}>
+                            <div className="flex items-center gap-2">
+                              <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                              <span>{program.name}</span>
+                            </div>
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <div className="p-4 text-center text-xs text-muted-foreground italic">
+                          No courses found in catalog.
+                        </div>
+                      )}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <DialogFooter>
-                <Button onClick={handleCreateApplication} className="bg-primary w-full">Submit Application</Button>
+                <Button onClick={handleCreateApplication} className="bg-primary w-full h-11">Submit Application</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -313,7 +353,7 @@ export default function AdmissionsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center text-sm">
-                        <UserPlus className="h-3 w-3 mr-1 text-primary" />
+                        <BookOpen className="h-3 w-3 mr-1 text-primary" />
                         {app.appliedCourse || 'General'}
                       </div>
                     </TableCell>
@@ -362,7 +402,7 @@ export default function AdmissionsPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-40 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-40 text-center text-muted-foreground italic">
                     <div className="flex flex-col items-center justify-center">
                       <AlertCircle className="h-8 w-8 mb-2 opacity-20" />
                       <p>No applications found for this filter.</p>
