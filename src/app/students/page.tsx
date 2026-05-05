@@ -570,7 +570,7 @@ export default function StudentsPage() {
         <DialogContent className="sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Edit Student Record</DialogTitle>
-            <DialogDescription>Update the information for this student.</DialogDescription>
+            <DialogDescription>Update the full professional profile for this scholar.</DialogDescription>
           </DialogHeader>
           <div className="grid gap-6 py-4">
             <div className="grid grid-cols-2 gap-4">
@@ -580,6 +580,7 @@ export default function StudentsPage() {
                   id="edit-fName" 
                   value={editFormData.firstName} 
                   onChange={(e) => setEditFormData({...editFormData, firstName: e.target.value})}
+                  placeholder="e.g. Jane"
                 />
               </div>
               <div className="space-y-2">
@@ -588,6 +589,7 @@ export default function StudentsPage() {
                   id="edit-lName" 
                   value={editFormData.lastName} 
                   onChange={(e) => setEditFormData({...editFormData, lastName: e.target.value})}
+                  placeholder="e.g. Doe"
                 />
               </div>
             </div>
@@ -599,7 +601,8 @@ export default function StudentsPage() {
                   id="edit-adm" 
                   value={editFormData.admissionNumber} 
                   onChange={(e) => setEditFormData({...editFormData, admissionNumber: e.target.value})}
-                  className="font-mono"
+                  className="font-mono font-bold text-primary"
+                  placeholder="RTTC/000/202X"
                 />
               </div>
               <div className="space-y-2">
@@ -623,12 +626,41 @@ export default function StudentsPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
+                <Label>Gender</Label>
+                <Select 
+                  onValueChange={(v) => setEditFormData({...editFormData, gender: v})} 
+                  value={editFormData.gender}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Male">Male</SelectItem>
+                    <SelectItem value="Female">Female</SelectItem>
+                    <SelectItem value="Other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-dob">Date of Birth</Label>
+                <Input 
+                  id="edit-dob" 
+                  type="date"
+                  value={editFormData.dateOfBirth} 
+                  onChange={(e) => setEditFormData({...editFormData, dateOfBirth: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
                 <Label htmlFor="edit-email">Contact Email</Label>
                 <Input 
                   id="edit-email" 
                   type="email" 
                   value={editFormData.contactEmail} 
                   onChange={(e) => setEditFormData({...editFormData, contactEmail: e.target.value})}
+                  placeholder="jane.doe@example.com"
                 />
               </div>
               <div className="space-y-2">
@@ -637,13 +669,24 @@ export default function StudentsPage() {
                   id="edit-phone" 
                   value={editFormData.contactPhone} 
                   onChange={(e) => setEditFormData({...editFormData, contactPhone: e.target.value})}
+                  placeholder="+254..."
                 />
               </div>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-address">Home Address / Location</Label>
+              <Input 
+                id="edit-address" 
+                value={editFormData.address} 
+                onChange={(e) => setEditFormData({...editFormData, address: e.target.value})}
+                placeholder="e.g. Nairobi, Westlands"
+              />
+            </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="bg-muted/30 p-4 -mx-6 -mb-6 border-t mt-4">
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveEdit} className="bg-primary">Save Changes</Button>
+            <Button onClick={handleSaveEdit} className="bg-primary px-8">Update Scholar Record</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
