@@ -1,7 +1,10 @@
 import type {Metadata} from 'next';
 import './globals.css';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
-import { ClientLayout } from '@/components/layout/client-layout';
+import { Inter, Outfit } from 'next/font/google';
+
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' });
 
 export const metadata: Metadata = {
   title: 'Risabu Connect ERP',
@@ -16,15 +19,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
-      <body className="font-body antialiased selection:bg-accent/30">
+      <body className={`${inter.variable} ${outfit.variable} font-body antialiased selection:bg-accent/30`}>
         <FirebaseClientProvider>
-          <ClientLayout>
-            {children}
-          </ClientLayout>
+          {children}
         </FirebaseClientProvider>
       </body>
     </html>

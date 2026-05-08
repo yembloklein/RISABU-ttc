@@ -64,12 +64,7 @@ const menuItems = [
     group: true,
     items: [
       {
-        title: "Invoices",
-        icon: FileText,
-        url: "/finance/invoices",
-      },
-      {
-        title: "Fee Payments",
+        title: "Fee Tracking",
         icon: CreditCard,
         url: "/finance/fees",
       },
