@@ -4,9 +4,10 @@ import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebas
 import { collection, query, where, limit } from "firebase/firestore"
 import { useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { BookOpen, Wallet, GraduationCap, Calendar, Activity, Loader2 } from "lucide-react"
+import { BookOpen, Wallet, GraduationCap, Calendar, Activity, Loader2, Download } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   Table,
   TableBody,
@@ -16,6 +17,11 @@ import {
   TableRow
 } from "@/components/ui/table"
 import { formatDistanceToNow } from "date-fns"
+import { useRef, useState } from "react"
+import { AdmissionLetter } from "@/components/admission-letter"
+import jsPDF from "jspdf"
+import html2canvas from "html2canvas"
+import { toast } from "@/hooks/use-toast"
 
 export default function StudentDashboard() {
   const { user } = useUser()
@@ -102,6 +108,50 @@ export default function StudentDashboard() {
     return { billed, paid, balance, percentage }
   }, [invoicesRaw, paymentsRaw])
 
+  const letterRef = useRef<HTMLDivElement>(null)
+  const [isGenerating, setIsGenerating] = useState(false)
+
+  const handleDownloadLetter = async () => {
+    if (!letterRef.current) return
+    setIsGenerating(true)
+    
+    try {
+      const canvas = await html2canvas(letterRef.current, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff"
+      })
+      
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      })
+      
+      const imgWidth = 210
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight)
+      pdf.save(`Admission_Letter_${student.firstName}_${student.lastName}.pdf`)
+      
+      toast({
+        title: "Success",
+        description: "Your admission letter has been downloaded."
+      })
+    } catch (error) {
+      console.error("PDF Error:", error)
+      toast({
+        title: "Error",
+        description: "Failed to generate admission letter.",
+        variant: "destructive"
+      })
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   if (isStudentLoading) {
     return <div className="h-96 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-slate-200" /></div>
   }
@@ -123,6 +173,17 @@ export default function StudentDashboard() {
             <p className="text-slate-500 font-medium max-w-lg">
               Check your academic progress and financial status below.
             </p>
+            {(student.admissionStatus === "Enrolled" || student.admissionNumber) && (
+              <Button 
+                onClick={handleDownloadLetter} 
+                disabled={isGenerating}
+                variant="outline" 
+                className="mt-2 border-blue-200 text-blue-700 hover:bg-blue-50 font-bold rounded-xl"
+              >
+                {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                Download Admission Letter
+              </Button>
+            )}
           </div>
           <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
             <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
@@ -285,6 +346,11 @@ export default function StudentDashboard() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Hidden Admission Letter for PDF Capture */}
+      <div className="fixed -left-[9999px] top-0 opacity-0 pointer-events-none">
+        <AdmissionLetter ref={letterRef} student={student} program={program} />
+      </div>
     </div>
   )
 }
