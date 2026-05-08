@@ -8,8 +8,6 @@ import { Wallet, CreditCard, Receipt, ArrowRight, Download, ShieldCheck, Landmar
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Table,
@@ -20,14 +18,6 @@ import {
   TableRow
 } from "@/components/ui/table"
 import { formatDistanceToNow } from "date-fns"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
 import { addDoc, serverTimestamp } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 
@@ -44,19 +34,6 @@ export default function FinancePage() {
   const { data: studentsData, isLoading: isStudentLoading } = useCollection(studentQuery)
   const student = studentsData?.[0]
   const { toast } = useToast()
-
-  const [isPaymentOpen, setIsPaymentOpen] = useState(false)
-  const [paymentAmount, setPaymentAmount] = useState("")
-  const [paymentPhone, setPaymentPhone] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [paymentSuccess, setPaymentSuccess] = useState(false)
-
-  // Initialize phone when student data loads
-  useEffect(() => {
-    if (student?.contactPhone && !paymentPhone) {
-      setPaymentPhone(student.contactPhone)
-    }
-  }, [student, paymentPhone])
 
   // 2. Fetch Program Data (for fees)
   const programQuery = useMemoFirebase(() => {
@@ -132,176 +109,6 @@ export default function FinancePage() {
           <Button size="sm" variant="outline" className="font-semibold">
             <Download className="h-4 w-4 mr-2" /> Fee Structure
           </Button>
-          <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 font-bold">
-                <CreditCard className="h-4 w-4 mr-2" /> Pay with M-Pesa
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden border-none shadow-2xl rounded-3xl bg-[#f8fafc]">
-              <Tabs defaultValue="status" className="w-full">
-                <div className="bg-white px-6 pt-4 border-b">
-                  <TabsList className="grid w-full grid-cols-2 bg-transparent h-12">
-                    <TabsTrigger value="status" className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none bg-transparent font-bold text-slate-400">Status</TabsTrigger>
-                    <TabsTrigger value="overview" className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 rounded-none bg-transparent font-bold text-slate-400">Overview</TabsTrigger>
-                  </TabsList>
-                </div>
-
-                <TabsContent value="status" className="mt-0 outline-none">
-                  <div className="p-8 space-y-8 bg-white m-4 rounded-2xl shadow-sm border border-slate-100">
-                    {/* Vertical Timeline */}
-                    <div className="relative pl-12 space-y-10">
-                      {/* Line */}
-                      <div className="absolute left-[19px] top-2 bottom-2 w-1 bg-emerald-500 rounded-full" />
-                      
-                      {/* Step 1 */}
-                      <div className="relative">
-                        <div className="absolute -left-[12px] h-6 w-6 rounded-full bg-emerald-500 border-4 border-white flex items-center justify-center shadow-sm">
-                          <Check className="h-3 w-3 text-white" />
-                        </div>
-                        <div className="space-y-1">
-                          <h4 className="text-base font-bold text-slate-900 leading-none">Initialization Ready</h4>
-                          <p className="text-[11px] text-slate-500 font-medium">Your payment request has been prepared.</p>
-                        </div>
-                      </div>
-
-                      {/* Step 2 */}
-                      <div className="relative">
-                        <div className="absolute -left-[12px] h-6 w-6 rounded-full bg-emerald-500 border-4 border-white flex items-center justify-center shadow-sm">
-                          <Check className="h-3 w-3 text-white" />
-                        </div>
-                        <div className="space-y-1">
-                          <h4 className="text-base font-bold text-blue-600 leading-none">Next: Complete STK Push</h4>
-                          <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
-                            Confirm the KES {paymentAmount || "0"} request on your phone to finalize.
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Step 3 (Waiting) */}
-                      <div className="relative">
-                        <div className="absolute -left-[12px] h-6 w-6 rounded-full bg-white border-2 border-slate-200" />
-                      </div>
-                    </div>
-
-                    {/* Info Cards */}
-                    <div className="space-y-3">
-                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-4">
-                        <div className="h-10 w-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
-                          <Wallet className="h-5 w-5 text-blue-600" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1">Required Amount</p>
-                          <p className="text-lg font-black text-slate-900">
-                            KES <span className="bg-blue-900 text-white px-2 py-0.5 rounded-lg ml-1">{Number(paymentAmount || 0).toLocaleString()}</span>
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex items-center gap-4">
-                        <div className="h-10 w-10 rounded-xl bg-purple-100 flex items-center justify-center shrink-0">
-                          <Package className="h-5 w-5 text-purple-600" />
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1">Purpose</p>
-                          <p className="text-sm font-bold text-slate-700">
-                            Payment for <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-lg">Tuition Fees</span> to complete enrollment.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Notice Box */}
-                    <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100 flex gap-4">
-                      <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                        <Info className="h-4 w-4 text-blue-600" />
-                      </div>
-                      <div className="space-y-1">
-                        <h5 className="text-sm font-bold text-blue-900">Important Notice</h5>
-                        <p className="text-[11px] text-blue-700/80 font-medium leading-relaxed">
-                          Please complete the payment on your phone to finalize the transaction and update your ledger.
-                        </p>
-                      </div>
-                    </div>
-
-                    <Button 
-                      onClick={async () => {
-                        if (!paymentAmount || isNaN(Number(paymentAmount)) || !paymentPhone) return
-                        setIsSubmitting(true)
-                        try {
-                          const formattedPhone = paymentPhone.startsWith('0') ? '254' + paymentPhone.substring(1) : paymentPhone.startsWith('254') ? paymentPhone : '254' + paymentPhone
-
-                          await addDoc(collection(firestore, "payments"), {
-                            studentId: student?.id,
-                            studentName: `${student?.firstName} ${student?.lastName}`,
-                            amount: Number(paymentAmount),
-                            phoneNumber: formattedPhone,
-                            paymentDate: new Date().toISOString(),
-                            type: "Fee",
-                            description: "M-Pesa Tuition Payment",
-                            transactionReference: "MP-" + Math.random().toString(36).substring(2, 10).toUpperCase(),
-                            status: "Completed",
-                            createdAt: serverTimestamp()
-                          })
-                          
-                          setPaymentSuccess(true)
-                          setTimeout(() => {
-                            setIsPaymentOpen(false)
-                            setPaymentSuccess(false)
-                            setPaymentAmount("")
-                          }, 2000)
-                        } catch (e) {
-                          toast({
-                            title: "Error",
-                            description: "Payment failed. Please try again.",
-                            variant: "destructive"
-                          })
-                        } finally {
-                          setIsSubmitting(false)
-                        }
-                      }}
-                      disabled={isSubmitting || !paymentAmount}
-                      className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg rounded-2xl transition-all shadow-lg shadow-blue-100"
-                    >
-                      {isSubmitting ? <Loader2 className="h-6 w-6 animate-spin" /> : "Initiate M-Pesa Payment"}
-                    </Button>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="overview" className="mt-0 outline-none">
-                  <div className="p-8 space-y-6 bg-white m-4 rounded-2xl shadow-sm border border-slate-100">
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Payment Amount</Label>
-                        <Input
-                          type="number"
-                          placeholder="0.00"
-                          value={paymentAmount}
-                          onChange={(e) => setPaymentAmount(e.target.value)}
-                          className="h-12 border-slate-200 rounded-xl font-bold"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">M-Pesa Phone</Label>
-                        <Input
-                          type="tel"
-                          placeholder="0712345678"
-                          value={paymentPhone}
-                          onChange={(e) => setPaymentPhone(e.target.value)}
-                          className="h-12 border-slate-200 rounded-xl font-bold"
-                        />
-                      </div>
-                    </div>
-                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-100">
-                      <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                        Ensure you are paying for the correct student account. All payments are non-refundable once processed.
-                      </p>
-                    </div>
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </DialogContent>
-          </Dialog>
         </div>
       </div>
 
