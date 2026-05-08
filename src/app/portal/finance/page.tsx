@@ -9,16 +9,14 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from "@/components/ui/table"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { formatDistanceToNow } from "date-fns"
 import { addDoc, serverTimestamp } from "firebase/firestore"
+import { useRef, useState } from "react"
+import { FinancialStatement } from "@/components/financial-statement"
+import { PaymentReceipt } from "@/components/payment-receipt"
+import jsPDF from "jspdf"
+import html2canvas from "html2canvas"
 import { useToast } from "@/hooks/use-toast"
 
 export default function FinancePage() {
@@ -94,6 +92,52 @@ export default function FinancePage() {
     return { totalInvoiced, totalPaid, balance, percentage }
   }, [invoicesRaw, paymentsRaw])
 
+  const statementRef = useRef<HTMLDivElement>(null)
+  const receiptRef = useRef<HTMLDivElement>(null)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [activeReceipt, setActiveReceipt] = useState<any>(null)
+
+  const downloadStatement = async () => {
+    if (!statementRef.current) return
+    setIsGenerating(true)
+    try {
+      const canvas = await html2canvas(statementRef.current, { scale: 2, useCORS: true })
+      const imgData = canvas.toDataURL('image/png')
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const imgWidth = 210
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight)
+      pdf.save(`Fee_Statement_${student.firstName}.pdf`)
+      toast({ title: "Success", description: "Statement downloaded successfully." })
+    } catch (e) {
+      toast({ title: "Error", description: "Failed to generate statement.", variant: "destructive" })
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const downloadReceipt = async (payment: any) => {
+    setActiveReceipt(payment)
+    setIsGenerating(true)
+    // Small delay to ensure state update renders the hidden component
+    setTimeout(async () => {
+      if (!receiptRef.current) return
+      try {
+        const canvas = await html2canvas(receiptRef.current, { scale: 2, useCORS: true })
+        const imgData = canvas.toDataURL('image/png')
+        const pdf = new jsPDF('p', 'mm', 'a4')
+        const imgWidth = 210
+        const imgHeight = (canvas.height * imgWidth) / canvas.width
+        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight)
+        pdf.save(`Receipt_${payment.transactionReference}.pdf`)
+      } catch (e) {
+        toast({ title: "Error", description: "Failed to generate receipt.", variant: "destructive" })
+      } finally {
+        setIsGenerating(false)
+      }
+    }, 100)
+  }
+
   if (isStudentLoading) {
     return <div className="h-96 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-slate-200" /></div>
   }
@@ -106,6 +150,10 @@ export default function FinancePage() {
           <p className="text-slate-500 font-medium mt-1">Manage your tuition fees and track payment history.</p>
         </div>
         <div className="flex items-center gap-3">
+          <Button size="sm" variant="outline" className="font-semibold" onClick={downloadStatement} disabled={isGenerating}>
+            {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+            Download Statement
+          </Button>
           <Button size="sm" variant="outline" className="font-semibold">
             <Download className="h-4 w-4 mr-2" /> Fee Structure
           </Button>
@@ -176,12 +224,13 @@ export default function FinancePage() {
                 <TableHead className="font-bold text-[10px] uppercase text-slate-500 h-10">Description</TableHead>
                 <TableHead className="font-bold text-[10px] uppercase text-slate-500 h-10">Reference</TableHead>
                 <TableHead className="text-right font-bold text-[10px] uppercase text-slate-500 h-10 pr-6">Amount</TableHead>
+                <th className="h-10 w-10"></th>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isPaymentsLoading || isInvoicesLoading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-32 text-center text-slate-400 font-medium">Syncing Ledger...</TableCell>
+                  <TableCell colSpan={5} className="h-32 text-center text-slate-400 font-medium">Syncing Ledger...</TableCell>
                 </TableRow>
               ) : ledger && ledger.length > 0 ? (
                 ledger.map((item) => (
@@ -210,17 +259,38 @@ export default function FinancePage() {
                         {item.ledgerType === 'invoice' ? '-' : '+'} KES {Number(item.amount).toLocaleString()}
                       </span>
                     </TableCell>
+                    <TableCell className="text-right pr-6 py-4">
+                      {item.ledgerType === 'payment' && (
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="h-8 w-8 p-0 text-slate-400 hover:text-emerald-600"
+                          onClick={() => downloadReceipt(item)}
+                          disabled={isGenerating}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="h-32 text-center text-slate-500 text-sm">No transactions found.</TableCell>
+                  <TableCell colSpan={5} className="h-32 text-center text-slate-500 text-sm">No transactions found.</TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      {/* Hidden Components for PDF Capture */}
+      <div className="fixed -left-[9999px] top-0 opacity-0 pointer-events-none">
+        <FinancialStatement ref={statementRef} student={student} ledger={ledger} stats={feeStats} />
+        {activeReceipt && (
+          <PaymentReceipt ref={receiptRef} student={student} payment={activeReceipt} />
+        )}
+      </div>
     </div>
-  )
+  );
 }
