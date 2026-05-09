@@ -11,7 +11,8 @@ import {
   LogOut,
   User,
   CalendarCheck,
-  ClipboardList
+  ClipboardList,
+  MessageSquare
 } from "lucide-react"
 
 import {
@@ -57,11 +58,17 @@ const portalMenuItems = [
     url: "/portal/attendance",
   },
   {
+    title: "Support",
+    icon: MessageSquare,
+    url: "/portal/support",
+  },
+  {
     title: "Profile",
     icon: User,
     url: "/portal/profile",
   },
 ]
+
 
 export function PortalSidebar({ student }: { student: any }) {
   const pathname = usePathname()
@@ -76,12 +83,13 @@ export function PortalSidebar({ student }: { student: any }) {
     <Sidebar className="border-r border-slate-200">
       <SidebarHeader className="h-16 flex items-center px-6 border-b border-slate-100">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 bg-blue-600 rounded-lg flex items-center justify-center">
+          <div className="h-8 w-8 bg-emerald-600 rounded-lg flex items-center justify-center">
             <GraduationCap className="h-5 w-5 text-white" />
           </div>
           <span className="font-bold text-slate-900 tracking-tight">Student Portal</span>
         </div>
       </SidebarHeader>
+
       <SidebarContent className="px-3 py-4">
         <SidebarGroup>
           <SidebarGroupContent>
@@ -96,14 +104,15 @@ export function PortalSidebar({ student }: { student: any }) {
                       onClick={() => setOpenMobile(false)}
                       className={`h-11 px-4 rounded-lg transition-all ${
                         isActive 
-                          ? "bg-blue-50 text-blue-600 font-bold" 
+                          ? "bg-emerald-50 text-emerald-600 font-bold" 
                           : "text-slate-600 hover:bg-slate-50 font-medium"
                       }`}
                     >
                       <Link href={item.url} className="flex items-center gap-3">
-                        <item.icon className={`h-4 w-4 ${isActive ? "text-blue-600" : "text-slate-400"}`} />
+                        <item.icon className={`h-4 w-4 ${isActive ? "text-emerald-600" : "text-slate-400"}`} />
                         <span>{item.title}</span>
                       </Link>
+
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )

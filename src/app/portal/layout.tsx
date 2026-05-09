@@ -12,8 +12,10 @@ import {
 } from "@/components/ui/sidebar"
 import { PortalSidebar } from "@/components/layout/portal-sidebar"
 import { Loader2, ChevronRight } from "lucide-react"
+import { NotificationBell } from "@/components/portal/notification-bell"
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
+
   const { user } = useUser()
   const router = useRouter()
   const firestore = useFirestore()
@@ -57,8 +59,9 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   if (isLoading && !isLoginPage) {
     return (
       <div className="h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
       </div>
+
     )
   }
 
@@ -75,12 +78,14 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             <div className="flex items-center gap-4 w-full">
               <SidebarTrigger className="text-slate-500 hover:text-slate-900" />
               <div className="h-4 w-px bg-slate-200" />
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-1">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Portal</span>
                 <ChevronRight className="h-3 w-3 text-slate-300" />
                 <span className="text-xs font-bold text-slate-900 uppercase tracking-widest capitalize">{pageTitle}</span>
               </div>
+              <NotificationBell studentId={studentData?.id} />
             </div>
+
           </header>
           <main className="flex-1 p-6 lg:p-10 max-w-7xl">
             {children}

@@ -83,13 +83,19 @@ export default function FinancePage() {
   }, [paymentsRaw, invoicesRaw])
 
   const feeStats = useMemo(() => {
-    const totalInvoiced = (invoicesRaw || []).reduce((sum, i) => sum + (Number(i.amount) || 0), 0)
-    const totalPaid = (paymentsRaw || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
+    // Tally with Admin: Total billed is from the program's tuition fee
+    const totalInvoiced = program ? Number(program.tuitionFee) : 0
+    
+    // Tally with Admin: Only count 'Fee' type payments towards tuition progress
+    const tuitionPayments = (paymentsRaw || []).filter(p => p.type === "Fee")
+    const totalPaid = tuitionPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
+    
     const balance = Math.max(0, totalInvoiced - totalPaid)
     const percentage = totalInvoiced > 0 ? Math.min(100, Math.round((totalPaid / totalInvoiced) * 100)) : 0
 
     return { totalInvoiced, totalPaid, balance, percentage }
-  }, [invoicesRaw, paymentsRaw])
+  }, [program, paymentsRaw])
+
 
   const statementRef = useRef<HTMLDivElement>(null)
   const receiptRef = useRef<HTMLDivElement>(null)
@@ -183,7 +189,7 @@ export default function FinancePage() {
 
               <div className="space-y-2">
                 <div className="flex justify-between text-xs font-bold text-slate-600 uppercase">
-                  <span>Balance Coverage</span>
+                  <span>Fee Payment Progress</span>
                   <span>{feeStats.percentage}%</span>
                 </div>
                 <Progress value={feeStats.percentage} className="h-2 bg-slate-100" />

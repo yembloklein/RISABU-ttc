@@ -153,5 +153,42 @@ service cloud.firestore {
       allow get, list: if isSignedIn();
       allow create, update, delete: if isAdmin();
     }
+
+    match /academic_resources/{resourceId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /unit_registrations/{regId} {
+      allow get: if isInternal() || isResourceStudent(resource.data);
+      allow list: if isInternal() || isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isInternal();
+    }
+
+    match /submissions/{subId} {
+      allow get: if isInternal() || isResourceStudent(resource.data);
+      allow list: if isInternal() || isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isInternal();
+      allow delete: if isAdmin();
+    }
+
+    match /notifications/{notifId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /tickets/{ticketId} {
+      allow get: if isInternal() || isResourceStudent(resource.data);
+      allow list: if isInternal() || isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isInternal() || isResourceStudent(resource.data);
+      allow delete: if isAdmin();
+    }
+
+
+
+
+
   }
 }

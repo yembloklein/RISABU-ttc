@@ -210,7 +210,7 @@ export default function FeesPage() {
       totalArrears += details.balance
     })
 
-    const totalCollected = (payments || []).reduce((sum, p) => sum + Number(p.amount), 0)
+    const totalCollected = (payments || []).filter(p => p.type === "Fee").reduce((sum, p) => sum + Number(p.amount), 0)
 
     return {
       totalBilled,

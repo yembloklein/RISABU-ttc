@@ -100,13 +100,19 @@ export default function StudentDashboard() {
   }, [attendance])
 
   const feeStats = useMemo(() => {
-    const billed = (invoicesRaw || []).reduce((sum, i) => sum + (Number(i.amount) || 0), 0)
-    const paid = (paymentsRaw || []).reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
+    // Tally with Admin: Total billed is from the program's tuition fee
+    const billed = program ? Number(program.tuitionFee) : 0
+    
+    // Tally with Admin: Only count 'Fee' type payments towards tuition progress
+    const tuitionPayments = (paymentsRaw || []).filter(p => p.type === "Fee")
+    const paid = tuitionPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
+    
     const balance = Math.max(0, billed - paid)
     const percentage = billed > 0 ? Math.min(100, Math.round((paid / billed) * 100)) : 0
 
     return { billed, paid, balance, percentage }
-  }, [invoicesRaw, paymentsRaw])
+  }, [program, paymentsRaw])
+
 
   const letterRef = useRef<HTMLDivElement>(null)
   const [isGenerating, setIsGenerating] = useState(false)

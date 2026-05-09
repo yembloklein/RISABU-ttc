@@ -14,8 +14,12 @@ import {
   FileText,
   CreditCard,
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  FileUp,
+  MessageSquare
 } from "lucide-react"
+
+
 
 import {
   Sidebar,
@@ -75,7 +79,43 @@ const menuItems = [
       },
     ],
   },
+  {
+    title: "Academics",
+    group: true,
+    items: [
+      {
+        title: "Academic Resources",
+        icon: FileText,
+        url: "/academics/resources",
+      },
+      {
+        title: "Manage Units",
+        icon: BookOpen,
+        url: "/academics/units",
+      },
+      {
+        title: "Registrations",
+        icon: Users,
+        url: "/academics/registrations",
+      },
+      {
+        title: "Submissions",
+        icon: FileUp,
+        url: "/academics/submissions",
+      },
+      {
+        title: "Support Tickets",
+        icon: MessageSquare,
+        url: "/academics/support",
+      },
+    ],
+  },
 ]
+
+
+
+
+
 
 export function AppSidebar() {
   const pathname = usePathname()
