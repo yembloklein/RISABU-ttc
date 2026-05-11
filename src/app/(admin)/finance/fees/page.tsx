@@ -39,6 +39,7 @@ import {
   AlertCircle,
   Printer
 } from "lucide-react"
+import { Logo } from "@/components/ui/logo"
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, serverTimestamp } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
@@ -373,8 +374,8 @@ export default function FeesPage() {
       {/* Stats Section - Premium Redesign */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <Card className="border-0 shadow-sm bg-gradient-to-br from-slate-900 to-slate-800 text-white overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-4 opacity-10">
-            <GraduationCap className="h-24 w-24 -mt-4 -mr-4" />
+          <div className="absolute top-0 right-0 p-4 opacity-5">
+            <Logo size={96} className="-mt-4 -mr-4 grayscale" />
           </div>
           <CardContent className="p-6">
             <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Total Expected</p>
@@ -625,8 +626,8 @@ export default function FeesPage() {
             {/* Printable Area */}
             <div id="receipt-print-area" className="p-8 bg-white text-slate-900">
               <div className="text-center mb-6">
-                <div className="w-12 h-12 bg-slate-900 text-white flex items-center justify-center rounded-xl mx-auto mb-3">
-                  <GraduationCap className="h-6 w-6" />
+                <div className="w-12 h-12 bg-white flex items-center justify-center rounded-xl mx-auto mb-3 ring-1 ring-slate-100 shadow-sm overflow-hidden">
+                  <Logo size={48} />
                 </div>
                 <h2 className="text-xl font-black uppercase tracking-tight">Risabu TTC</h2>
                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Official Payment Receipt</p>

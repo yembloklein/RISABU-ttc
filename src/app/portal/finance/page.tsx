@@ -57,6 +57,30 @@ export default function FinancePage() {
 
   const { data: invoicesRaw, isLoading: isInvoicesLoading } = useCollection(invoicesQuery)
   
+  // 5. Fetch Student Documents (to check for uploaded receipts)
+  const docsQuery = useMemoFirebase(() => {
+    if (!firestore || !student?.id) return null
+    return query(collection(firestore, "student_documents"), where("studentId", "==", student.id))
+  }, [firestore, student])
+
+  const { data: documents } = useCollection(docsQuery)
+
+  const uploadedReceipts = useMemo(() => {
+    return documents?.filter(d => d.category === "payment_receipt")
+  }, [documents])
+
+  // 6. Fetch Official School Documents
+  const schoolDocsQuery = useMemoFirebase(() => {
+    if (!firestore) return null
+    return query(collection(firestore, "school_documents"))
+  }, [firestore])
+
+  const { data: schoolDocs } = useCollection(schoolDocsQuery)
+
+  const officialFeeStructure = useMemo(() => {
+    return schoolDocs?.find(d => d.type === "official_fee_structure")
+  }, [schoolDocs])
+
   // Combine into a chronological ledger
   const ledger = useMemo(() => {
     const combined: any[] = []
@@ -159,9 +183,25 @@ export default function FinancePage() {
             {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
             Download Statement
           </Button>
-          <Button size="sm" variant="outline" className="font-semibold">
-            <Download className="h-4 w-4 mr-2" /> Fee Structure
-          </Button>
+          {uploadedReceipts && uploadedReceipts.length > 0 && (
+            <Button size="sm" variant="default" className="font-semibold bg-emerald-600 hover:bg-emerald-700" asChild>
+               <a href="/portal/documents">
+                <Receipt className="h-4 w-4 mr-2" />
+                View {uploadedReceipts.length} Uploaded Receipts
+               </a>
+            </Button>
+          )}
+          {officialFeeStructure ? (
+            <Button size="sm" variant="outline" className="font-semibold border-emerald-200 text-emerald-700 hover:bg-emerald-50" asChild>
+              <a href={officialFeeStructure.downloadURL} target="_blank" rel="noopener noreferrer">
+                <Download className="h-4 w-4 mr-2" /> Official Fee Structure
+              </a>
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" className="font-semibold">
+              <Download className="h-4 w-4 mr-2" /> Fee Structure
+            </Button>
+          )}
         </div>
       </div>
 

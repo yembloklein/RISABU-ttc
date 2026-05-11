@@ -10,14 +10,15 @@ import {
   UserPlus,
   BookOpen,
   Receipt,
-  GraduationCap,
   FileText,
   CreditCard,
   LogOut,
   ShieldCheck,
   FileUp,
-  MessageSquare
+  MessageSquare,
+  Settings
 } from "lucide-react"
+import { Logo } from "@/components/ui/logo"
 
 
 
@@ -110,6 +111,17 @@ const menuItems = [
       },
     ],
   },
+  {
+    title: "Settings",
+    group: true,
+    items: [
+      {
+        title: "School Documents",
+        icon: Settings,
+        url: "/settings/documents",
+      },
+    ],
+  },
 ]
 
 
@@ -130,8 +142,8 @@ export function AppSidebar() {
     <Sidebar variant="sidebar" collapsible="icon">
       <SidebarHeader className="border-b px-6 py-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-lg">
-            <GraduationCap className="h-6 w-6" />
+          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-slate-100">
+            <Logo size={40} className="p-0.5" />
           </div>
           <div className="flex flex-col overflow-hidden transition-all group-data-[collapsible=icon]:hidden">
             <span className="text-lg font-bold leading-none text-primary">Risabu</span>
@@ -191,8 +203,8 @@ export function AppSidebar() {
       <SidebarFooter className="border-t p-4">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton 
-              tooltip="Logout" 
+            <SidebarMenuButton
+              tooltip="Logout"
               className="text-destructive hover:text-destructive hover:bg-destructive/10"
               onClick={handleLogout}
             >

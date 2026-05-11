@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
   BookOpen,
-  GraduationCap,
   Wallet,
   LogOut,
   User,
@@ -14,6 +13,7 @@ import {
   ClipboardList,
   MessageSquare
 } from "lucide-react"
+import { Logo } from "@/components/ui/logo"
 
 import {
   Sidebar,
@@ -83,8 +83,8 @@ export function PortalSidebar({ student }: { student: any }) {
     <Sidebar className="border-r border-slate-200">
       <SidebarHeader className="h-16 flex items-center px-6 border-b border-slate-100">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 bg-emerald-600 rounded-lg flex items-center justify-center">
-            <GraduationCap className="h-5 w-5 text-white" />
+          <div className="h-8 w-8 overflow-hidden rounded-lg bg-white flex items-center justify-center ring-1 ring-slate-100">
+            <Logo size={32} />
           </div>
           <span className="font-bold text-slate-900 tracking-tight">Student Portal</span>
         </div>
@@ -98,15 +98,14 @@ export function PortalSidebar({ student }: { student: any }) {
                 const isActive = pathname === item.url
                 return (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton 
-                      asChild 
-                      isActive={isActive} 
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive}
                       onClick={() => setOpenMobile(false)}
-                      className={`h-11 px-4 rounded-lg transition-all ${
-                        isActive 
-                          ? "bg-emerald-50 text-emerald-600 font-bold" 
+                      className={`h-11 px-4 rounded-lg transition-all ${isActive
+                          ? "bg-emerald-50 text-emerald-600 font-bold"
                           : "text-slate-600 hover:bg-slate-50 font-medium"
-                      }`}
+                        }`}
                     >
                       <Link href={item.url} className="flex items-center gap-3">
                         <item.icon className={`h-4 w-4 ${isActive ? "text-emerald-600" : "text-slate-400"}`} />
@@ -136,8 +135,8 @@ export function PortalSidebar({ student }: { student: any }) {
         </div>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton 
-              tooltip="Logout" 
+            <SidebarMenuButton
+              tooltip="Logout"
               className="h-10 rounded-lg text-rose-500 hover:text-rose-600 hover:bg-rose-50 font-bold"
               onClick={handleLogout}
             >

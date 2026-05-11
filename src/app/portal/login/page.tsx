@@ -9,7 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Loader2, GraduationCap, UserPlus, LogIn, MailCheck, ShieldAlert } from "lucide-react"
+import { Loader2, UserPlus, LogIn, MailCheck, ShieldAlert } from "lucide-react"
+import { Logo } from "@/components/ui/logo"
 
 export default function StudentLogin() {
   const [isLogin, setIsLogin] = useState(true)
@@ -127,8 +128,8 @@ export default function StudentLogin() {
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-[400px] shadow-xl border-primary/10">
         <CardHeader className="text-center space-y-4">
-          <div className="mx-auto bg-primary text-primary-foreground p-3 rounded-2xl w-fit shadow-lg">
-            <GraduationCap className="h-8 w-8" />
+          <div className="mx-auto bg-white p-2 rounded-2xl w-fit shadow-lg ring-1 ring-slate-100 overflow-hidden">
+            <Logo size={64} />
           </div>
           <div>
             <CardTitle className="text-2xl font-bold text-slate-900">Student Portal</CardTitle>

@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { GraduationCap, Loader2, UserPlus, LogIn } from "lucide-react"
+import { Loader2, UserPlus, LogIn } from "lucide-react"
+import { Logo } from "@/components/ui/logo"
 import { useAuth, useUser, initiateEmailSignIn, initiateEmailSignUp } from "@/firebase"
 
 export default function LoginPage() {
@@ -45,8 +46,8 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-[400px] shadow-xl border-primary/10">
         <CardHeader className="text-center space-y-4">
-          <div className="mx-auto bg-primary text-primary-foreground p-3 rounded-2xl w-fit shadow-lg">
-            <GraduationCap className="h-8 w-8" />
+          <div className="mx-auto bg-white p-2 rounded-2xl w-fit shadow-lg ring-1 ring-slate-100 overflow-hidden">
+            <Logo size={64} />
           </div>
           <div>
             <CardTitle className="text-2xl font-bold">Risabu Connect</CardTitle>

@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { 
-  GraduationCap, 
   MapPin, 
   Phone, 
   Mail, 
@@ -13,6 +12,7 @@ import {
   ShieldCheck,
   Award
 } from 'lucide-react';
+import { Logo } from '@/components/ui/logo';
 
 interface AdmissionLetterProps {
   student: any;
@@ -39,8 +39,8 @@ export const AdmissionLetter = React.forwardRef<HTMLDivElement, AdmissionLetterP
       {/* Header Section */}
       <div className="flex justify-between items-center mb-10 pb-8 border-b border-slate-100">
         <div className="flex items-center gap-5">
-          <div className="h-20 w-20 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-lg rotate-3">
-            <GraduationCap size={48} />
+          <div className="h-20 w-20 bg-white rounded-2xl flex items-center justify-center shadow-lg ring-1 ring-slate-100 overflow-hidden p-1">
+            <Logo size={80} />
           </div>
           <div>
             <h1 className="text-3xl font-black text-emerald-900 tracking-tighter uppercase leading-none">Risabu Technical</h1>
@@ -153,7 +153,7 @@ export const AdmissionLetter = React.forwardRef<HTMLDivElement, AdmissionLetterP
             </div>
             
             <div className="h-20 w-20 opacity-10 grayscale">
-               <GraduationCap size={80} />
+               <Logo size={80} />
             </div>
           </div>
         </div>

@@ -1,7 +1,7 @@
 
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -27,6 +27,7 @@ import {
   FileBadge,
   Edit2
 } from "lucide-react"
+import { Logo } from "@/components/ui/logo"
 import { 
   Sheet, 
   SheetContent, 
@@ -35,7 +36,7 @@ import {
   SheetTitle, 
   SheetTrigger 
 } from "@/components/ui/sheet"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -64,7 +65,7 @@ import {
 } from "@/components/ui/table"
 import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, doc, serverTimestamp } from "firebase/firestore"
-import { toast } from "@/hooks/use-toast"
+import { toast, useToast } from "@/hooks/use-toast"
 
 export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -263,8 +264,8 @@ export default function StudentsPage() {
               
               <header className="space-y-6 w-full">
                 <div className="flex flex-col items-center gap-4">
-                  <div className="bg-primary p-5 rounded-2xl shadow-xl border-4 border-white">
-                    <GraduationCap className="h-14 w-14 text-white" />
+                  <div className="bg-white p-3 rounded-2xl shadow-xl border-4 border-slate-100 overflow-hidden">
+                    <Logo size={80} />
                   </div>
                   <div className="space-y-1">
                     <h1 className="text-5xl font-black text-primary uppercase tracking-tighter">Risabu Technical</h1>
@@ -489,92 +490,103 @@ export default function StudentsPage() {
                               </div>
                             </SheetHeader>
                             
-                            <div className="space-y-8 mt-4">
-                              <section>
-                                <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                                  <UserCircle className="h-4 w-4 text-primary" />
-                                  Personal Information
-                                </h3>
-                                <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-xl text-sm">
-                                  <div>
-                                    <label className="text-xs text-muted-foreground block">Full Name</label>
-                                    <p className="font-medium">{activeStudent?.firstName} {activeStudent?.lastName}</p>
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-muted-foreground block">Date of Birth</label>
-                                    <p className="font-medium">{activeStudent?.dateOfBirth || "Not Recorded"}</p>
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-muted-foreground block">Gender</label>
-                                    <p className="font-medium">{activeStudent?.gender || "Not Specified"}</p>
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-muted-foreground block">Address</label>
-                                    <p className="font-medium">{activeStudent?.address || "Nairobi, Kenya"}</p>
-                                  </div>
-                                </div>
-                              </section>
+                            <Tabs defaultValue="profile" className="mt-4">
+                              <TabsList className="grid w-full grid-cols-2">
+                                <TabsTrigger value="profile">Profile Details</TabsTrigger>
+                                <TabsTrigger value="documents">Official Documents</TabsTrigger>
+                              </TabsList>
 
-                              <section>
-                                <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                                  <GraduationCap className="h-4 w-4 text-primary" />
-                                  Academic Profile
-                                </h3>
-                                <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-xl text-sm">
-                                  <div className="col-span-2">
-                                    <label className="text-xs text-muted-foreground block">Enrolled Course</label>
-                                    <p className="font-medium">{activeStudent?.appliedCourse || "General Studies"}</p>
+                              <TabsContent value="profile" className="space-y-8 mt-4">
+                                <section>
+                                  <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                                    <UserCircle className="h-4 w-4 text-primary" />
+                                    Personal Information
+                                  </h3>
+                                  <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-xl text-sm">
+                                    <div>
+                                      <label className="text-xs text-muted-foreground block">Full Name</label>
+                                      <p className="font-medium">{activeStudent?.firstName} {activeStudent?.lastName}</p>
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-muted-foreground block">Date of Birth</label>
+                                      <p className="font-medium">{activeStudent?.dateOfBirth || "Not Recorded"}</p>
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-muted-foreground block">Gender</label>
+                                      <p className="font-medium">{activeStudent?.gender || "Not Specified"}</p>
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-muted-foreground block">Address</label>
+                                      <p className="font-medium">{activeStudent?.address || "Nairobi, Kenya"}</p>
+                                    </div>
                                   </div>
-                                  <div>
-                                    <label className="text-xs text-muted-foreground block">Admission Date</label>
-                                    <p className="font-medium">{activeStudent?.admissionDate}</p>
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-muted-foreground block">Admission Number</label>
-                                    <p className="font-bold text-primary">{activeStudent?.admissionNumber || "Pending"}</p>
-                                  </div>
-                                </div>
-                              </section>
+                                </section>
 
-                              <section>
-                                <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                                  <Phone className="h-4 w-4 text-primary" />
-                                  Contact & Emergency
-                                </h3>
-                                <div className="space-y-3 bg-muted/30 p-4 rounded-xl text-sm">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-muted-foreground">Primary Email</span>
-                                    <span className="font-medium">{activeStudent?.contactEmail}</span>
+                                <section>
+                                  <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                                    <GraduationCap className="h-4 w-4 text-primary" />
+                                    Academic Profile
+                                  </h3>
+                                  <div className="grid grid-cols-2 gap-4 bg-muted/30 p-4 rounded-xl text-sm">
+                                    <div className="col-span-2">
+                                      <label className="text-xs text-muted-foreground block">Enrolled Course</label>
+                                      <p className="font-medium">{activeStudent?.appliedCourse || "General Studies"}</p>
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-muted-foreground block">Admission Date</label>
+                                      <p className="font-medium">{activeStudent?.admissionDate}</p>
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-muted-foreground block">Admission Number</label>
+                                      <p className="font-bold text-primary">{activeStudent?.admissionNumber || "Pending"}</p>
+                                    </div>
                                   </div>
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-muted-foreground">Phone Number</span>
-                                    <span className="font-medium">{activeStudent?.contactPhone || "N/A"}</span>
+                                </section>
+
+                                <section>
+                                  <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                                    <Phone className="h-4 w-4 text-primary" />
+                                    Contact & Emergency
+                                  </h3>
+                                  <div className="space-y-3 bg-muted/30 p-4 rounded-xl text-sm">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-muted-foreground">Primary Email</span>
+                                      <span className="font-medium">{activeStudent?.contactEmail}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-muted-foreground">Phone Number</span>
+                                      <span className="font-medium">{activeStudent?.contactPhone || "N/A"}</span>
+                                    </div>
                                   </div>
+                                </section>
+                                
+                                <div className="flex flex-col gap-2 pt-6">
+                                  <div className="flex gap-2">
+                                    <Button className="flex-1 bg-primary" onClick={() => handlePrintID(activeStudent)}>
+                                      <Printer className="h-4 w-4 mr-2" />
+                                      Print ID Card
+                                    </Button>
+                                    <Button 
+                                      variant="outline" 
+                                      className="flex-1"
+                                      onClick={() => handleOpenEditDialog(activeStudent)}
+                                    >
+                                      Edit Records
+                                    </Button>
+                                  </div>
+                                  {activeStudent?.status === "Graduated" && (
+                                    <Button className="w-full bg-accent hover:bg-accent/90" onClick={() => handlePrintCertificate(activeStudent)}>
+                                      <Award className="h-4 w-4 mr-2" />
+                                      Print Graduation Certificate
+                                    </Button>
+                                  )}
                                 </div>
-                              </section>
-                              
-                              <div className="flex flex-col gap-2 pt-6">
-                                <div className="flex gap-2">
-                                  <Button className="flex-1 bg-primary" onClick={() => handlePrintID(activeStudent)}>
-                                    <Printer className="h-4 w-4 mr-2" />
-                                    Print ID Card
-                                  </Button>
-                                  <Button 
-                                    variant="outline" 
-                                    className="flex-1"
-                                    onClick={() => handleOpenEditDialog(activeStudent)}
-                                  >
-                                    Edit Records
-                                  </Button>
-                                </div>
-                                {activeStudent?.status === "Graduated" && (
-                                  <Button className="w-full bg-accent hover:bg-accent/90" onClick={() => handlePrintCertificate(activeStudent)}>
-                                    <Award className="h-4 w-4 mr-2" />
-                                    Print Graduation Certificate
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
+                              </TabsContent>
+
+                              <TabsContent value="documents" className="mt-4">
+                                <StudentDocumentsList student={activeStudent} />
+                              </TabsContent>
+                            </Tabs>
                           </SheetContent>
                         </Sheet>
                         <DropdownMenu>
@@ -763,6 +775,135 @@ export default function StudentsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+import { useStorage, useCollection as useCollectionQuery } from "@/firebase"
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage"
+import { addDoc, query, where, deleteDoc } from "firebase/firestore"
+import { Download, Trash2, Plus, FileText, AlertTriangle } from "lucide-react"
+
+function StudentDocumentsList({ student }: { student: any }) {
+  const firestore = useFirestore()
+  const storage = useStorage()
+  const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { toast } = useToast()
+
+  const docsQuery = useMemoFirebase(() => {
+    if (!firestore || !student?.id) return null
+    return query(collection(firestore, "student_documents"), where("studentId", "==", student.id))
+  }, [firestore, student])
+
+  const { data: documents } = useCollectionQuery(docsQuery)
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !student?.id || !firestore) return
+    e.target.value = ""
+
+    setUploading(true)
+    setProgress(0)
+
+    try {
+      const storagePath = `student_documents/${student.id}/official/${Date.now()}_${file.name}`
+      const storageRef = ref(storage, storagePath)
+      const uploadTask = uploadBytesResumable(storageRef, file)
+
+      await new Promise<void>((resolve, reject) => {
+        uploadTask.on("state_changed", 
+          (snap) => setProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+          (err) => reject(err),
+          () => resolve()
+        )
+      })
+
+      const downloadURL = await getDownloadURL(uploadTask.snapshot.ref)
+
+      await addDoc(collection(firestore, "student_documents"), {
+        studentId: student.id,
+        category: "admission_letter", // Default to admission letter for this context, or let them choose
+        categoryLabel: "Official Admission Letter",
+        fileName: file.name,
+        fileSize: file.size,
+        downloadURL,
+        storagePath,
+        uploadedAt: serverTimestamp(),
+        isOfficial: true // Mark as uploaded by admin
+      })
+
+      toast({ title: "Success", description: "Document uploaded to student profile." })
+    } catch (error) {
+      console.error(error)
+      toast({ title: "Upload Failed", variant: "destructive" })
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleDelete = async (docItem: any) => {
+    if(!firestore) return
+    try {
+      await deleteObject(ref(storage, docItem.storagePath))
+      await deleteDoc(doc(firestore, "student_documents", docItem.id))
+      toast({ title: "Deleted", description: "Document removed." })
+    } catch (error) {
+      console.error(error)
+      toast({ title: "Error", variant: "destructive" })
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-bold uppercase tracking-wider text-slate-400">Issued Documents</h4>
+        <Button size="sm" variant="outline" className="h-8 gap-2 font-bold" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+          <Plus className="h-3.5 w-3.5" />
+          Upload Official File
+        </Button>
+        <input ref={fileInputRef} type="file" className="hidden" onChange={handleUpload} />
+      </div>
+
+      <div className="space-y-2">
+        {documents?.filter(d => d.isOfficial).length === 0 ? (
+          <div className="py-8 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
+             <p className="text-xs text-slate-400 font-medium">No official documents issued yet.</p>
+          </div>
+        ) : (
+          documents?.filter(d => d.isOfficial).map((docItem) => (
+            <div key={docItem.id} className="flex items-center justify-between p-3 rounded-xl bg-white border border-slate-100 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                  <FileText className="h-4 w-4" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-900 truncate max-w-[180px]">{docItem.fileName}</p>
+                  <p className="text-[10px] text-slate-400">{docItem.categoryLabel}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button size="icon" variant="ghost" className="h-7 w-7" asChild>
+                  <a href={docItem.downloadURL} target="_blank" rel="noopener noreferrer">
+                    <Download className="h-3.5 w-3.5" />
+                  </a>
+                </Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7 text-rose-500 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleDelete(docItem)}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {uploading && (
+        <div className="space-y-2 pt-2">
+          <Progress value={progress} className="h-1" />
+          <p className="text-[10px] text-center font-bold text-primary uppercase animate-pulse">{progress}% Uploading...</p>
+        </div>
+      )}
     </div>
   )
 }

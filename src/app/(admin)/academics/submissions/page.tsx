@@ -32,9 +32,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 
-
 import { Search, Download, CheckCircle, Clock, Loader2, FileText, User, GraduationCap, Filter, Trash2 } from "lucide-react"
-import { useFirestore, useCollection, useMemoFirebase, useUser, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase"
+
+import { ref, deleteObject } from "firebase/storage"
+import { useFirestore, useCollection, useMemoFirebase, useUser, useStorage, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase"
 
 import { collection, query, orderBy, doc, serverTimestamp, addDoc } from "firebase/firestore"
 
@@ -48,7 +49,9 @@ export default function SubmissionsPage() {
   const [activeSub, setActiveSub] = useState<any>(null)
   
   const firestore = useFirestore()
+  const storage = useStorage()
   const { user } = useUser()
+
 
 
   // 1. Fetch Submissions
@@ -107,11 +110,15 @@ export default function SubmissionsPage() {
 
 
   const handleDeleteSubmission = async (submission: any) => {
-    if (!firestore || !confirm("Are you sure you want to permanently delete this submission and its file?")) return
+    if (!firestore || !storage || !confirm("Are you sure you want to permanently delete this submission and its file?")) return
     
     try {
-      // 1. Delete file from disk via API
-      if (submission.fileUrl) {
+      // 1. Delete file from Storage if path exists
+      if (submission.storagePath) {
+        const fileRef = ref(storage, submission.storagePath)
+        await deleteObject(fileRef)
+      } else if (submission.fileUrl && !submission.fileUrl.includes('firebasestorage')) {
+        // Fallback for old local files (optional cleanup)
         await fetch('/api/assignments/delete', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -123,11 +130,12 @@ export default function SubmissionsPage() {
       const docRef = doc(firestore, "submissions", submission.id)
       deleteDocumentNonBlocking(docRef)
       
-      toast({ title: "Deleted", description: "Submission has been removed." })
+      toast({ title: "Deleted", description: "Submission and file have been removed from the cloud." })
     } catch (error: any) {
       toast({ title: "Delete Failed", description: error.message, variant: "destructive" })
     }
   }
+
 
 
   return (

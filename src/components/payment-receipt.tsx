@@ -1,7 +1,8 @@
 "use client"
 
 import React from 'react';
-import { GraduationCap, ShieldCheck, CheckCircle2, MapPin, Phone } from 'lucide-react';
+import { ShieldCheck, CheckCircle2, MapPin, Phone } from 'lucide-react';
+import { Logo } from '@/components/ui/logo';
 
 interface PaymentReceiptProps {
   student: any;
@@ -22,8 +23,8 @@ export const PaymentReceipt = React.forwardRef<HTMLDivElement, PaymentReceiptPro
       
       <div className="flex justify-between items-start mb-8 relative">
         <div className="flex items-center gap-3">
-          <div className="h-12 w-12 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-md">
-            <GraduationCap size={28} />
+          <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center shadow-sm ring-1 ring-slate-100 overflow-hidden">
+            <Logo size={48} />
           </div>
           <div>
             <h1 className="text-xl font-black text-emerald-900 tracking-tight uppercase leading-none">Risabu TTC</h1>

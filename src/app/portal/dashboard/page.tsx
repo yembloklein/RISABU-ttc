@@ -4,7 +4,8 @@ import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebas
 import { collection, query, where, limit } from "firebase/firestore"
 import { useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { BookOpen, Wallet, GraduationCap, Calendar, Activity, Loader2, Download } from "lucide-react"
+import { BookOpen, Wallet, Calendar, Activity, Loader2, Download } from "lucide-react"
+import { Logo } from "@/components/ui/logo"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -74,6 +75,34 @@ export default function StudentDashboard() {
   }, [firestore, student])
   
   const { data: grades } = useCollection(gradesQuery)
+  
+  // 5. Fetch Student Documents (to check for custom admission letter)
+  const docsQuery = useMemoFirebase(() => {
+    if (!firestore || !student?.id) return null
+    return query(collection(firestore, "student_documents"), where("studentId", "==", student.id))
+  }, [firestore, student])
+
+  const { data: documents } = useCollection(docsQuery)
+
+  const customAdmissionLetter = useMemo(() => {
+    return documents?.find(d => d.category === "admission_letter")
+  }, [documents])
+
+  // 6. Fetch Official School Documents
+  const schoolDocsQuery = useMemoFirebase(() => {
+    if (!firestore) return null
+    return query(collection(firestore, "school_documents"))
+  }, [firestore])
+
+  const { data: schoolDocs } = useCollection(schoolDocsQuery)
+
+  const officialAdmissionLetter = useMemo(() => {
+    return schoolDocs?.find(d => d.type === "official_admission_letter")
+  }, [schoolDocs])
+
+  const studentSpecificOfficialLetter = useMemo(() => {
+    return documents?.find(d => d.category === "admission_letter" && d.isOfficial === true)
+  }, [documents])
 
   const gpa = useMemo(() => {
     if (!grades || grades.length === 0) return 0
@@ -180,15 +209,52 @@ export default function StudentDashboard() {
               Check your academic progress and financial status below.
             </p>
             {(student.admissionStatus === "Enrolled" || student.admissionNumber) && (
-              <Button 
-                onClick={handleDownloadLetter} 
-                disabled={isGenerating}
-                variant="outline" 
-                className="mt-2 border-blue-200 text-blue-700 hover:bg-blue-50 font-bold rounded-xl"
-              >
-                {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-                Download Admission Letter
-              </Button>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {studentSpecificOfficialLetter ? (
+                  <Button 
+                    asChild
+                    variant="default" 
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl"
+                  >
+                    <a href={studentSpecificOfficialLetter.downloadURL} target="_blank" rel="noopener noreferrer">
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Your Official Admission Letter
+                    </a>
+                  </Button>
+                ) : officialAdmissionLetter ? (
+                  <Button 
+                    asChild
+                    variant="default" 
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl"
+                  >
+                    <a href={officialAdmissionLetter.downloadURL} target="_blank" rel="noopener noreferrer">
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Official Admission Letter
+                    </a>
+                  </Button>
+                ) : customAdmissionLetter ? (
+                  <Button 
+                    asChild
+                    variant="default" 
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl"
+                  >
+                    <a href={customAdmissionLetter.downloadURL} target="_blank" rel="noopener noreferrer">
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Custom Admission Letter
+                    </a>
+                  </Button>
+                ) : (
+                  <Button 
+                    onClick={handleDownloadLetter} 
+                    disabled={isGenerating}
+                    variant="outline" 
+                    className="border-blue-200 text-blue-700 hover:bg-blue-50 font-bold rounded-xl"
+                  >
+                    {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+                    Download Admission Letter
+                  </Button>
+                )}
+              </div>
             )}
           </div>
           <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
@@ -266,7 +332,7 @@ export default function StudentDashboard() {
             
             <div className="flex items-start gap-3">
               <div className="h-8 w-8 rounded-lg bg-slate-50 flex items-center justify-center shrink-0">
-                <GraduationCap className="h-4 w-4 text-slate-400" />
+                <Logo size={16} />
               </div>
               <div>
                 <p className="text-[10px] font-bold text-slate-400 uppercase">Admission No</p>
