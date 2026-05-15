@@ -45,6 +45,7 @@ import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, u
 import { collection, serverTimestamp } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
 import * as XLSX from 'xlsx'
+import { Logo } from "@/components/ui/logo"
 
 export default function FeesPage() {
   const [searchTerm, setSearchTerm] = useState("")
