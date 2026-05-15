@@ -21,10 +21,18 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from "@/components/ui/dialog"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { BookOpen, Plus, Search, Edit2, Trash2, Loader2, Info } from "lucide-react"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { BookOpen, Plus, Search, Edit2, Trash2, Loader2, Info, Users, GraduationCap, Phone, Mail } from "lucide-react"
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, doc, serverTimestamp } from "firebase/firestore"
 
@@ -41,6 +49,8 @@ export default function CoursesPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingCourseId, setEditingCourseId] = useState<string | null>(null)
   const [formData, setFormData] = useState({ name: "", tuitionFee: "", durationMonths: "", description: "" })
+  const [selectedCourse, setSelectedCourse] = useState<string | null>(null)
+  const [isStudentsSheetOpen, setIsStudentsSheetOpen] = useState(false)
   
   const firestore = useFirestore()
   const { user } = useUser()
@@ -48,6 +58,21 @@ export default function CoursesPage() {
   
   const programsRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "programs") : null, [firestore, user])
   const { data: programs, isLoading } = useCollection(programsRef)
+
+  const studentsRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "students") : null, [firestore, user])
+  const { data: students } = useCollection(studentsRef)
+
+  // Build enrollment count map: course name -> count
+  const enrollmentCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    (students || []).forEach(s => {
+      if (s.admissionStatus === 'Enrolled' && s.appliedCourse) {
+        const course = s.appliedCourse.trim();
+        counts[course] = (counts[course] || 0) + 1;
+      }
+    });
+    return counts;
+  }, [students]);
 
   const filteredPrograms = useMemo(() => {
     return (programs || []).filter(p => 
@@ -216,6 +241,7 @@ export default function CoursesPage() {
                 <TableHead>Course Name</TableHead>
                 <TableHead>Tuition Fee</TableHead>
                 <TableHead>Duration</TableHead>
+                <TableHead>Enrolled Students</TableHead>
                 <TableHead>Description</TableHead>
                 {isAdmin && <TableHead className="text-right">Actions</TableHead>}
               </TableRow>
@@ -228,12 +254,28 @@ export default function CoursesPage() {
                   </TableCell>
                 </TableRow>
               ) : filteredPrograms.length > 0 ? (
-                filteredPrograms.map((p) => (
+                filteredPrograms.map((p) => {
+                  const enrolled = enrollmentCounts[p.name] || 0;
+                  return (
                   <TableRow key={p.id}>
                     <TableCell className="font-bold text-primary">{p.name}</TableCell>
                     <TableCell className="font-mono font-semibold">KES {p.tuitionFee.toLocaleString()}</TableCell>
                     <TableCell>
                       <Badge variant="secondary">{p.durationMonths} Months</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <button
+                        onClick={() => { setSelectedCourse(p.name); setIsStudentsSheetOpen(true); }}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold transition-all ${
+                          enrolled > 0
+                            ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 cursor-pointer'
+                            : 'bg-slate-100 text-slate-500 cursor-default'
+                        }`}
+                      >
+                        <Users className="h-3 w-3" />
+                        {enrolled} {enrolled === 1 ? 'Student' : 'Students'}
+                        {enrolled > 0 && <span className="ml-0.5 opacity-60">↗</span>}
+                      </button>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm max-w-xs truncate">
                       {p.description || "No description provided."}
@@ -257,7 +299,8 @@ export default function CoursesPage() {
                       </TableCell>
                     )}
                   </TableRow>
-                ))
+                  );
+                })
               ) : (
                 <TableRow>
                   <TableCell colSpan={5} className="h-24 text-center text-muted-foreground italic">
@@ -269,6 +312,68 @@ export default function CoursesPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Students enrolled in course - side sheet */}
+      <Sheet open={isStudentsSheetOpen} onOpenChange={setIsStudentsSheetOpen}>
+        <SheetContent className="sm:max-w-[480px] p-0 overflow-y-auto">
+          <SheetHeader className="px-6 pt-6 pb-4 border-b border-slate-100 bg-white sticky top-0 z-10">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-lg bg-emerald-50 flex items-center justify-center">
+                <GraduationCap className="h-5 w-5 text-emerald-600" />
+              </div>
+              <div>
+                <SheetTitle className="text-base font-bold text-slate-900">{selectedCourse}</SheetTitle>
+                <SheetDescription className="text-xs text-slate-500 mt-0.5">
+                  {selectedCourse ? (enrollmentCounts[selectedCourse] || 0) : 0} enrolled students
+                </SheetDescription>
+              </div>
+            </div>
+          </SheetHeader>
+
+          <div className="px-6 py-4 space-y-2">
+            {selectedCourse && (students || []).filter(s =>
+              s.admissionStatus === 'Enrolled' && s.appliedCourse?.trim() === selectedCourse
+            ).length === 0 ? (
+              <div className="py-16 text-center">
+                <Users className="h-8 w-8 mx-auto text-slate-300 mb-3" />
+                <p className="text-sm text-slate-500">No students enrolled in this course yet.</p>
+              </div>
+            ) : (
+              (students || []).filter(s =>
+                s.admissionStatus === 'Enrolled' && s.appliedCourse?.trim() === selectedCourse
+              ).map((s) => (
+                <div key={s.id} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 bg-white hover:bg-slate-50 transition-colors">
+                  <Avatar className="h-9 w-9 shrink-0">
+                    <AvatarFallback className="bg-emerald-50 text-emerald-700 text-xs font-bold">
+                      {s.firstName?.[0]}{s.lastName?.[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-900 truncate">{s.firstName} {s.lastName}</p>
+                    <p className="text-xs text-slate-500 truncate">ADM: {s.admissionNumber || '—'}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                      s.status === 'Active' || !s.status
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : s.status === 'Graduated'
+                        ? 'bg-blue-50 text-blue-700'
+                        : 'bg-rose-50 text-rose-700'
+                    }`}>
+                      {s.status || 'Active'}
+                    </span>
+                    {s.contactPhone && (
+                      <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
+                        <Phone className="h-2.5 w-2.5" /> {s.contactPhone}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }

@@ -25,7 +25,9 @@ import {
   Printer,
   Award,
   FileBadge,
-  Edit2
+  Edit2,
+  UploadCloud,
+  FileSpreadsheet
 } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
 import { 
@@ -52,6 +54,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -63,9 +66,10 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table"
-import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, useUser } from "@/firebase"
+import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking, addDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, doc, serverTimestamp } from "firebase/firestore"
 import { toast, useToast } from "@/hooks/use-toast"
+import * as XLSX from 'xlsx'
 
 export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -73,6 +77,9 @@ export default function StudentsPage() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
   const [printMode, setPrintMode] = useState<'id' | 'certificate' | null>(null)
   
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+  const [importing, setImporting] = useState(false)
+
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editFormData, setEditFormData] = useState<any>({
     firstName: "",
@@ -101,6 +108,16 @@ export default function StudentsPage() {
   const activeStudent = useMemo(() => {
     return (students || []).find(s => s.id === selectedStudentId) || null;
   }, [students, selectedStudentId]);
+
+  const schoolDocsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return collection(firestore, "school_documents");
+  }, [firestore]);
+  
+  const { data: schoolDocs } = useCollection(schoolDocsQuery);
+
+  const idTemplateUrl = useMemo(() => schoolDocs?.find((d: any) => d.type === 'official_id_template')?.downloadURL, [schoolDocs]);
+  const certificateTemplateUrl = useMemo(() => schoolDocs?.find((d: any) => d.type === 'official_certificate_template')?.downloadURL, [schoolDocs]);
 
   const filteredStudents = useMemo(() => {
     return (students || []).filter(stu => {
@@ -177,6 +194,141 @@ export default function StudentsPage() {
     setIsEditDialogOpen(false);
   };
 
+  const handleStudentsExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    
+    try {
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          const buffer = evt.target?.result;
+          const wb = XLSX.read(buffer, { type: 'array' });
+          const wsname = wb.SheetNames[0];
+          const ws = wb.Sheets[wsname];
+          const data = XLSX.utils.sheet_to_json(ws);
+          
+          if (data.length === 0) {
+            toast({ title: "Empty File", description: "No data rows found in the spreadsheet.", variant: "destructive" });
+            setImporting(false);
+            return;
+          }
+
+          // Log actual headers for debugging
+          const actualHeaders = Object.keys(data[0] as any);
+          console.log("Excel headers detected:", actualHeaders);
+
+          let successCount = 0;
+          let updateCount = 0;
+          let failCount = 0;
+
+          // Helper: find column value using partial-match on cleaned key
+          const findVal = (row: any, possibleKeys: string[]): string => {
+            const entries = Object.entries(row);
+            // 1. Exact clean match
+            for (const [key, val] of entries) {
+              const cleanKey = key.toLowerCase().replace(/[\s_\-\.]/g, '');
+              if (possibleKeys.some(pk => cleanKey === pk)) return String(val ?? '');
+            }
+            // 2. Partial/contains match
+            for (const [key, val] of entries) {
+              const cleanKey = key.toLowerCase().replace(/[\s_\-\.]/g, '');
+              if (possibleKeys.some(pk => cleanKey.includes(pk) || pk.includes(cleanKey))) return String(val ?? '');
+            }
+            return '';
+          };
+
+          for (const row of data as any[]) {
+            // Use exact confirmed column names first, then fuzzy fallback
+            const firstName = row['First Name'] || row['first name'] || row['FIRST NAME'] || findVal(row, ['firstname', 'first', 'fname', 'name', 'studentname', 'fullname', 'names', 'student']);
+            const lastName  = row['Last Name']  || row['last name']  || row['LAST NAME']  || findVal(row, ['lastname', 'last', 'surname', 'lname']);
+            const admNo     = (row['ADM'] || row['Adm'] || row['adm'] || row['ADM No'] || row['Adm No'] || findVal(row, ['admno', 'adm', 'admissionnumber', 'admission', 'regno', 'registrationnumber', 'studentid']) || '').toString().trim();
+            const course    = row['Course'] || row['course'] || row['COURSE'] || findVal(row, ['course', 'program', 'appliedcourse', 'department', 'class']) || 'General Studies';
+            const email     = row['Email'] || row['email'] || row['EMAIL'] || findVal(row, ['email', 'emailaddress', 'contactemail', 'mail']);
+            const phone     = row['Phone'] || row['phone'] || row['PHONE'] || findVal(row, ['phone', 'phonenumber', 'contact', 'mobile', 'tel']);
+            const gender    = row['Gender'] || row['gender'] || row['GENDER'] || findVal(row, ['gender', 'sex']);
+            const dob       = row['DOB'] || row['dob'] || row['Date of Birth'] || row['date of birth'] || findVal(row, ['dob', 'dateofbirth', 'birthdate', 'birth']);
+            const status    = row['STATUS'] || row['Status'] || row['status'] || findVal(row, ['status', 'state']) || 'Active';
+            const address   = row['Address'] || row['address'] || findVal(row, ['address', 'location', 'residence', 'town', 'city']);
+
+            // Debug: log first row to confirm detection
+            if (data.indexOf(row) === 0) {
+              console.log('First row parsed:', { firstName, lastName, admNo, course, email });
+            }
+
+            if (!firstName) {
+              console.log('Skipping row (no firstName):', row);
+              failCount++;
+              continue;
+            }
+
+            if (firestore) {
+              const studentsCollRef = collection(firestore, "students");
+              
+              // Find existing by admission number
+              const existingStudent = admNo ? (students || []).find(s => s.admissionNumber === admNo) : null;
+              
+              if (existingStudent) {
+                const docRef = doc(firestore, "students", existingStudent.id);
+                updateDocumentNonBlocking(docRef, {
+                  firstName: firstName.toString(),
+                  lastName: lastName.toString(),
+                  contactEmail: email.toString(),
+                  contactPhone: phone.toString(),
+                  address: address || existingStudent.address || '',
+                  appliedCourse: course || 'General Studies',
+                  gender: gender.toString(),
+                  dateOfBirth: dob || existingStudent.dateOfBirth || '',
+                  status: status.toString(),
+                  admissionStatus: "Enrolled",
+                  updatedAt: serverTimestamp(),
+                });
+                updateCount++;
+              } else {
+                addDocumentNonBlocking(studentsCollRef, {
+                  firstName: firstName.toString(),
+                  lastName: lastName.toString(),
+                  contactEmail: email.toString(),
+                  contactPhone: phone.toString(),
+                  address: address || '',
+                  appliedCourse: course || 'General Studies',
+                  gender: gender.toString(),
+                  dateOfBirth: dob || '',
+                  status: status.toString(),
+                  admissionNumber: admNo,
+                  admissionStatus: "Enrolled",
+                  admissionDate: new Date().toLocaleDateString('en-GB'),
+                  createdAt: serverTimestamp(),
+                  updatedAt: serverTimestamp(),
+                });
+                successCount++;
+              }
+            }
+          }
+          
+          toast({
+            title: "Import Complete",
+            description: `Added ${successCount} new students. Updated ${updateCount} existing. ${failCount > 0 ? 'Skipped ' + failCount + ' invalid rows.' : ''}`,
+          });
+          setIsImportDialogOpen(false);
+        } catch (err) {
+          console.error("Excel processing error:", err);
+          toast({ title: "Import Error", description: "Failed to parse Excel file. Please ensure it's a valid format.", variant: "destructive" });
+        } finally {
+          setImporting(false);
+          if (e.target) e.target.value = '';
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } catch (error) {
+      console.error("File reading error:", error);
+      toast({ title: "Import Error", description: "Failed to read file.", variant: "destructive" });
+      setImporting(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
   const handlePrintID = (student: any) => {
     setSelectedStudentId(student.id);
     setPrintMode('id');
@@ -198,6 +350,23 @@ export default function StudentsPage() {
       {activeStudent && printMode === 'id' && (
         <div id="id-card-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999]">
           <div className="flex items-center justify-center h-screen bg-white">
+            {idTemplateUrl ? (
+              <div className="w-[3.375in] h-[2.125in] relative overflow-hidden bg-white print:m-0">
+                <img src={idTemplateUrl} className="absolute inset-0 w-full h-full object-cover z-0" crossOrigin="anonymous" />
+                
+                <div className="absolute z-10 top-[22%] left-[6%] w-[22%] h-[45%] bg-white/20 rounded-md flex items-center justify-center overflow-hidden backdrop-blur-sm shadow-sm border border-white/30">
+                  <span className="text-2xl font-black text-slate-800">
+                    {activeStudent.firstName?.[0]}{activeStudent.lastName?.[0]}
+                  </span>
+                </div>
+                
+                <div className="absolute z-10 top-[25%] left-[32%] text-slate-900">
+                  <p className="text-[12px] font-black leading-tight uppercase tracking-tight">{activeStudent.firstName} {activeStudent.lastName}</p>
+                  <p className="text-[8px] font-bold text-slate-700 mt-1 uppercase max-w-[120px] leading-tight">{activeStudent.appliedCourse || "General Studies"}</p>
+                  <p className="text-[9px] font-mono font-black mt-3 text-emerald-800">{activeStudent.admissionNumber || activeStudent.id.substring(0,8).toUpperCase()}</p>
+                </div>
+              </div>
+            ) : (
             <div className="w-[3.375in] h-[2.125in] border-[3px] border-primary rounded-xl overflow-hidden flex flex-col relative bg-white shadow-none">
               <div className="absolute left-0 top-0 bottom-0 w-2 bg-primary"></div>
               <div className="bg-primary p-2 flex items-center gap-3 pl-4">
@@ -213,12 +382,10 @@ export default function StudentsPage() {
                 </div>
               </div>
               <div className="flex p-3 gap-4 flex-1 pl-4">
-                <div className="w-20 h-24 bg-muted rounded-lg overflow-hidden border-2 border-primary/20 shadow-sm">
-                  <img 
-                    src={`https://picsum.photos/seed/${activeStudent.id}/200/200`} 
-                    alt="Photo" 
-                    className="w-full h-full object-cover"
-                  />
+                <div className="w-20 h-24 bg-primary/10 rounded-lg overflow-hidden border-2 border-primary/20 shadow-sm flex items-center justify-center">
+                  <span className="text-3xl font-black text-primary">
+                    {activeStudent.firstName?.[0]}{activeStudent.lastName?.[0]}
+                  </span>
                 </div>
                 <div className="flex flex-col flex-1 gap-1 py-1">
                   <div className="mb-1">
@@ -251,12 +418,38 @@ export default function StudentsPage() {
                 </div>
               </div>
             </div>
+            )}
           </div>
         </div>
       )}
 
       {activeStudent && printMode === 'certificate' && (
         <div id="certificate-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999]">
+          {certificateTemplateUrl ? (
+            <div className="w-[11in] h-[8.5in] relative bg-white mx-auto print:m-0">
+              <img src={certificateTemplateUrl} className="absolute inset-0 w-full h-full object-cover z-0" crossOrigin="anonymous" />
+              
+              <div className="absolute z-10 inset-0 flex flex-col items-center justify-center text-center">
+                <div className="mt-[2.5in]">
+                  <h3 className="text-6xl font-black text-slate-900 tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>
+                    {activeStudent.firstName} {activeStudent.lastName}
+                  </h3>
+                </div>
+                
+                <div className="mt-[1.2in]">
+                  <h4 className="text-3xl font-black text-slate-800 uppercase tracking-tight">
+                    {activeStudent.appliedCourse || "Professional Certification"}
+                  </h4>
+                </div>
+                
+                <div className="absolute bottom-[1in] left-[1.5in]">
+                  <span className="font-mono text-[10px] opacity-60 uppercase tracking-[0.2em] text-slate-900">
+                    {activeStudent.admissionNumber || activeStudent.id}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
           <div className="w-[11in] h-[8.5in] border-[12px] border-primary p-1 bg-white relative">
             <div className="w-full h-full border-[2px] border-primary p-12 flex flex-col items-center justify-between text-center relative overflow-hidden">
               <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 -mr-32 -mt-32 rounded-full"></div>
@@ -317,6 +510,7 @@ export default function StudentsPage() {
               </footer>
             </div>
           </div>
+          )}
         </div>
       )}
 
@@ -331,70 +525,110 @@ export default function StudentsPage() {
 
         {/* Minimalist Stats Row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="bg-white border-slate-200 shadow-sm rounded-xl overflow-hidden flex flex-col">
-            <div className="h-1 w-full bg-blue-500"></div>
-            <CardContent className="p-5 flex-1 flex flex-col justify-between">
-              <div className="flex justify-between items-start mb-2">
-                <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Total Enrolled</p>
-                <UserCircle className="h-4 w-4 text-blue-500" />
+          <Card className="bg-white border-slate-200 shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-shadow">
+            <CardContent className="p-5">
+              <div className="flex justify-between items-start mb-4">
+                <p className="text-slate-500 font-medium text-sm">Total Enrolled</p>
+                <div className="bg-blue-50 p-2 rounded-xl"><UserCircle className="h-5 w-5 text-blue-600" /></div>
               </div>
-              <h3 className="text-3xl font-black text-slate-900">{stats.total}</h3>
+              <h3 className="text-4xl font-bold text-slate-900">{stats.total}</h3>
             </CardContent>
           </Card>
-          <Card className="bg-white border-slate-200 shadow-sm rounded-xl overflow-hidden flex flex-col">
-            <div className="h-1 w-full bg-emerald-500"></div>
-            <CardContent className="p-5 flex-1 flex flex-col justify-between">
-              <div className="flex justify-between items-start mb-2">
-                <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Active Now</p>
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+          <Card className="bg-white border-slate-200 shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-shadow">
+            <CardContent className="p-5">
+              <div className="flex justify-between items-start mb-4">
+                <p className="text-slate-500 font-medium text-sm">Active Now</p>
+                <div className="bg-emerald-50 p-2 rounded-xl"><CheckCircle2 className="h-5 w-5 text-emerald-600" /></div>
               </div>
-              <h3 className="text-3xl font-black text-slate-900">{stats.active}</h3>
+              <h3 className="text-4xl font-bold text-slate-900">{stats.active}</h3>
             </CardContent>
           </Card>
-          <Card className="bg-white border-slate-200 shadow-sm rounded-xl overflow-hidden flex flex-col">
-            <div className="h-1 w-full bg-slate-800"></div>
-            <CardContent className="p-5 flex-1 flex flex-col justify-between">
-              <div className="flex justify-between items-start mb-2">
-                <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Graduated Alumni</p>
-                <Award className="h-4 w-4 text-slate-800" />
+          <Card className="bg-white border-slate-200 shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-shadow">
+            <CardContent className="p-5">
+              <div className="flex justify-between items-start mb-4">
+                <p className="text-slate-500 font-medium text-sm">Graduated</p>
+                <div className="bg-slate-100 p-2 rounded-xl"><Award className="h-5 w-5 text-slate-700" /></div>
               </div>
-              <h3 className="text-3xl font-black text-slate-900">{stats.graduated}</h3>
+              <h3 className="text-4xl font-bold text-slate-900">{stats.graduated}</h3>
             </CardContent>
           </Card>
-          <Card className="bg-white border-slate-200 shadow-sm rounded-xl overflow-hidden flex flex-col">
-            <div className="h-1 w-full bg-orange-500"></div>
-            <CardContent className="p-5 flex-1 flex flex-col justify-between">
-              <div className="flex justify-between items-start mb-2">
-                <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">On Leave</p>
-                <Clock className="h-4 w-4 text-orange-500" />
+          <Card className="bg-white border-slate-200 shadow-sm rounded-2xl overflow-hidden hover:shadow-md transition-shadow">
+            <CardContent className="p-5">
+              <div className="flex justify-between items-start mb-4">
+                <p className="text-slate-500 font-medium text-sm">On Leave</p>
+                <div className="bg-orange-50 p-2 rounded-xl"><Clock className="h-5 w-5 text-orange-600" /></div>
               </div>
-              <h3 className="text-3xl font-black text-slate-900">{stats.onLeave}</h3>
+              <h3 className="text-4xl font-bold text-slate-900">{stats.onLeave}</h3>
             </CardContent>
           </Card>
         </div>
       </div>
 
       {/* Control Bar */}
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between no-print bg-white p-2 rounded-2xl shadow-sm ring-1 ring-slate-200">
+      <div className="flex flex-col md:flex-row gap-4 items-center justify-between no-print">
         <Tabs defaultValue="Active" className="w-full md:w-auto" onValueChange={setActiveTab}>
-          <TabsList className="bg-slate-100/50 p-1 rounded-xl h-12 w-full md:w-auto overflow-x-auto justify-start md:justify-center">
-            <TabsTrigger value="Active" className="rounded-lg px-4 md:px-6 font-bold h-full data-[state=active]:bg-white data-[state=active]:shadow-sm">Active</TabsTrigger>
-            <TabsTrigger value="On Leave" className="rounded-lg px-4 md:px-6 font-bold h-full data-[state=active]:bg-white data-[state=active]:shadow-sm">On Leave</TabsTrigger>
-            <TabsTrigger value="Graduated" className="rounded-lg px-4 md:px-6 font-bold h-full data-[state=active]:bg-white data-[state=active]:shadow-sm">Graduated</TabsTrigger>
-            <TabsTrigger value="All" className="rounded-lg px-4 md:px-6 font-bold h-full data-[state=active]:bg-white data-[state=active]:shadow-sm">All</TabsTrigger>
+          <TabsList className="bg-white border border-slate-200 p-1 rounded-xl h-12 w-full md:w-auto overflow-x-auto justify-start md:justify-center shadow-sm">
+            <TabsTrigger value="Active" className="rounded-lg px-6 font-medium h-full data-[state=active]:bg-slate-100 data-[state=active]:shadow-none data-[state=active]:text-slate-900 text-slate-500">Active</TabsTrigger>
+            <TabsTrigger value="On Leave" className="rounded-lg px-6 font-medium h-full data-[state=active]:bg-slate-100 data-[state=active]:shadow-none data-[state=active]:text-slate-900 text-slate-500">On Leave</TabsTrigger>
+            <TabsTrigger value="Graduated" className="rounded-lg px-6 font-medium h-full data-[state=active]:bg-slate-100 data-[state=active]:shadow-none data-[state=active]:text-slate-900 text-slate-500">Graduated</TabsTrigger>
+            <TabsTrigger value="All" className="rounded-lg px-6 font-medium h-full data-[state=active]:bg-slate-100 data-[state=active]:shadow-none data-[state=active]:text-slate-900 text-slate-500">All</TabsTrigger>
           </TabsList>
         </Tabs>
 
-        <div className="flex w-full md:w-auto gap-3 px-2 md:px-0">
-          <div className="relative flex-1 md:w-72">
+        <div className="flex w-full md:w-auto gap-3">
+          <div className="relative flex-1 md:w-80">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input 
-              placeholder="Search by name, ADM, or course..." 
-              className="pl-10 h-12 bg-slate-50 border-slate-200 rounded-xl focus-visible:ring-blue-500 shadow-inner w-full"
+              placeholder="Search students..." 
+              className="pl-10 h-12 bg-white border-slate-200 rounded-xl focus-visible:ring-slate-300 shadow-sm w-full transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="h-12 px-6 rounded-xl font-medium shadow-sm bg-slate-900 hover:bg-slate-800 text-white transition-all">
+                <UploadCloud className="mr-2 h-4 w-4" /> Import
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Import Students from Excel</DialogTitle>
+                <DialogDescription>
+                  Upload an Excel (.xlsx) or CSV file containing existing student records.
+                </DialogDescription>
+                <div className="mt-4">
+                  <span className="font-semibold text-slate-700">Supported Columns:</span>
+                  <ul className="list-disc pl-5 mt-1 text-xs text-slate-600 space-y-1">
+                    <li><b>First Name</b> (Required)</li>
+                    <li><b>Last Name</b></li>
+                    <li><b>Admission Number</b> (or ADM)</li>
+                    <li><b>Course</b> (or Program)</li>
+                    <li><b>Email</b>, <b>Phone</b>, <b>Gender</b>, <b>DOB</b>, <b>Status</b></li>
+                  </ul>
+                </div>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl p-8 bg-slate-50/50 hover:bg-slate-50 transition-colors">
+                  <UploadCloud className="h-10 w-10 text-slate-400 mb-4" />
+                  <Label htmlFor="student-excel-upload" className="cursor-pointer bg-white px-4 py-2 border shadow-sm rounded-lg font-medium text-sm hover:bg-slate-50 transition-colors text-slate-700">
+                    {importing ? "Processing..." : "Select Excel File"}
+                  </Label>
+                  <Input 
+                    id="student-excel-upload" 
+                    type="file" 
+                    accept=".xlsx, .xls, .csv" 
+                    className="hidden" 
+                    onChange={handleStudentsExcelUpload}
+                    disabled={importing}
+                  />
+                  <p className="text-xs text-slate-400 mt-3 text-center">
+                    All imported students will be marked as "Enrolled" automatically.
+                  </p>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -422,7 +656,6 @@ export default function StudentsPage() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10 border border-slate-200 rounded-md">
-                          <AvatarImage src={`https://picsum.photos/seed/${student.id}/200/200`} />
                           <AvatarFallback className="bg-slate-100 text-slate-700 text-xs font-bold rounded-md">
                             {student.firstName[0]}{student.lastName[0]}
                           </AvatarFallback>
@@ -434,30 +667,21 @@ export default function StudentsPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center text-xs text-slate-600">
-                          <Mail className="h-3 w-3 mr-1.5 text-slate-400" />
-                          <span className="truncate max-w-[150px]" title={student.contactEmail}>{student.contactEmail}</span>
-                        </div>
-                        <div className="flex items-center text-xs text-slate-600">
-                          <Phone className="h-3 w-3 mr-1.5 text-slate-400" />
-                          <span>{student.contactPhone || "No Phone"}</span>
-                        </div>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm font-medium text-slate-700 truncate max-w-[180px]" title={student.contactEmail}>{student.contactEmail || "No Email"}</span>
+                        <span className="text-xs text-slate-500">{student.contactPhone || "No Phone"}</span>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center text-sm font-medium text-slate-700">
-                        <BookOpen className="h-3.5 w-3.5 mr-2 text-slate-400" />
-                        <span className="truncate max-w-[150px]" title={student.appliedCourse || "General Studies"}>
-                          {student.appliedCourse || "General Studies"}
-                        </span>
-                      </div>
+                      <span className="text-sm font-medium text-slate-700 truncate max-w-[150px] block" title={student.appliedCourse || "General Studies"}>
+                        {student.appliedCourse || "General Studies"}
+                      </span>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={`border font-bold uppercase tracking-widest text-[9px] px-2 py-0.5 rounded-sm ${
-                        (student.status || "Active") === "Active" ? "border-emerald-200 text-emerald-700 bg-emerald-50" :
-                        (student.status || "Active") === "On Leave" ? "border-orange-200 text-orange-700 bg-orange-50" : 
-                        (student.status || "Active") === "Graduated" ? "border-slate-300 text-slate-700 bg-slate-50" : "border-rose-200 text-rose-700 bg-rose-50"
+                      <Badge variant="outline" className={`border-0 font-medium px-2.5 py-0.5 rounded-full text-xs ${
+                        (student.status || "Active") === "Active" ? "bg-emerald-50 text-emerald-700" :
+                        (student.status || "Active") === "On Leave" ? "bg-orange-50 text-orange-700" : 
+                        (student.status || "Active") === "Graduated" ? "bg-slate-100 text-slate-700" : "bg-rose-50 text-rose-700"
                       }`}>
                         {student.status || "Active"}
                       </Badge>
@@ -479,7 +703,6 @@ export default function StudentsPage() {
                             <SheetHeader className="pb-6">
                               <div className="flex items-center gap-4">
                                 <Avatar className="h-20 w-20 border-4 border-primary/10">
-                                  <AvatarImage src={`https://picsum.photos/seed/${activeStudent?.id}/200/200`} />
                                   <AvatarFallback className="text-xl">{activeStudent?.firstName?.[0]}{activeStudent?.lastName?.[0]}</AvatarFallback>
                                 </Avatar>
                                 <div>

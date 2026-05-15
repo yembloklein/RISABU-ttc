@@ -2,22 +2,18 @@
 
 import { useState, useEffect } from "react"
 import { useUser, useFirestore, useCollection, useMemoFirebase, useStorage } from "@/firebase"
-import { collection, query, where, limit, addDoc, serverTimestamp, getDocs, orderBy } from "firebase/firestore"
+import { collection, query, where, limit, addDoc, serverTimestamp, getDocs } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { BookOpen, FileText, Video, Download, ExternalLink, GraduationCap, Clock, Loader2, FileSpreadsheet, CheckCircle2, PlusCircle, UploadCloud, FileUp, Send } from "lucide-react"
-import { Badge } from "@/components/ui/badge"
+import { Card, CardContent } from "@/components/ui/card"
+import {
+  BookOpen, FileText, Download, GraduationCap, Clock, Loader2,
+  FileSpreadsheet, CheckCircle2, PlusCircle, UploadCloud, FileUp,
+  Send, AlertCircle, Video, BookMarked
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
 import { useToast } from "@/hooks/use-toast"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger
 } from "@/components/ui/dialog"
 
 export default function AcademicsPage() {
@@ -33,16 +29,13 @@ export default function AcademicsPage() {
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false)
   const [targetUnit, setTargetUnit] = useState<any>(null)
 
-  // 1. Fetch Student Data
   useEffect(() => {
     async function fetchStudent() {
       if (!firestore || !user?.email) return
       try {
         const q = query(collection(firestore, "students"), where("contactEmail", "==", user.email), limit(1))
         const snap = await getDocs(q)
-        if (!snap.empty) {
-          setStudent({ id: snap.docs[0].id, ...snap.docs[0].data() })
-        }
+        if (!snap.empty) setStudent({ id: snap.docs[0].id, ...snap.docs[0].data() })
       } catch (e) {
         console.error(e)
       } finally {
@@ -52,36 +45,28 @@ export default function AcademicsPage() {
     fetchStudent()
   }, [user, firestore])
 
-  // 2. Fetch Units Data
   const unitsQuery = useMemoFirebase(() => {
     if (!firestore || !student?.appliedCourse) return null
     return query(collection(firestore, "units"), where("courseName", "==", student.appliedCourse))
   }, [firestore, student])
-  
   const { data: units, isLoading: isUnitsLoading } = useCollection(unitsQuery)
 
-  // 3. Fetch Resources Data
   const resourcesQuery = useMemoFirebase(() => {
     if (!firestore || !student?.appliedCourse) return null
     return query(collection(firestore, "academic_resources"), where("courseName", "==", student.appliedCourse))
   }, [firestore, student])
-  
   const { data: resources, isLoading: isResourcesLoading } = useCollection(resourcesQuery)
 
-  // 4. Fetch Student Unit Registrations
   const registrationsQuery = useMemoFirebase(() => {
     if (!firestore || !student?.id) return null
     return query(collection(firestore, "unit_registrations"), where("studentId", "==", student.id))
   }, [firestore, student])
-
   const { data: registrations, isLoading: isRegistrationsLoading } = useCollection(registrationsQuery)
 
-  // 5. Fetch Student Submissions
   const submissionsQuery = useMemoFirebase(() => {
     if (!firestore || !student?.id) return null
     return query(collection(firestore, "submissions"), where("studentId", "==", student.id))
   }, [firestore, student])
-
   const { data: studentSubmissions, isLoading: isSubmissionsLoading } = useCollection(submissionsQuery)
 
   const handleRegisterUnit = async (unit: any) => {
@@ -99,7 +84,7 @@ export default function AcademicsPage() {
         progress: 0,
         registeredAt: serverTimestamp(),
       })
-      toast({ title: "Success", description: `Registered for ${unit.name} successfully.` })
+      toast({ title: "Unit Registered", description: `You are now registered for ${unit.name}.` })
     } catch (error: any) {
       toast({ title: "Registration Failed", description: error.message, variant: "destructive" })
     }
@@ -110,18 +95,14 @@ export default function AcademicsPage() {
       toast({ title: "Error", description: "Please select a file to upload.", variant: "destructive" })
       return
     }
-
     setIsSubmitting(true)
     try {
-      // 1. Upload to Firebase Storage
       const fileName = `${Date.now()}_${selectedFile.name}`
       const storagePath = `submissions/${student.id}/${fileName}`
       const storageRef = ref(storage, storagePath)
-      
       const uploadResult = await uploadBytes(storageRef, selectedFile)
       const downloadUrl = await getDownloadURL(uploadResult.ref)
 
-      // 2. Record in Firestore
       await addDoc(collection(firestore!, "submissions"), {
         studentId: student.id,
         studentName: `${student.firstName} ${student.lastName}`,
@@ -132,12 +113,11 @@ export default function AcademicsPage() {
         unitName: targetUnit.unitName,
         fileName: selectedFile.name,
         fileUrl: downloadUrl,
-        storagePath: storagePath,
+        storagePath,
         status: "Pending",
         submittedAt: serverTimestamp(),
       })
-
-      toast({ title: "Assignment Submitted", description: "Your work has been uploaded to cloud storage successfully." })
+      toast({ title: "Assignment Submitted", description: "Your work has been uploaded successfully." })
       setSubmitDialogOpen(false)
       setSelectedFile(null)
     } catch (error: any) {
@@ -148,219 +128,272 @@ export default function AcademicsPage() {
   }
 
   if (isStudentLoading || isUnitsLoading || isResourcesLoading || isRegistrationsLoading || isSubmissionsLoading) {
-    return <div className="h-96 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-emerald-600" /></div>
+    return (
+      <div className="h-80 flex flex-col items-center justify-center gap-3">
+        <Loader2 className="h-7 w-7 animate-spin text-emerald-600" />
+        <p className="text-sm text-slate-500">Loading your academic profile...</p>
+      </div>
+    )
   }
 
+  const availableUnits = (units || []).filter(u => !(registrations || []).some(r => r.unitId === u.id))
+  const totalUnits = (registrations || []).length
+  const avgProgress = totalUnits > 0
+    ? Math.round((registrations || []).reduce((s, r) => s + (r.progress || 0), 0) / totalUnits)
+    : 0
+
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-12">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-6 pb-10">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 uppercase">Academics</h1>
-          <p className="text-slate-500 font-medium mt-1">Manage your course units and access learning resources.</p>
+          <h1 className="text-2xl font-bold flex items-center gap-2 text-slate-900">
+            <GraduationCap className="h-6 w-6 text-emerald-600" />
+            Academics
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            {student?.appliedCourse ? (
+              <>{student.appliedCourse} · {totalUnits} unit{totalUnits !== 1 ? 's' : ''} registered</>
+            ) : "Manage your course units and learning resources"}
+          </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { label: "Programme", value: student?.appliedCourse || "—", icon: BookMarked, color: "text-indigo-600", bg: "bg-indigo-50" },
+          { label: "Registered Units", value: totalUnits, icon: BookOpen, color: "text-emerald-600", bg: "bg-emerald-50" },
+          { label: "Avg Progress", value: `${avgProgress}%`, icon: Clock, color: "text-blue-600", bg: "bg-blue-50" },
+          { label: "Submissions", value: (studentSubmissions || []).length, icon: Send, color: "text-orange-600", bg: "bg-orange-50" },
+        ].map((s, i) => (
+          <Card key={i} className="border border-slate-200 shadow-sm rounded-xl bg-white">
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${s.bg} ${s.color}`}>
+                <s.icon className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs text-slate-500 font-medium truncate">{s.label}</p>
+                <p className="text-base font-bold text-slate-900 truncate leading-tight mt-0.5">{s.value}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left: Registered Units + Available */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="space-y-4">
-            <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">My Registered Units</h2>
-            <div className="grid grid-cols-1 gap-4">
-              {registrations && registrations.length > 0 ? (
-                registrations.map((reg) => (
-                  <Card key={reg.id} className="border-0 shadow-sm rounded-2xl overflow-hidden ring-1 ring-slate-200 hover:ring-emerald-200 transition-all bg-white">
-                    <CardContent className="p-0">
-                      <div className="flex flex-col sm:flex-row items-stretch">
-                        <div className="p-6 flex-1">
-                          <div className="flex items-center justify-between mb-3">
-                            <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2.5 py-1 rounded-lg uppercase tracking-wider">
-                              {reg.unitCode}
+
+          {/* Registered Units */}
+          <div>
+            <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              My Registered Units
+            </h2>
+            <div className="space-y-3">
+              {(registrations || []).length > 0 ? (
+                (registrations || []).map((reg) => {
+                  const submission = (studentSubmissions || []).find(s => s.unitId === reg.unitId)
+                  const isGraded = submission?.status === 'Graded'
+                  return (
+                    <div
+                      key={reg.id}
+                      className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-sm transition-all"
+                    >
+                      {/* Unit header row */}
+                      <div className="flex items-start justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+                            <BookOpen className="h-5 w-5 text-emerald-600" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-slate-900 text-sm leading-tight truncate">{reg.unitName}</p>
+                            <p className="text-xs font-mono text-slate-400 mt-0.5">{reg.unitCode}</p>
+                          </div>
+                        </div>
+                        <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                          reg.status === 'Registered' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {reg.status || "Registered"}
+                        </span>
+                      </div>
+
+                      {/* Progress */}
+                      <div className="space-y-1 mb-3">
+                        <div className="flex justify-between text-xs font-medium text-slate-500">
+                          <span>Progress</span>
+                          <span className="text-emerald-600">{reg.progress || 0}%</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                          <div
+                            className="h-full bg-emerald-500 rounded-full transition-all"
+                            style={{ width: `${reg.progress || 0}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Assignment submission status */}
+                      {submission && (
+                        <div className={`rounded-lg px-3 py-2 mb-3 flex items-center gap-2 ${
+                          isGraded ? 'bg-emerald-50 border border-emerald-100' : 'bg-amber-50 border border-amber-100'
+                        }`}>
+                          {isGraded
+                            ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                            : <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                          }
+                          <div className="min-w-0">
+                            <span className={`text-xs font-semibold ${isGraded ? 'text-emerald-700' : 'text-amber-700'}`}>
+                              Assignment: {submission.status}
                             </span>
-                            <Badge variant="secondary" className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase px-2 py-0.5 shadow-none border-0">
-                              <CheckCircle2 className="h-3 w-3 mr-1" /> {reg.status || "Registered"}
-                            </Badge>
+                            {submission.feedback && (
+                              <p className="text-xs text-slate-600 italic mt-0.5 truncate">"{submission.feedback}"</p>
+                            )}
                           </div>
-                          <h3 className="text-xl font-black text-slate-900 leading-tight">{reg.unitName}</h3>
-                          
-                          {/* Submission Status & Feedback */}
-                          {(() => {
-                            const submission = (studentSubmissions || []).find(s => s.unitId === reg.unitId);
-                            if (!submission) return null;
-                            return (
-                              <div className="mt-4 p-4 rounded-2xl bg-slate-50/50 border border-slate-100 space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Assignment Status</span>
-                                  <Badge className={`border-0 text-[9px] font-black uppercase px-2.5 py-0.5 shadow-none ${
-                                    submission.status === 'Graded' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                                  }`}>
-                                    {submission.status}
-                                  </Badge>
-                                </div>
-                                {submission.feedback && (
-                                  <div className="pt-3 border-t border-slate-200">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Instructor Feedback</p>
-                                    <p className="text-xs text-slate-600 italic font-medium leading-relaxed">"{submission.feedback}"</p>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })()}
+                        </div>
+                      )}
 
-                          <div className="mt-6 space-y-2">
-                            <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                              <span>Course Progress</span>
-                              <span>{reg.progress || 0}%</span>
+                      {/* Actions */}
+                      <div className="flex gap-2 flex-wrap">
+                        <Dialog open={submitDialogOpen && targetUnit?.id === reg.id} onOpenChange={(open) => {
+                          setSubmitDialogOpen(open)
+                          if (open) { setTargetUnit(reg); setSelectedFile(null) }
+                        }}>
+                          <DialogTrigger asChild>
+                            <Button size="sm" variant="outline" className="h-8 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50">
+                              <Send className="h-3 w-3 mr-1.5" /> Submit Work
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-[420px] rounded-xl">
+                            <DialogHeader>
+                              <DialogTitle className="text-base font-bold">Submit Assignment</DialogTitle>
+                              <DialogDescription className="text-sm text-slate-500">
+                                Upload your work for <strong>{reg.unitName}</strong>.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="py-6 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 relative hover:border-emerald-400 transition-all group">
+                              <input
+                                type="file"
+                                className="absolute inset-0 opacity-0 cursor-pointer"
+                                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                              />
+                              <UploadCloud className="h-10 w-10 text-slate-300 group-hover:text-emerald-500 mb-2 transition-colors" />
+                              <span className="text-sm font-medium text-slate-600 px-4 text-center">
+                                {selectedFile ? selectedFile.name : "Click to select file"}
+                              </span>
+                              <span className="text-xs text-slate-400 mt-1">PDF, ZIP or DOCX · Max 10MB</span>
                             </div>
-                            <Progress value={reg.progress || 0} className="h-2 bg-slate-100" />
-                          </div>
-                        </div>
-                        <div className="bg-slate-50/30 p-4 sm:w-48 flex flex-col justify-center gap-2 border-t sm:border-t-0 sm:border-l border-slate-100">
-                          <Dialog open={submitDialogOpen && targetUnit?.id === reg.id} onOpenChange={(open) => {
-                            setSubmitDialogOpen(open)
-                            if (open) {
-                              setTargetUnit(reg)
-                              setSelectedFile(null)
-                            }
-                          }}>
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm" className="h-10 justify-start text-xs font-black uppercase tracking-tight border-emerald-100 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl shadow-sm">
-                                <Send className="h-3.5 w-3.5 mr-2" /> Submit Work
+                            <DialogFooter className="mt-2">
+                              <Button
+                                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-10 rounded-lg"
+                                onClick={handleSubmitAssignment}
+                                disabled={isSubmitting || !selectedFile}
+                              >
+                                {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />}
+                                {isSubmitting ? "Uploading..." : "Confirm Submission"}
                               </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-[425px] border-0 shadow-2xl rounded-3xl">
-                              <DialogHeader>
-                                <DialogTitle className="text-xl font-black uppercase tracking-tight">Submit Assignment</DialogTitle>
-                                <DialogDescription className="font-medium text-slate-500">
-                                  Upload your work for <strong>{reg.unitName}</strong>.
-                                </DialogDescription>
-                              </DialogHeader>
-                              <div className="py-8 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50 relative group hover:border-emerald-400 transition-all">
-                                <input 
-                                  type="file" 
-                                  className="absolute inset-0 opacity-0 cursor-pointer" 
-                                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
-                                />
-                                <UploadCloud className="h-12 w-12 text-slate-300 group-hover:text-emerald-500 mb-3" />
-                                <span className="text-xs font-bold text-slate-600 px-6 text-center">
-                                  {selectedFile ? selectedFile.name : "Select your assignment file"}
-                                </span>
-                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">PDF, ZIP, or DOCX (Max 10MB)</span>
-                              </div>
-                              <DialogFooter className="mt-4">
-                                <Button 
-                                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black h-12 rounded-xl shadow-lg shadow-emerald-100"
-                                  onClick={handleSubmitAssignment}
-                                  disabled={isSubmitting || !selectedFile}
-                                >
-                                  {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <FileUp className="h-5 w-5 mr-2" />}
-                                  {isSubmitting ? "UPLOADING..." : "CONFIRM SUBMISSION"}
-                                </Button>
-                              </DialogFooter>
-                            </DialogContent>
-                          </Dialog>
-                          <Button variant="ghost" size="sm" className="h-10 justify-start text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-xl">
-                            <FileText className="h-3.5 w-3.5 mr-2" /> Course Notes
-                          </Button>
-                          <Button variant="ghost" size="sm" className="h-10 justify-start text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-xl">
-                            <Video className="h-3.5 w-3.5 mr-2" /> Video Lessons
-                          </Button>
-                        </div>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
+                        <Button size="sm" variant="ghost" className="h-8 text-xs text-slate-500 hover:bg-slate-100">
+                          <FileText className="h-3 w-3 mr-1.5" /> Notes
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-8 text-xs text-slate-500 hover:bg-slate-100">
+                          <Video className="h-3 w-3 mr-1.5" /> Videos
+                        </Button>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))
+                    </div>
+                  )
+                })
               ) : (
-                <div className="py-20 text-center border-2 border-dashed rounded-3xl bg-slate-50/50">
-                  <BookOpen className="h-10 w-10 text-slate-200 mx-auto mb-4" />
-                  <p className="text-sm font-black text-slate-400 uppercase tracking-widest">You haven't registered for any units yet.</p>
+                <div className="py-14 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+                  <BookOpen className="h-8 w-8 text-slate-300 mx-auto mb-3" />
+                  <p className="text-sm font-medium text-slate-500">No units registered yet.</p>
+                  <p className="text-xs text-slate-400 mt-1">Register from the list below to get started.</p>
                 </div>
               )}
             </div>
           </div>
 
-          <div className="space-y-4 pt-6">
-            <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Available to Register</h2>
-            <div className="grid grid-cols-1 gap-3">
-              {units && units.filter(u => !(registrations || []).some(r => r.unitId === u.id)).length > 0 ? (
-                units.filter(u => !(registrations || []).some(r => r.unitId === u.id)).map((unit) => (
-                  <Card key={unit.id} className="border-0 shadow-sm rounded-2xl overflow-hidden ring-1 ring-slate-200 hover:ring-emerald-200 transition-all bg-white">
-                    <CardContent className="p-5 flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="h-12 w-12 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
-                          <BookOpen className="h-6 w-6" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{unit.code}</span>
-                            <span className="h-1 w-1 rounded-full bg-slate-300" />
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{unit.instructor || "Faculty"}</span>
-                          </div>
-                          <h3 className="text-sm font-black text-slate-900">{unit.name}</h3>
-                        </div>
+          {/* Available Units */}
+          {availableUnits.length > 0 && (
+            <div>
+              <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                <PlusCircle className="h-4 w-4 text-blue-500" />
+                Available to Register
+              </h2>
+              <div className="space-y-2">
+                {availableUnits.map((unit) => (
+                  <div key={unit.id} className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4 hover:border-emerald-200 hover:shadow-sm transition-all">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                        <BookOpen className="h-4 w-4 text-slate-500" />
                       </div>
-                      <Button 
-                        size="sm" 
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-black h-10 px-6 rounded-xl shadow-md shadow-emerald-100"
-                        onClick={() => handleRegisterUnit(unit)}
-                      >
-                        <PlusCircle className="h-4 w-4 mr-2" /> REGISTER
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))
-              ) : (
-                <div className="py-10 text-center border-2 border-dashed rounded-3xl bg-slate-50/50">
-                  <p className="text-xs font-black text-slate-400 uppercase tracking-widest">No new units available for registration.</p>
-                </div>
-              )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 truncate">{unit.name}</p>
+                        <p className="text-xs text-slate-400 font-mono">{unit.code}{unit.instructor ? ` · ${unit.instructor}` : ''}</p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-xs shrink-0"
+                      onClick={() => handleRegisterUnit(unit)}
+                    >
+                      <PlusCircle className="h-3 w-3 mr-1.5" /> Register
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-
-        <div className="space-y-6">
-          <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest px-1">Course Materials</h2>
-          <Card className="border-0 shadow-sm rounded-3xl overflow-hidden ring-1 ring-slate-200 bg-white">
+        {/* Right: Course Materials + Support */}
+        <div className="space-y-4">
+          <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+            <Download className="h-4 w-4 text-slate-500" />
+            Course Materials
+          </h2>
+          <Card className="border border-slate-200 shadow-sm rounded-xl overflow-hidden bg-white">
             <CardContent className="p-0">
-              {resources && resources.length > 0 ? (
-                <div className="divide-y divide-slate-50">
-                  {resources.map((res) => (
-                    <a 
-                      key={res.id} 
-                      href={res.fileUrl} 
-                      target="_blank" 
+              {(resources || []).length > 0 ? (
+                <div className="divide-y divide-slate-100">
+                  {(resources || []).map((res) => (
+                    <a
+                      key={res.id}
+                      href={res.fileUrl}
+                      target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center justify-between p-5 hover:bg-slate-50 transition-all group"
+                      className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors group"
                     >
-                      <div className="flex items-center gap-4">
-                        <div className={`h-11 w-11 rounded-xl flex items-center justify-center shrink-0 transition-all ${
-                          res.type === 'Assignment' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'
-                        }`}>
-                          {res.type === 'Assignment' ? <FileSpreadsheet className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-bold text-slate-900 line-clamp-1 leading-tight">{res.title}</span>
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{res.type}</span>
-                        </div>
+                      <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
+                        res.type === 'Assignment' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'
+                      }`}>
+                        {res.type === 'Assignment' ? <FileSpreadsheet className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
                       </div>
-                      <Download className="h-4 w-4 text-slate-300 group-hover:text-emerald-500 transition-all group-hover:scale-110" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-900 truncate leading-tight">{res.title}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{res.type}</p>
+                      </div>
+                      <Download className="h-3.5 w-3.5 text-slate-300 group-hover:text-emerald-500 transition-colors shrink-0" />
                     </a>
                   ))}
                 </div>
               ) : (
-                <div className="p-12 text-center">
-                  <p className="text-sm font-black text-slate-300 uppercase italic">No materials yet.</p>
+                <div className="py-10 text-center">
+                  <FileText className="h-7 w-7 text-slate-200 mx-auto mb-2" />
+                  <p className="text-xs text-slate-400">No materials uploaded yet.</p>
                 </div>
               )}
             </CardContent>
           </Card>
 
-          
-          <div className="bg-emerald-600 rounded-[2rem] p-8 text-white shadow-xl shadow-emerald-100 relative overflow-hidden group">
-            <div className="absolute -right-4 -bottom-4 h-24 w-24 bg-emerald-500 rounded-full opacity-50 transition-transform group-hover:scale-150" />
-            <h4 className="text-lg font-black uppercase tracking-tight mb-2 relative z-10">Academic Support</h4>
-            <p className="text-xs text-emerald-50 font-medium leading-relaxed mb-6 relative z-10">Need help with your units? Our instructors are here to guide you.</p>
-            <Button size="lg" className="w-full bg-white text-emerald-700 hover:bg-emerald-50 font-black rounded-xl shadow-lg relative z-10 transition-transform hover:-translate-y-1">
-              OPEN SUPPORT TICKET
+          {/* Academic Support CTA */}
+          <div className="bg-emerald-600 rounded-xl p-5 text-white">
+            <h4 className="text-sm font-bold mb-1">Academic Support</h4>
+            <p className="text-xs text-emerald-50 leading-relaxed mb-4">Need help with your units? Our instructors are available to assist.</p>
+            <Button size="sm" className="w-full bg-white text-emerald-700 hover:bg-emerald-50 text-xs font-semibold h-9 rounded-lg">
+              Open Support Ticket
             </Button>
           </div>
         </div>

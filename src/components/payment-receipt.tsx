@@ -7,14 +7,79 @@ import { Logo } from '@/components/ui/logo';
 interface PaymentReceiptProps {
   student: any;
   payment: any;
+  templateImageUrl?: string;
 }
 
-export const PaymentReceipt = React.forwardRef<HTMLDivElement, PaymentReceiptProps>(({ student, payment }, ref) => {
+export const PaymentReceipt = React.forwardRef<HTMLDivElement, PaymentReceiptProps>(({ student, payment, templateImageUrl }, ref) => {
   const today = new Date().toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'long',
     year: 'numeric'
   });
+
+  const parsedPaymentDate = payment.paymentDate?.toDate 
+    ? new Date(payment.paymentDate.toDate()).toLocaleDateString('en-GB')
+    : payment.paymentDate ? new Date(payment.paymentDate).toLocaleDateString('en-GB') : today;
+
+  if (templateImageUrl) {
+    return (
+      <div ref={ref} className="relative w-[793px] h-[1122px] mx-auto bg-white overflow-hidden text-slate-900 font-sans print:m-0">
+        <img 
+          src={templateImageUrl} 
+          alt="Official Template" 
+          className="absolute inset-0 w-full h-full object-cover z-0" 
+          crossOrigin="anonymous"
+        />
+        
+        <div className="absolute z-10 top-[28%] left-[12%] right-[12%] text-lg leading-relaxed text-slate-800">
+          <div className="flex justify-between items-end mb-8">
+            <div>
+              <p className="font-bold">Receipt No: {payment.transactionReference || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="font-bold">Date: {parsedPaymentDate}</p>
+            </div>
+          </div>
+          
+          <h2 className="font-black text-2xl mb-8 uppercase text-center underline underline-offset-4 decoration-2">Official Payment Receipt</h2>
+          
+          <div className="space-y-6">
+            <div className="flex border-b border-slate-300 pb-2">
+              <span className="w-1/3 font-bold text-slate-500 uppercase text-sm tracking-wider">Received From:</span>
+              <span className="w-2/3 font-black text-slate-900">{student?.firstName} {student?.lastName} (ADM: {student?.admissionNumber || 'N/A'})</span>
+            </div>
+            
+            <div className="flex border-b border-slate-300 pb-2">
+              <span className="w-1/3 font-bold text-slate-500 uppercase text-sm tracking-wider">The Sum Of:</span>
+              <span className="w-2/3 font-black text-slate-900">KES {Number(payment.amount).toLocaleString()}</span>
+            </div>
+            
+            <div className="flex border-b border-slate-300 pb-2">
+              <span className="w-1/3 font-bold text-slate-500 uppercase text-sm tracking-wider">Payment Method:</span>
+              <span className="w-2/3 font-black text-slate-900">{payment.paymentMethod || 'M-Pesa Online'}</span>
+            </div>
+
+            <div className="flex border-b border-slate-300 pb-2">
+              <span className="w-1/3 font-bold text-slate-500 uppercase text-sm tracking-wider">Description:</span>
+              <span className="w-2/3 font-black text-slate-900">{payment.description || 'Fee Payment'}</span>
+            </div>
+          </div>
+
+          <div className="mt-16 flex justify-between">
+            <div className="text-center w-48">
+              <div className="h-10 border-b border-slate-900 mb-2 relative">
+                <span className="absolute bottom-1 left-2 font-cursive text-2xl text-emerald-800 opacity-40 select-none">Valid</span>
+              </div>
+              <p className="font-black text-sm uppercase tracking-widest text-emerald-900">Finance Officer</p>
+            </div>
+            <div className="text-center w-48 opacity-20 grayscale">
+              <Logo size={64} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={ref} className="bg-white p-10 max-w-[600px] mx-auto text-slate-800 font-sans shadow-lg border border-slate-100 relative overflow-hidden">

@@ -17,9 +17,10 @@ import { Logo } from '@/components/ui/logo';
 interface AdmissionLetterProps {
   student: any;
   program: any;
+  templateImageUrl?: string;
 }
 
-export const AdmissionLetter = React.forwardRef<HTMLDivElement, AdmissionLetterProps>(({ student, program }, ref) => {
+export const AdmissionLetter = React.forwardRef<HTMLDivElement, AdmissionLetterProps>(({ student, program, templateImageUrl }, ref) => {
   const today = new Date().toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'long',
@@ -29,6 +30,51 @@ export const AdmissionLetter = React.forwardRef<HTMLDivElement, AdmissionLetterP
   // Theme Color: Deep Emerald Green
   const themeGreen = "#059669";
   const lightGreen = "#ecfdf5";
+
+  if (templateImageUrl) {
+    return (
+      <div ref={ref} className="relative w-[793px] h-[1122px] mx-auto bg-white overflow-hidden text-slate-900 font-serif print:m-0">
+        <img 
+          src={templateImageUrl} 
+          alt="Official Template" 
+          className="absolute inset-0 w-full h-full object-cover z-0" 
+          crossOrigin="anonymous"
+        />
+        
+        <div className="absolute z-10 top-[28%] left-[12%] right-[12%] text-lg leading-relaxed text-slate-800">
+          <div className="flex justify-between items-end mb-8">
+            <div>
+              <p className="font-bold">Ref: {student.admissionNumber || 'RTTC/ADM/TEMP'}</p>
+            </div>
+            <div>
+              <p className="font-bold">Date: {today}</p>
+            </div>
+          </div>
+          
+          <p className="font-bold text-xl mb-6">Dear {student.firstName} {student.lastName},</p>
+          
+          <p className="mb-6">
+            On behalf of the Board of Governors and the Academic Board, I am delighted to offer you admission to 
+            <strong> Risabu Technical Training College</strong>.
+          </p>
+
+          <p className="mb-6">
+            You have been selected to pursue <strong>{student.appliedCourse || program?.name || program?.code}</strong>. Your performance 
+            and application demonstrated a commitment to excellence that aligns with our college values.
+          </p>
+
+          <p className="mb-6">
+            You are required to report for orientation and registration on <strong>{student.admissionDate || today}</strong>. 
+            Please ensure you bring your original academic certificates and your national ID ({student.nationalId || 'Verified'}).
+          </p>
+          
+          <p className="mb-12">
+            Congratulations on your admission, and we look forward to seeing you excel in your chosen field of study.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={ref} className="bg-white p-12 max-w-[850px] mx-auto text-slate-800 font-serif leading-relaxed shadow-2xl relative overflow-hidden">

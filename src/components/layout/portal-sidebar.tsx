@@ -11,7 +11,8 @@ import {
   User,
   CalendarCheck,
   ClipboardList,
-  MessageSquare
+  MessageSquare,
+  FileText
 } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
 
@@ -53,6 +54,11 @@ const portalMenuItems = [
     url: "/portal/finance",
   },
   {
+    title: "Documents",
+    icon: FileText,
+    url: "/portal/documents",
+  },
+  {
     title: "Attendance",
     icon: CalendarCheck,
     url: "/portal/attendance",
@@ -80,17 +86,20 @@ export function PortalSidebar({ student }: { student: any }) {
   }
 
   return (
-    <Sidebar className="border-r border-slate-200">
-      <SidebarHeader className="h-16 flex items-center px-6 border-b border-slate-100">
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 overflow-hidden rounded-lg bg-white flex items-center justify-center ring-1 ring-slate-100">
-            <Logo size={32} />
+    <Sidebar variant="sidebar" collapsible="icon">
+      <SidebarHeader className="border-b px-6 py-4">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-white shadow-lg ring-1 ring-slate-100">
+            <Logo size={40} className="p-0.5" />
           </div>
-          <span className="font-bold text-slate-900 tracking-tight">Student Portal</span>
+          <div className="flex flex-col overflow-hidden transition-all group-data-[collapsible=icon]:hidden">
+            <span className="text-lg font-bold leading-none text-primary">Student</span>
+            <span className="text-xs text-muted-foreground">Portal Dashboard</span>
+          </div>
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="px-3 py-4">
+      <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
@@ -101,17 +110,13 @@ export function PortalSidebar({ student }: { student: any }) {
                     <SidebarMenuButton
                       asChild
                       isActive={isActive}
+                      tooltip={item.title}
                       onClick={() => setOpenMobile(false)}
-                      className={`h-11 px-4 rounded-lg transition-all ${isActive
-                          ? "bg-emerald-50 text-emerald-600 font-bold"
-                          : "text-slate-600 hover:bg-slate-50 font-medium"
-                        }`}
                     >
-                      <Link href={item.url} className="flex items-center gap-3">
-                        <item.icon className={`h-4 w-4 ${isActive ? "text-emerald-600" : "text-slate-400"}`} />
+                      <Link href={item.url}>
+                        <item.icon className="h-4 w-4" />
                         <span>{item.title}</span>
                       </Link>
-
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 )
@@ -120,28 +125,16 @@ export function PortalSidebar({ student }: { student: any }) {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="p-4 border-t border-slate-100">
-        <div className="flex items-center gap-3 p-2 rounded-xl bg-slate-50 border border-slate-100 mb-2">
-          <Avatar className="h-9 w-9 border-2 border-white shadow-sm">
-            <AvatarImage src={student?.profileImage} />
-            <AvatarFallback className="bg-slate-200 text-slate-500 font-bold text-xs">
-              {student?.firstName?.[0]}{student?.lastName?.[0]}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 overflow-hidden">
-            <p className="text-xs font-bold text-slate-900 truncate">{student?.firstName} {student?.lastName}</p>
-            <p className="text-[10px] font-medium text-slate-500 truncate">{student?.contactEmail}</p>
-          </div>
-        </div>
+      <SidebarFooter className="border-t p-4">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip="Logout"
-              className="h-10 rounded-lg text-rose-500 hover:text-rose-600 hover:bg-rose-50 font-bold"
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
               onClick={handleLogout}
             >
               <LogOut className="h-4 w-4" />
-              <span className="text-xs">Log Out</span>
+              <span>Log Out</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

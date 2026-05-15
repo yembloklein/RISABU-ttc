@@ -24,7 +24,9 @@ import {
   FileCheck2,
   FileBadge,
   Receipt,
-  GraduationCap
+  GraduationCap,
+  Award,
+  Briefcase
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { formatDistanceToNow } from "date-fns"
@@ -42,8 +44,10 @@ import {
 const OFFICIAL_DOC_TYPES = [
   { key: "official_admission_letter", label: "Admission Letter", icon: FileBadge, description: "Official template for admission notifications" },
   { key: "official_fee_structure", label: "Fee Structure", icon: Receipt, description: "Standard fee schedule for all students" },
-  { key: "official_prospectus", label: "College Prospectus", icon: BookOpen, description: "Official college brochure and course catalog" },
-  { key: "official_id_template", label: "ID Card Template", icon: GraduationCap, description: "Official layout/instructions for student IDs" },
+  { key: "official_payment_receipt", label: "Payment Receipt Template", icon: Receipt, description: "Template design for auto-generated student receipts" },
+  { key: "official_exam_pass", label: "Exam Pass Template", icon: FileCheck2, description: "Background design for the examination passes" },
+  { key: "official_internship_letter", label: "Internship Letter Template", icon: Briefcase, description: "Letterhead for Industrial Attachment requests" },
+  { key: "official_certificate_template", label: "Certificate Template", icon: Award, description: "Official graduation certificate design" },
   { key: "official_other", label: "General Document", icon: FileText, description: "Any other official downloadable document" },
 ]
 
@@ -84,6 +88,20 @@ export default function SchoolDocumentsPage() {
 
     try {
       const typeInfo = OFFICIAL_DOC_TYPES.find(t => t.key === activeType)
+
+      // Auto-cleanup: Enforce 1-to-1 relationship by deleting the previous document of this type
+      const existingDocs = schoolDocs?.filter(d => d.type === activeType) || []
+      for (const oldDoc of existingDocs) {
+        try {
+          if (oldDoc.storagePath) {
+            await deleteObject(ref(storage, oldDoc.storagePath))
+          }
+          await deleteDoc(doc(firestore, "school_documents", oldDoc.id))
+        } catch (e) {
+          console.warn("Failed to delete old document", e)
+        }
+      }
+
       const storagePath = `school_documents/${activeType}/${Date.now()}_${file.name}`
       const storageRef = ref(storage, storagePath)
       const uploadTask = uploadBytesResumable(storageRef, file)
@@ -171,15 +189,15 @@ export default function SchoolDocumentsPage() {
                 {existing && existing.length > 0 ? (
                   <div className="space-y-2">
                     {existing.map((docItem) => (
-                      <div key={docItem.id} className="flex items-center justify-between p-2 rounded-lg bg-background border text-xs">
-                        <span className="truncate max-w-[120px] font-medium">{docItem.fileName}</span>
+                      <div key={docItem.id} className="flex items-center justify-between p-2 rounded-lg bg-emerald-50 border border-emerald-100 text-xs shadow-sm">
+                        <span className="truncate max-w-[120px] font-bold text-emerald-700">{docItem.fileName}</span>
                         <div className="flex items-center gap-1">
-                          <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-primary" asChild>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100/50" asChild>
                             <a href={docItem.downloadURL} target="_blank" rel="noopener noreferrer">
                               <Download className="h-3.5 w-3.5" />
                             </a>
                           </Button>
-                          <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => setDeleteTarget(docItem)}>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-rose-500 hover:text-rose-600 hover:bg-rose-50" onClick={() => setDeleteTarget(docItem)}>
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
@@ -187,7 +205,7 @@ export default function SchoolDocumentsPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="h-16 flex items-center justify-center text-xs text-muted-foreground italic">
+                  <div className="h-16 flex items-center justify-center text-xs text-slate-400 bg-slate-50/50 rounded-lg border border-dashed border-slate-200">
                     No official file uploaded
                   </div>
                 )}
@@ -200,12 +218,21 @@ export default function SchoolDocumentsPage() {
                 ) : (
                   <Button 
                     className="w-full h-9 gap-2 text-xs font-bold" 
-                    variant="outline" 
+                    variant={existing && existing.length > 0 ? "outline" : "default"} 
                     onClick={() => triggerUpload(type.key)}
                     disabled={!!uploadingType}
                   >
-                    <Plus className="h-3.5 w-3.5" />
-                    Upload Official File
+                    {existing && existing.length > 0 ? (
+                      <>
+                        <Upload className="h-3.5 w-3.5" />
+                        Replace Document
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="h-3.5 w-3.5" />
+                        Upload Official File
+                      </>
+                    )}
                   </Button>
                 )}
               </CardContent>

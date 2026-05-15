@@ -116,7 +116,6 @@ export default function ProfilePage() {
     <div className="max-w-4xl space-y-8 animate-in fade-in duration-500 pb-12">
       <div className="flex items-center gap-6">
         <Avatar className="h-20 w-20 border shadow-sm">
-          <AvatarImage src={student.profileImage} />
           <AvatarFallback className="bg-slate-100 text-slate-400 text-xl font-bold">
             {student.firstName?.[0]}{student.lastName?.[0]}
           </AvatarFallback>

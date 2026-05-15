@@ -24,7 +24,8 @@ import {
   Download,
   AlertCircle,
   LayoutGrid,
-  List
+  List,
+  Users
 } from "lucide-react"
 import { 
   Table, 
@@ -250,443 +251,405 @@ export default function StaffPage() {
     });
   };
 
+
+  const stats = useMemo(() => {
+    return {
+      total: (users || []).length,
+      active: (users || []).filter(u => u.status !== 'Suspended').length,
+      admins: (users || []).filter(u => u.role === 'Admin').length,
+      departments: new Set((users || []).map(u => u.department).filter(Boolean)).size
+    }
+  }, [users])
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-10">
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-3">
-            <ShieldCheck className="h-8 w-8 text-primary" />
+          <h1 className="text-2xl font-bold flex items-center gap-2 text-slate-900">
+            <ShieldCheck className="h-6 w-6 text-emerald-600" />
             Staff & Employee Directory
           </h1>
-          <p className="text-muted-foreground">Manage college employees and organizational departments</p>
+          <p className="text-muted-foreground mt-1 text-sm">Manage college employees, roles, and access</p>
         </div>
-
-        <div className="flex gap-2">
-          <div className="flex items-center bg-white border border-slate-200 p-1 rounded-xl shadow-sm mr-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className={`h-8 w-10 p-0 rounded-lg ${viewMode === 'grid' ? 'bg-emerald-50 text-emerald-600' : 'text-slate-400'}`}
-              onClick={() => setViewMode('grid')}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className={`h-8 w-10 p-0 rounded-lg ${viewMode === 'list' ? 'bg-emerald-50 text-emerald-600' : 'text-slate-400'}`}
-              onClick={() => setViewMode('list')}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
-
+        
+        <div className="flex gap-3">
           {isAuthorizedToManage && (
-            <Button variant="outline" onClick={exportToCSV} disabled={filteredStaff.length === 0} className="rounded-xl">
+            <Button variant="outline" size="sm" onClick={exportToCSV} disabled={filteredStaff.length === 0} className="h-9">
               <Download className="mr-2 h-4 w-4" /> Export CSV
             </Button>
           )}
-
           {isAuthorizedToManage && (
-            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-lg shadow-emerald-600/20 px-6">
-                  <Plus className="mr-2 h-4 w-4" /> Add Employee
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border-0 shadow-2xl rounded-2xl">
-                <div className="bg-emerald-600 p-8 text-white">
-                  <DialogTitle className="text-2xl font-black">Register Employee</DialogTitle>
-                  <DialogDescription className="text-emerald-50 mt-1.5 opacity-90">
-                    Create a professional record for a new staff member or lecturer.
-                  </DialogDescription>
-                </div>
-                <div className="p-8 pt-6 space-y-6">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="fName" className="text-xs font-bold uppercase text-slate-500">First Name</Label>
-                      <Input id="fName" className="h-11 bg-slate-50 border-slate-200" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} placeholder="John" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lName" className="text-xs font-bold uppercase text-slate-500">Last Name</Label>
-                      <Input id="lName" className="h-11 bg-slate-50 border-slate-200" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} placeholder="Doe" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="text-xs font-bold uppercase text-slate-500">Work Email</Label>
-                    <Input id="email" type="email" className="h-11 bg-slate-50 border-slate-200 font-medium" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="j.doe@risabu.ac.ke" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone" className="text-xs font-bold uppercase text-slate-500">Phone Number</Label>
-                    <Input id="phone" className="h-11 bg-slate-50 border-slate-200" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} placeholder="+254 700 000 000" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase text-slate-500">Department</Label>
-                      <Select onValueChange={(v) => setFormData({...formData, department: v})} defaultValue={formData.department}>
-                        <SelectTrigger className="h-11 bg-slate-50 border-slate-200">
-                          <SelectValue placeholder="Select Dept" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {DEPARTMENTS.map(dept => (
-                            <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-xs font-bold uppercase text-slate-500">Access Role</Label>
-                      <Select onValueChange={(v) => setFormData({...formData, role: v})} defaultValue={formData.role}>
-                        <SelectTrigger className="h-11 bg-slate-50 border-slate-200">
-                          <SelectValue placeholder="Select Role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Staff">Standard Staff</SelectItem>
-                          <SelectItem value="Admin">Administrator</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <Button onClick={handleAddEmployee} className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl mt-4">
-                    Complete Registration
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white h-9" onClick={() => setIsCreateOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Add Employee
+            </Button>
           )}
         </div>
       </div>
 
-      <div className="relative group">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" />
-        <Input 
-          placeholder="Search staff by name, email, ID or department..." 
-          className="pl-11 h-12 bg-white border-slate-200 rounded-2xl shadow-sm focus-visible:ring-emerald-500 focus-visible:border-emerald-500 transition-all"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      {/* Stats Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: "Total Staff", value: stats.total, icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
+          { label: "Active", value: stats.active, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50" },
+          { label: "Admins", value: stats.admins, icon: ShieldAlert, color: "text-indigo-600", bg: "bg-indigo-50" },
+          { label: "Departments", value: stats.departments, icon: Briefcase, color: "text-orange-600", bg: "bg-orange-50" }
+        ].map((stat, i) => (
+          <Card key={i} className="border border-slate-200 shadow-sm rounded-xl bg-white">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${stat.bg} ${stat.color}`}>
+                <stat.icon className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-slate-500">{stat.label}</p>
+                <h3 className="text-2xl font-bold text-slate-900 leading-none mt-1">{stat.value}</h3>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {isLoading ? (
-        <div className="flex flex-col items-center justify-center py-24">
-          <Loader2 className="h-10 w-10 animate-spin text-primary mb-4" />
-          <p className="text-muted-foreground animate-pulse">Retrieving records...</p>
+      {/* Control Bar */}
+      <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-2 rounded-xl shadow-sm border border-slate-200">
+        <div className="flex items-center bg-slate-100 p-1 rounded-lg w-full md:w-auto">
+          <Button variant="ghost" size="sm" className={`h-8 px-4 rounded-md text-xs font-medium transition-all ${viewMode === 'grid' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`} onClick={() => setViewMode('grid')}>
+            <LayoutGrid className="mr-2 h-3.5 w-3.5" /> Grid
+          </Button>
+          <Button variant="ghost" size="sm" className={`h-8 px-4 rounded-md text-xs font-medium transition-all ${viewMode === 'list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`} onClick={() => setViewMode('list')}>
+            <List className="mr-2 h-3.5 w-3.5" /> List
+          </Button>
         </div>
-      ) : viewMode === 'grid' ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {filteredStaff.length > 0 ? (
-            filteredStaff.map((staff) => (
-              <Card key={staff.id} className={`group transition-all hover:shadow-lg border shadow-sm rounded-2xl overflow-hidden ${staff.role === 'Admin' ? 'border-emerald-100 bg-emerald-50/20' : 'bg-white'}`}>
-                {/* ... existing card content ... */}
-                <CardHeader className="flex flex-row items-center justify-between pb-3 px-6 pt-6">
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-14 w-14 ring-4 ring-white shadow-md">
-                      <AvatarImage src={`https://picsum.photos/seed/${staff.id}/200/200`} />
-                      <AvatarFallback className="bg-emerald-100 text-emerald-700 font-black">
+
+        <div className="relative flex-1 md:max-w-md w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input 
+            placeholder="Search employees..." 
+            className="pl-9 h-10 bg-slate-50 border border-slate-200 focus-visible:ring-1 focus-visible:ring-emerald-500 rounded-lg text-sm w-full"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div>
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-xl border border-slate-200 shadow-sm">
+            <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mb-4" />
+            <p className="text-slate-500 text-sm">Loading Directory...</p>
+          </div>
+        ) : viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredStaff.length > 0 ? (
+              filteredStaff.map((staff) => (
+                <div key={staff.id} className="group relative bg-white border border-slate-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-all">
+                  {staff.role === 'Admin' && (
+                    <div className="absolute top-3 right-3 h-6 w-6 bg-emerald-50 rounded-full flex items-center justify-center">
+                      <ShieldAlert className="h-3 w-3 text-emerald-600" />
+                    </div>
+                  )}
+                  
+                  <div className="flex flex-col items-center text-center">
+                    <Avatar className="h-16 w-16 mb-3">
+                      <AvatarFallback className={`text-lg font-bold ${staff.role === 'Admin' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
                         {staff.firstName?.[0]}{staff.lastName?.[0]}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="flex flex-col">
-                      <CardTitle className="text-base font-black text-slate-900 flex items-center gap-1.5">
-                        {staff.firstName} {staff.lastName}
-                        {staff.role === "Admin" && <ShieldAlert className="h-4 w-4 text-emerald-600" />}
-                      </CardTitle>
-                      <CardDescription className="text-xs font-mono text-slate-400">
-                        {staff.employeeId || `ID: ${staff.id.slice(0, 6).toUpperCase()}`}
-                      </CardDescription>
-                    </div>
-                  </div>
-                  
-                  {isAuthorizedToManage && staff.email !== "clainyemblo@gmail.com" && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-slate-100">
-                          <MoreVertical className="h-4 w-4 text-slate-400" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-56 p-1 rounded-xl shadow-xl border-slate-100">
-                        <DropdownMenuLabel className="px-3 py-2 text-xs font-bold uppercase text-slate-400 tracking-wider">Administration</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => { setSelectedStaffId(staff.id); setIsViewOpen(true); }} className="rounded-lg">
-                          <UserCog className="mr-2 h-4 w-4 text-slate-500" /> View Profile
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOpenEdit(staff)} className="rounded-lg">
-                          <Edit2 className="mr-2 h-4 w-4 text-slate-500" /> Edit Details
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleUpdateStatus(staff.id, staff.status === "Active" ? "Suspended" : "Active")} className="rounded-lg">
-                          {staff.status === "Active" ? (
-                            <><Lock className="mr-2 h-4 w-4 text-slate-500" /> Suspend Access</>
-                          ) : (
-                            <><CheckCircle2 className="mr-2 h-4 w-4 text-emerald-500" /> Activate Access</>
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-rose-600 focus:text-rose-700 focus:bg-rose-50 rounded-lg" onClick={() => handleDeleteUser(staff.id)}>
-                          <Trash2 className="mr-2 h-4 w-4" /> Remove Record
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </CardHeader>
-
-                <CardContent className="px-6 pb-6 pt-2 space-y-4">
-                  <div className="space-y-2.5">
-                    <div className="flex items-center gap-2.5 text-xs font-bold text-slate-600">
-                      <Mail className="h-4 w-4 text-emerald-600/70" />
-                      <span className="truncate">{staff.email}</span>
-                    </div>
-                    <div className="flex items-center gap-2.5 text-xs font-bold text-slate-600">
-                      <Briefcase className="h-4 w-4 text-emerald-600/70" />
-                      <span>{staff.department || "General Staff"}</span>
-                    </div>
-                    {staff.phone && (
-                      <div className="flex items-center gap-2.5 text-xs font-bold text-slate-600">
-                        <Phone className="h-4 w-4 text-emerald-600/70" />
-                        <span>{staff.phone}</span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="flex items-center justify-between pt-2">
-                    <Badge className={`rounded-lg px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider border-0 shadow-sm ${staff.role === "Admin" ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'}`}>
-                      {staff.role || "Staff"}
-                    </Badge>
-                    <div className={`flex items-center gap-1.5 text-[10px] font-black uppercase tracking-tight ${staff.status === 'Suspended' ? 'text-rose-600' : 'text-emerald-600'}`}>
-                      {staff.status === 'Suspended' ? (
-                        <><AlertCircle className="h-3.5 w-3.5" /> Suspended</>
-                      ) : (
-                        <><CheckCircle2 className="h-3.5 w-3.5" /> Active</>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <div className="col-span-full py-24 text-center bg-muted/20 rounded-2xl border-2 border-dashed">
-              <h3 className="text-lg font-semibold">No employees found</h3>
-              <p className="text-muted-foreground text-sm mt-1">
-                Your search did not return any records.
-              </p>
-            </div>
-          )}
-        </div>
-      ) : (
-        <Card className="border shadow-sm rounded-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <Table>
-            <TableHeader className="bg-slate-50/50">
-              <TableRow className="border-slate-100 hover:bg-transparent">
-                <TableHead className="w-[80px] h-12 text-[10px] font-black uppercase tracking-wider text-slate-400 pl-6">Avatar</TableHead>
-                <TableHead className="h-12 text-[10px] font-black uppercase tracking-wider text-slate-400">Employee Details</TableHead>
-                <TableHead className="h-12 text-[10px] font-black uppercase tracking-wider text-slate-400">Department</TableHead>
-                <TableHead className="h-12 text-[10px] font-black uppercase tracking-wider text-slate-400">Access Role</TableHead>
-                <TableHead className="h-12 text-[10px] font-black uppercase tracking-wider text-slate-400">Status</TableHead>
-                <TableHead className="h-12 w-[50px] text-right pr-6"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredStaff.length > 0 ? (
-                filteredStaff.map((staff) => (
-                  <TableRow key={staff.id} className="border-slate-100 group">
-                    <TableCell className="py-3 pl-6">
-                      <Avatar className="h-9 w-9 ring-2 ring-white shadow-sm">
-                        <AvatarImage src={`https://picsum.photos/seed/${staff.id}/200/200`} />
-                        <AvatarFallback className="bg-emerald-50 text-emerald-600 text-[10px] font-bold">
-                          {staff.firstName?.[0]}{staff.lastName?.[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-black text-slate-900 leading-tight">{staff.firstName} {staff.lastName}</span>
-                        <span className="text-[10px] font-mono text-slate-400">{staff.employeeId || staff.id.slice(0, 6).toUpperCase()}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <span className="text-xs font-bold text-slate-600">{staff.department || "General"}</span>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <Badge className={`rounded-lg px-2 py-0.5 text-[9px] font-black uppercase tracking-wider border-0 ${staff.role === "Admin" ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                        {staff.role}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="py-3">
-                      <div className={`flex items-center gap-1 text-[9px] font-black uppercase tracking-wider ${staff.status === 'Suspended' ? 'text-rose-600' : 'text-emerald-600'}`}>
-                        {staff.status === 'Suspended' ? 'Suspended' : 'Active'}
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-3 pr-6 text-right">
+                    
+                    <h3 className="text-base font-bold text-slate-900 mb-0.5">{staff.firstName} {staff.lastName}</h3>
+                    <p className="text-xs text-slate-500 mb-4">{staff.department || "General Staff"}</p>
+                    
+                    <div className="flex gap-2 w-full mt-auto">
+                      <Button variant="outline" size="sm" className="flex-1 h-8 text-xs font-medium" onClick={() => { setSelectedStaffId(staff.id); setIsViewOpen(true); }}>
+                        Profile
+                      </Button>
                       {isAuthorizedToManage && staff.email !== "clainyemblo@gmail.com" && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <MoreVertical className="h-4 w-4 text-slate-400" />
+                            <Button variant="outline" size="icon" className="h-8 w-8 text-slate-500">
+                              <MoreVertical className="h-3.5 w-3.5" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56 rounded-xl shadow-xl border-slate-100">
-                             <DropdownMenuItem onClick={() => { setSelectedStaffId(staff.id); setIsViewOpen(true); }}>
-                              <UserCog className="mr-2 h-4 w-4" /> View Profile
+                          <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border-slate-200 p-1">
+                            <DropdownMenuItem onClick={() => handleOpenEdit(staff)} className="text-xs">
+                              <Edit2 className="mr-2 h-3.5 w-3.5 text-slate-400" /> Edit Details
                             </DropdownMenuItem>
-                             <DropdownMenuItem onClick={() => handleOpenEdit(staff)}>
-                              <Edit2 className="mr-2 h-4 w-4 text-slate-500" /> Edit Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleUpdateStatus(staff.id, staff.status === "Active" ? "Suspended" : "Active")}>
-                              <Lock className="mr-2 h-4 w-4" /> Toggle Access
+                            <DropdownMenuItem onClick={() => handleUpdateStatus(staff.id, staff.status === "Active" ? "Suspended" : "Active")} className="text-xs">
+                              <Lock className="mr-2 h-3.5 w-3.5 text-slate-400" /> Toggle Access
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-rose-600" onClick={() => handleDeleteUser(staff.id)}>
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            <DropdownMenuItem className="text-xs text-rose-600 focus:bg-rose-50" onClick={() => handleDeleteUser(staff.id)}>
+                              <Trash2 className="mr-2 h-3.5 w-3.5" /> Remove
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-32 text-center text-slate-400 font-bold">No records matched your search.</TableCell>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-full py-20 text-center bg-slate-50 rounded-xl border border-slate-200">
+                <Users className="h-8 w-8 mx-auto text-slate-400 mb-3" />
+                <h3 className="text-base font-medium text-slate-900">No employees found</h3>
+                <p className="text-slate-500 text-sm mt-1">Adjust your search or add a new record.</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <Card className="border border-slate-200 shadow-sm rounded-xl overflow-hidden bg-white">
+            <Table>
+              <TableHeader className="bg-slate-50">
+                <TableRow className="border-slate-200">
+                  <TableHead className="font-semibold text-slate-500 text-xs pl-4">Employee</TableHead>
+                  <TableHead className="font-semibold text-slate-500 text-xs">Department</TableHead>
+                  <TableHead className="font-semibold text-slate-500 text-xs">Role</TableHead>
+                  <TableHead className="font-semibold text-slate-500 text-xs">Status</TableHead>
+                  <TableHead className="font-semibold text-slate-500 text-xs text-right pr-4">Actions</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </Card>
-      )}
-      
+              </TableHeader>
+              <TableBody>
+                {filteredStaff.length > 0 ? (
+                  filteredStaff.map((staff) => (
+                    <TableRow key={staff.id} className="border-slate-100 hover:bg-slate-50 group">
+                      <TableCell className="py-3 pl-4">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className={`text-xs font-bold ${staff.role === 'Admin' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
+                              {staff.firstName?.[0]}{staff.lastName?.[0]}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-slate-900">{staff.firstName} {staff.lastName}</span>
+                            <span className="text-xs text-slate-500">{staff.email}</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <span className="text-sm text-slate-700">{staff.department || "General"}</span>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <Badge variant="secondary" className={`rounded-md px-2 py-0.5 text-[10px] font-medium ${staff.role === "Admin" ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
+                          {staff.role}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="py-3">
+                        <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-medium ${staff.status === 'Suspended' ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                          {staff.status === 'Suspended' ? 'Suspended' : 'Active'}
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-3 pr-4 text-right">
+                        <Button variant="ghost" size="sm" className="h-8 text-xs text-slate-500 hover:text-slate-900 mr-2" onClick={() => { setSelectedStaffId(staff.id); setIsViewOpen(true); }}>
+                          Details
+                        </Button>
+                        {isAuthorizedToManage && staff.email !== "clainyemblo@gmail.com" && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="h-4 w-4 text-slate-400" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg border-slate-200 p-1">
+                               <DropdownMenuItem onClick={() => handleOpenEdit(staff)} className="text-xs">
+                                <Edit2 className="mr-2 h-3.5 w-3.5 text-slate-400" /> Edit Record
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleUpdateStatus(staff.id, staff.status === "Active" ? "Suspended" : "Active")} className="text-xs">
+                                <Lock className="mr-2 h-3.5 w-3.5 text-slate-400" /> Toggle Access
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-rose-600 focus:bg-rose-50 text-xs" onClick={() => handleDeleteUser(staff.id)}>
+                                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-32 text-center text-slate-400">No records matched your search.</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </Card>
+        )}
+      </div>
+
       {!isAuthorizedToManage && (
-        <Card className="border-rose-200 bg-rose-50/50 rounded-2xl shadow-sm ring-1 ring-rose-200">
-          <CardHeader className="flex flex-row items-start gap-4 p-5">
-            <div className="h-10 w-10 rounded-full bg-rose-100 flex items-center justify-center text-rose-600 shrink-0">
-              <Lock className="h-5 w-5" />
-            </div>
-            <div>
-              <CardTitle className="text-sm font-black text-rose-900 uppercase tracking-tight">Restricted Administrative View</CardTitle>
-              <CardDescription className="text-xs font-medium text-rose-700 leading-relaxed mt-1">
-                You are viewing the organizational directory. Modification of employee records, role assignments, and access suspension is strictly limited to authorized Administrators.
-              </CardDescription>
-            </div>
-          </CardHeader>
-        </Card>
+        <div className="mt-4">
+          <Card className="border-rose-100 bg-rose-50/50 rounded-xl shadow-sm">
+            <CardHeader className="flex flex-row items-center gap-3 p-4">
+              <div className="h-8 w-8 rounded-lg bg-rose-100 flex items-center justify-center text-rose-600 shrink-0">
+                <Lock className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-semibold text-rose-900">Restricted Administrative View</CardTitle>
+                <CardDescription className="text-xs text-rose-700 mt-0.5">
+                  Modification of employee records is limited to authorized Administrators.
+                </CardDescription>
+              </div>
+            </CardHeader>
+          </Card>
+        </div>
       )}
 
       {/* Staff Profile Sheet (View) */}
       <Sheet open={isViewOpen} onOpenChange={setIsViewOpen}>
-        <SheetContent className="sm:max-w-[500px] overflow-y-auto border-0 shadow-2xl p-0">
+        <SheetContent className="sm:max-w-[420px] overflow-y-auto border-l shadow-2xl p-0">
           {activeStaff && (
             <div className="flex flex-col h-full bg-white">
-              <div className="bg-slate-50 px-8 pt-12 pb-8 border-b">
-                <div className="flex flex-col items-center text-center gap-4">
-                  <Avatar className="h-28 w-28 ring-4 ring-white shadow-xl">
-                    <AvatarImage src={`https://picsum.photos/seed/${activeStaff.id}/200/200`} />
-                    <AvatarFallback className="bg-emerald-600 text-white text-4xl font-black">
-                      {activeStaff.firstName?.[0]}{activeStaff.lastName?.[0]}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <SheetTitle className="text-3xl font-black text-slate-900">{activeStaff.firstName} {activeStaff.lastName}</SheetTitle>
-                    <SheetDescription className="font-mono text-xs font-bold text-emerald-600 uppercase tracking-widest mt-1">
-                      {activeStaff.employeeId || activeStaff.id}
-                    </SheetDescription>
-                    <Badge className="mt-3 bg-slate-900 text-white rounded-lg px-4 py-1 text-[10px] font-black uppercase">
-                      {activeStaff.role}
-                    </Badge>
-                  </div>
+              <div className="px-6 pt-10 pb-6 flex flex-col items-center text-center gap-3 border-b border-slate-100">
+                <Avatar className="h-20 w-20 border border-slate-200">
+                  <AvatarFallback className="bg-emerald-50 text-emerald-600 text-2xl font-bold">
+                    {activeStaff.firstName?.[0]}{activeStaff.lastName?.[0]}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <SheetTitle className="text-xl font-bold text-slate-900">{activeStaff.firstName} {activeStaff.lastName}</SheetTitle>
+                  <SheetDescription className="text-sm text-slate-500 mt-1">
+                    {activeStaff.role} · {activeStaff.department || "General Staff"}
+                  </SheetDescription>
                 </div>
               </div>
 
-              <div className="flex-1 p-8 space-y-10">
-                <section>
-                  <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-4">Professional Identity</h3>
-                  <div className="grid grid-cols-2 gap-y-6">
-                    <div>
-                      <Label className="text-[10px] font-bold text-slate-400 uppercase">Department</Label>
-                      <p className="text-sm font-black text-slate-900">{activeStaff.department || "Administration"}</p>
-                    </div>
-                    <div>
-                      <Label className="text-[10px] font-bold text-slate-400 uppercase">Join Date</Label>
-                      <p className="text-sm font-black text-slate-900">{activeStaff.joinDate || "N/A"}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <Label className="text-[10px] font-bold text-slate-400 uppercase">Qualifications</Label>
-                      <p className="text-sm font-bold text-slate-700">{activeStaff.qualifications || "Not Recorded"}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <Label className="text-[10px] font-bold text-slate-400 uppercase">Specialization</Label>
-                      <p className="text-sm font-bold text-slate-700">{activeStaff.specialization || "General"}</p>
-                    </div>
+              <div className="flex-1 px-6 py-6 space-y-6">
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-500">Employee ID</span>
+                    <span className="font-mono text-sm text-slate-900">{activeStaff.employeeId || activeStaff.id.slice(0,8).toUpperCase()}</span>
                   </div>
-                </section>
-
-                <section>
-                  <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-4">Contact Information</h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                        <Mail className="h-4 w-4" />
-                      </div>
-                      <span className="text-sm font-bold text-slate-600">{activeStaff.email}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                        <Phone className="h-4 w-4" />
-                      </div>
-                      <span className="text-sm font-bold text-slate-600">{activeStaff.phone || "No phone linked"}</span>
-                    </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-500">Join Date</span>
+                    <span className="text-sm text-slate-900">{activeStaff.joinDate || "Not Recorded"}</span>
                   </div>
-                </section>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-500">Email Address</span>
+                    <span className="text-sm text-slate-900">{activeStaff.email}</span>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-xs font-medium text-slate-500">Phone Number</span>
+                    <span className="text-sm text-slate-900">{activeStaff.phone || "Not Recorded"}</span>
+                  </div>
+                  {(activeStaff.qualifications || activeStaff.specialization) && (
+                    <div className="flex flex-col gap-1">
+                       <span className="text-xs font-medium text-slate-500">Qualifications</span>
+                       <span className="text-sm text-slate-900">{activeStaff.qualifications || activeStaff.specialization}</span>
+                    </div>
+                  )}
+                </div>
 
                 {activeStaff.bio && (
-                  <section>
-                    <h3 className="text-[10px] font-black uppercase text-slate-400 tracking-[0.2em] mb-4">Professional Biography</h3>
-                    <p className="text-sm leading-relaxed text-slate-500 font-medium italic">
-                      "{activeStaff.bio}"
+                  <div>
+                    <span className="text-xs font-medium text-slate-500 block mb-1">Biography</span>
+                    <p className="text-sm leading-relaxed text-slate-700">
+                      {activeStaff.bio}
                     </p>
-                  </section>
+                  </div>
                 )}
               </div>
 
-              <div className="p-8 border-t bg-slate-50 flex gap-3">
-                <Button 
-                  className="flex-1 h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl shadow-lg shadow-emerald-600/20"
-                  onClick={() => { setIsViewOpen(false); handleOpenEdit(activeStaff); }}
-                >
-                  Edit Professional Profile
-                </Button>
-                <Button variant="outline" className="h-12 w-12 p-0 rounded-xl border-slate-200" onClick={() => setIsViewOpen(false)}>
-                  <Trash2 className="h-4 w-4 text-slate-400" />
-                </Button>
-              </div>
+              {isAuthorizedToManage && (
+                <div className="p-6 border-t border-slate-100 mt-auto">
+                  <Button 
+                    className="w-full h-10 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-lg"
+                    onClick={() => { setIsViewOpen(false); handleOpenEdit(activeStaff); }}
+                  >
+                    Edit Profile
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </SheetContent>
       </Sheet>
 
-      {/* Staff Editor Dialog */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden border-0 shadow-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
-          <div className="bg-emerald-600 p-8 text-white">
-            <DialogTitle className="text-2xl font-black italic">Edit Staff Profile</DialogTitle>
-            <DialogDescription className="text-emerald-50 opacity-80 mt-1">
-              Updating institutional records for {formData.firstName} {formData.lastName}
+      {/* Staff Editor / Create Dialogs */}
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border-0 shadow-2xl rounded-xl">
+          <div className="bg-emerald-600 p-6 text-white">
+            <DialogTitle className="text-xl font-bold">Register Employee</DialogTitle>
+            <DialogDescription className="text-emerald-50 mt-1 text-sm">
+              Create a new staff member record.
             </DialogDescription>
           </div>
-          <div className="p-8 space-y-6">
+          <div className="p-6 space-y-4 bg-white">
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase text-slate-400">First Name</Label>
-                <Input value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="h-11 bg-slate-50 border-slate-200 rounded-xl" />
+              <div className="space-y-1.5">
+                <Label htmlFor="fName" className="text-xs font-medium text-slate-700">First Name</Label>
+                <Input id="fName" className="h-10" value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} placeholder="John" />
               </div>
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase text-slate-400">Last Name</Label>
-                <Input value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="h-11 bg-slate-50 border-slate-200 rounded-xl" />
+              <div className="space-y-1.5">
+                <Label htmlFor="lName" className="text-xs font-medium text-slate-700">Last Name</Label>
+                <Input id="lName" className="h-10" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} placeholder="Doe" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-xs font-medium text-slate-700">Work Email</Label>
+              <Input id="email" type="email" className="h-10" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="j.doe@risabu.ac.ke" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="phone" className="text-xs font-medium text-slate-700">Phone Number</Label>
+              <Input id="phone" className="h-10" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} placeholder="+254..." />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-700">Department</Label>
+                <Select onValueChange={(v) => setFormData({...formData, department: v})} defaultValue={formData.department}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Select Dept" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DEPARTMENTS.map(dept => (
+                      <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-700">Access Role</Label>
+                <Select onValueChange={(v) => setFormData({...formData, role: v})} defaultValue={formData.role}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder="Select Role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Staff">Standard Staff</SelectItem>
+                    <SelectItem value="Admin">Administrator</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <Button onClick={handleAddEmployee} className="w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg mt-2">
+              Complete Registration
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border-0 shadow-2xl rounded-xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-slate-900 p-6 text-white">
+            <DialogTitle className="text-xl font-bold">Edit Profile</DialogTitle>
+            <DialogDescription className="text-slate-400 mt-1 text-sm">
+              Updating records for {formData.firstName} {formData.lastName}
+            </DialogDescription>
+          </div>
+          <div className="p-6 space-y-4 bg-white">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-700">First Name</Label>
+                <Input value={formData.firstName} onChange={(e) => setFormData({...formData, firstName: e.target.value})} className="h-10" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-700">Last Name</Label>
+                <Input value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} className="h-10" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase text-slate-400">Department</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-700">Department</Label>
                 <Select onValueChange={(v) => setFormData({...formData, department: v})} defaultValue={formData.department}>
-                  <SelectTrigger className="h-11 bg-slate-50 border-slate-200 rounded-xl">
+                  <SelectTrigger className="h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -696,10 +659,10 @@ export default function StaffPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label className="text-[10px] font-bold uppercase text-slate-400">Access Role</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-700">Access Role</Label>
                 <Select onValueChange={(v) => setFormData({...formData, role: v})} defaultValue={formData.role}>
-                  <SelectTrigger className="h-11 bg-slate-50 border-slate-200 rounded-xl">
+                  <SelectTrigger className="h-10">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -709,23 +672,23 @@ export default function StaffPage() {
                 </Select>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label className="text-[10px] font-bold uppercase text-slate-400">Qualifications</Label>
-              <Input value={formData.qualifications} onChange={(e) => setFormData({...formData, qualifications: e.target.value})} className="h-11 bg-slate-50 border-slate-200 rounded-xl" placeholder="e.g. PhD in Computer Science" />
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-slate-700">Qualifications</Label>
+              <Input value={formData.qualifications} onChange={(e) => setFormData({...formData, qualifications: e.target.value})} className="h-10" placeholder="e.g. PhD in CS" />
             </div>
-            <div className="space-y-2">
-              <Label className="text-[10px] font-bold uppercase text-slate-400">Professional Bio</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-slate-700">Professional Bio</Label>
               <textarea 
-                className="w-full min-h-[100px] p-4 text-sm bg-slate-50 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                className="w-full min-h-[80px] p-3 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-none"
                 value={formData.bio}
                 onChange={(e) => setFormData({...formData, bio: e.target.value})}
                 placeholder="Brief professional background..."
               />
             </div>
-            <div className="flex gap-3 pt-4 border-t">
-              <Button variant="outline" onClick={() => setIsEditOpen(false)} className="flex-1 h-12 rounded-xl font-bold">Cancel</Button>
-              <Button onClick={handleUpdateStaff} className="flex-2 h-12 bg-emerald-600 hover:bg-emerald-700 text-white px-12 rounded-xl font-black shadow-lg shadow-emerald-600/20">
-                Update Profile
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" onClick={() => setIsEditOpen(false)} className="flex-1 h-10">Cancel</Button>
+              <Button onClick={handleUpdateStaff} className="flex-[2] h-10 bg-emerald-600 hover:bg-emerald-700 text-white">
+                Save Changes
               </Button>
             </div>
           </div>

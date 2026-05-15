@@ -71,27 +71,36 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-slate-50/50">
-        <PortalSidebar student={studentData} />
-        <SidebarInset className="flex flex-col bg-transparent">
-          <header className="h-16 flex items-center px-8 border-b border-slate-100 bg-white sticky top-0 z-20">
-            <div className="flex items-center gap-4 w-full">
-              <SidebarTrigger className="text-slate-500 hover:text-slate-900" />
-              <div className="h-4 w-px bg-slate-200" />
-              <div className="flex items-center gap-2 flex-1">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Portal</span>
-                <ChevronRight className="h-3 w-3 text-slate-300" />
-                <span className="text-xs font-bold text-slate-900 uppercase tracking-widest capitalize">{pageTitle}</span>
-              </div>
-              <NotificationBell studentId={studentData?.id} />
+      <PortalSidebar student={studentData} />
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6 sticky top-0 bg-background/80 backdrop-blur-md z-10">
+          <SidebarTrigger className="-ml-1" />
+          <div className="flex-1">
+            <nav aria-label="Breadcrumb">
+              <ol className="flex items-center space-x-2 text-sm text-muted-foreground">
+                <li>Risabu Connect</li>
+                <li className="before:content-['/'] before:mr-2">Portal</li>
+                <li className="before:content-['/'] before:mr-2 capitalize">{pageTitle}</li>
+              </ol>
+            </nav>
+          </div>
+          <div className="flex items-center gap-4">
+            <NotificationBell studentId={studentData?.id} />
+            <div className="flex flex-col items-end hidden sm:flex">
+              <span className="text-sm font-medium">{studentData?.firstName} {studentData?.lastName}</span>
+              <span className="text-xs text-muted-foreground">
+                {studentData?.appliedCourse || 'Enrolled Student'}
+              </span>
             </div>
-
-          </header>
-          <main className="flex-1 p-6 lg:p-10 max-w-7xl">
-            {children}
-          </main>
-        </SidebarInset>
-      </div>
+            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+              {(studentData?.firstName?.[0] || user?.email?.[0] || 'U').toUpperCase()}{(studentData?.lastName?.[0] || '').toUpperCase()}
+            </div>
+          </div>
+        </header>
+        <main className="p-6 md:p-8">
+          {children}
+        </main>
+      </SidebarInset>
     </SidebarProvider>
   )
 }

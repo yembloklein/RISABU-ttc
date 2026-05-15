@@ -2,65 +2,52 @@
 
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
 import { collection, query, where, limit } from "firebase/firestore"
-import { useMemo } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { BookOpen, Wallet, Calendar, Activity, Loader2, Download } from "lucide-react"
-import { Logo } from "@/components/ui/logo"
-import { Progress } from "@/components/ui/progress"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
+import { useMemo, useRef, useState } from "react"
+import { Card, CardContent } from "@/components/ui/card"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
-} from "@/components/ui/table"
-import { formatDistanceToNow } from "date-fns"
-import { useRef, useState } from "react"
+  BookOpen, Wallet, Calendar, Activity, Loader2, Download,
+  GraduationCap, TrendingUp, Clock, CreditCard, CheckCircle2,
+  AlertCircle, ArrowRight, Hash
+} from "lucide-react"
+import { Logo } from "@/components/ui/logo"
+import { Button } from "@/components/ui/button"
 import { AdmissionLetter } from "@/components/admission-letter"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
 import { toast } from "@/hooks/use-toast"
+import { formatDistanceToNow } from "date-fns"
+import Link from "next/link"
 
 export default function StudentDashboard() {
   const { user } = useUser()
   const firestore = useFirestore()
 
-  // 1. Fetch Student Data
   const studentQuery = useMemoFirebase(() => {
     if (!firestore || !user?.email) return null
     return query(collection(firestore, "students"), where("contactEmail", "==", user.email), limit(1))
   }, [firestore, user])
-  
   const { data: studentsData, isLoading: isStudentLoading } = useCollection(studentQuery)
   const student = studentsData?.[0]
 
-  // 2. Fetch Program Data (for fees)
   const programQuery = useMemoFirebase(() => {
     if (!firestore || !student?.appliedCourse) return null
     return query(collection(firestore, "programs"), where("name", "==", student.appliedCourse), limit(1))
   }, [firestore, student])
-  
   const { data: programsData } = useCollection(programQuery)
   const program = programsData?.[0]
 
-  // 3. Fetch Payments
   const paymentsQuery = useMemoFirebase(() => {
     if (!firestore || !student?.id) return null
     return query(collection(firestore, "payments"), where("studentId", "==", student.id))
   }, [firestore, student])
-
   const { data: paymentsRaw, isLoading: isPaymentsLoading } = useCollection(paymentsQuery)
-  
-  // 4. Fetch Invoices
+
   const invoicesQuery = useMemoFirebase(() => {
     if (!firestore || !student?.id) return null
     return query(collection(firestore, "invoices"), where("studentId", "==", student.id))
   }, [firestore, student])
-
   const { data: invoicesRaw } = useCollection(invoicesQuery)
+
   const ledger = useMemo(() => {
     const combined: any[] = []
     if (paymentsRaw) paymentsRaw.forEach(p => combined.push({ ...p, ledgerType: 'payment', sortDate: p.paymentDate ? new Date(p.paymentDate).getTime() : (p.createdAt?.toMillis?.() || Date.now()) }))
@@ -68,80 +55,52 @@ export default function StudentDashboard() {
     return combined.sort((a, b) => b.sortDate - a.sortDate)
   }, [paymentsRaw, invoicesRaw])
 
-  // 4. Fetch Grades (Real-time)
   const gradesQuery = useMemoFirebase(() => {
     if (!firestore || !student?.id) return null
     return query(collection(firestore, "grades"), where("studentId", "==", student.id))
   }, [firestore, student])
-  
   const { data: grades } = useCollection(gradesQuery)
-  
-  // 5. Fetch Student Documents (to check for custom admission letter)
+
   const docsQuery = useMemoFirebase(() => {
     if (!firestore || !student?.id) return null
     return query(collection(firestore, "student_documents"), where("studentId", "==", student.id))
   }, [firestore, student])
-
   const { data: documents } = useCollection(docsQuery)
 
-  const customAdmissionLetter = useMemo(() => {
-    return documents?.find(d => d.category === "admission_letter")
-  }, [documents])
-
-  // 6. Fetch Official School Documents
   const schoolDocsQuery = useMemoFirebase(() => {
     if (!firestore) return null
     return query(collection(firestore, "school_documents"))
   }, [firestore])
-
   const { data: schoolDocs } = useCollection(schoolDocsQuery)
 
-  const officialAdmissionLetter = useMemo(() => {
-    return schoolDocs?.find(d => d.type === "official_admission_letter")
-  }, [schoolDocs])
-
-  const studentSpecificOfficialLetter = useMemo(() => {
-    return documents?.find(d => d.category === "admission_letter" && d.isOfficial === true)
-  }, [documents])
+  const customAdmissionLetter = useMemo(() => documents?.find(d => d.category === "admission_letter"), [documents])
+  const officialAdmissionLetter = useMemo(() => schoolDocs?.find(d => d.type === "official_admission_letter"), [schoolDocs])
+  const studentSpecificOfficialLetter = useMemo(() => documents?.find(d => d.category === "admission_letter" && d.isOfficial === true), [documents])
 
   const gpa = useMemo(() => {
-    if (!grades || grades.length === 0) return 0
-    const totalPoints = grades.reduce((acc, g) => {
-      const grade = g.grade || "F"
-      const points: Record<string, number> = { "A": 4, "B+": 3.5, "B": 3, "C+": 2.5, "C": 2, "D": 1, "F": 0 }
-      return acc + (points[grade] || 0)
-    }, 0)
-    return parseFloat((totalPoints / grades.length).toFixed(2))
+    if (!grades || grades.length === 0) return null
+    const points: Record<string, number> = { "A": 4, "B+": 3.5, "B": 3, "C+": 2.5, "C": 2, "D": 1, "F": 0 }
+    return parseFloat((grades.reduce((acc, g) => acc + (points[g.grade || "F"] || 0), 0) / grades.length).toFixed(2))
   }, [grades])
 
-  // 5. Fetch Attendance (Real-time)
   const attendanceQuery = useMemoFirebase(() => {
     if (!firestore || !student?.id) return null
     return query(collection(firestore, "attendance"), where("studentId", "==", student.id))
   }, [firestore, student])
-  
   const { data: attendance } = useCollection(attendanceQuery)
 
   const attendanceRate = useMemo(() => {
-    if (!attendance || attendance.length === 0) return 0
-    const attended = attendance.filter(a => a.status === "Present").length
-    return Math.round((attended / attendance.length) * 100)
+    if (!attendance || attendance.length === 0) return null
+    return Math.round((attendance.filter(a => a.status === "Present").length / attendance.length) * 100)
   }, [attendance])
 
   const feeStats = useMemo(() => {
-    // Tally with Admin: Total billed is from the program's tuition fee
     const billed = program ? Number(program.tuitionFee) : 0
-    
-    // Tally with Admin: Only count 'Fee' type payments towards tuition progress
-    const tuitionPayments = (paymentsRaw || []).filter(p => p.type === "Fee")
-    const paid = tuitionPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
-    
+    const paid = (paymentsRaw || []).filter(p => p.type === "Fee").reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
     const balance = Math.max(0, billed - paid)
     const percentage = billed > 0 ? Math.min(100, Math.round((paid / billed) * 100)) : 0
-
     return { billed, paid, balance, percentage }
   }, [program, paymentsRaw])
-
 
   const letterRef = useRef<HTMLDivElement>(null)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -149,279 +108,240 @@ export default function StudentDashboard() {
   const handleDownloadLetter = async () => {
     if (!letterRef.current) return
     setIsGenerating(true)
-    
     try {
-      const canvas = await html2canvas(letterRef.current, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: "#ffffff"
-      })
-      
-      const imgData = canvas.toDataURL('image/png')
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      })
-      
+      const canvas = await html2canvas(letterRef.current, { scale: 2, useCORS: true, logging: false, backgroundColor: "#ffffff" })
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
       const imgWidth = 210
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
-      
-      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight)
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, imgWidth, (canvas.height * imgWidth) / canvas.width)
       pdf.save(`Admission_Letter_${student.firstName}_${student.lastName}.pdf`)
-      
-      toast({
-        title: "Success",
-        description: "Your admission letter has been downloaded."
-      })
+      toast({ title: "Downloaded", description: "Your admission letter has been saved." })
     } catch (error) {
-      console.error("PDF Error:", error)
-      toast({
-        title: "Error",
-        description: "Failed to generate admission letter.",
-        variant: "destructive"
-      })
+      toast({ title: "Error", description: "Failed to generate admission letter.", variant: "destructive" })
     } finally {
       setIsGenerating(false)
     }
   }
 
   if (isStudentLoading) {
-    return <div className="h-96 flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-slate-200" /></div>
+    return (
+      <div className="h-80 flex flex-col items-center justify-center gap-3">
+        <Loader2 className="h-7 w-7 animate-spin text-emerald-600" />
+        <p className="text-sm text-slate-500">Loading your dashboard...</p>
+      </div>
+    )
   }
 
   if (!student) return null
 
+  const letterUrl = studentSpecificOfficialLetter?.downloadURL || officialAdmissionLetter?.downloadURL || customAdmissionLetter?.downloadURL
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-12">
-      {/* Simple Welcome Banner */}
-      <div className="bg-white border rounded-2xl p-8 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-50 font-semibold px-3">
-              Active Student
-            </Badge>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-              Welcome, {student.firstName}
-            </h1>
-            <p className="text-slate-500 font-medium max-w-lg">
-              Check your academic progress and financial status below.
-            </p>
-            {(student.admissionStatus === "Enrolled" || student.admissionNumber) && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {studentSpecificOfficialLetter ? (
-                  <Button 
-                    asChild
-                    variant="default" 
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl"
-                  >
-                    <a href={studentSpecificOfficialLetter.downloadURL} target="_blank" rel="noopener noreferrer">
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Your Official Admission Letter
-                    </a>
-                  </Button>
-                ) : officialAdmissionLetter ? (
-                  <Button 
-                    asChild
-                    variant="default" 
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl"
-                  >
-                    <a href={officialAdmissionLetter.downloadURL} target="_blank" rel="noopener noreferrer">
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Official Admission Letter
-                    </a>
-                  </Button>
-                ) : customAdmissionLetter ? (
-                  <Button 
-                    asChild
-                    variant="default" 
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl"
-                  >
-                    <a href={customAdmissionLetter.downloadURL} target="_blank" rel="noopener noreferrer">
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Custom Admission Letter
-                    </a>
-                  </Button>
-                ) : (
-                  <Button 
-                    onClick={handleDownloadLetter} 
-                    disabled={isGenerating}
-                    variant="outline" 
-                    className="border-blue-200 text-blue-700 hover:bg-blue-50 font-bold rounded-xl"
-                  >
-                    {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-                    Download Admission Letter
-                  </Button>
-                )}
+    <div className="space-y-6 pb-10">
+      {/* Welcome header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold text-emerald-600 uppercase tracking-widest mb-1">Student Portal</p>
+          <h1 className="text-2xl font-bold text-slate-900">Welcome back, {student.firstName} 👋</h1>
+          <p className="text-sm text-slate-500 mt-0.5">{student.appliedCourse || "General Admission"} · {student.admissionNumber || "ADM Pending"}</p>
+        </div>
+
+        {(student.admissionStatus === "Enrolled" || student.admissionNumber) && (
+          letterUrl ? (
+            <Button asChild className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 text-sm shrink-0">
+              <a href={letterUrl} target="_blank" rel="noopener noreferrer">
+                <Download className="h-4 w-4 mr-2" /> Download Admission Letter
+              </a>
+            </Button>
+          ) : (
+            <Button onClick={handleDownloadLetter} disabled={isGenerating} variant="outline" className="h-9 text-sm shrink-0 border-slate-200">
+              {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+              Download Admission Letter
+            </Button>
+          )
+        )}
+      </div>
+
+      {/* Stats row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          {
+            label: "Fee Paid",
+            value: `${feeStats.percentage}%`,
+            sub: `KES ${feeStats.paid.toLocaleString()} of ${feeStats.billed.toLocaleString()}`,
+            icon: CreditCard,
+            color: "text-emerald-600", bg: "bg-emerald-50",
+            bar: true, barVal: feeStats.percentage, barColor: feeStats.percentage >= 100 ? 'bg-emerald-500' : 'bg-emerald-400'
+          },
+          {
+            label: "Balance Due",
+            value: `KES ${feeStats.balance.toLocaleString()}`,
+            sub: feeStats.balance <= 0 ? "Fully cleared" : "Outstanding",
+            icon: Wallet,
+            color: feeStats.balance <= 0 ? "text-emerald-600" : "text-rose-600",
+            bg: feeStats.balance <= 0 ? "bg-emerald-50" : "bg-rose-50",
+          },
+          {
+            label: "GPA",
+            value: gpa !== null ? gpa.toFixed(2) : "—",
+            sub: grades?.length ? `Based on ${grades.length} grade(s)` : "No grades yet",
+            icon: TrendingUp,
+            color: "text-blue-600", bg: "bg-blue-50"
+          },
+          {
+            label: "Attendance",
+            value: attendanceRate !== null ? `${attendanceRate}%` : "—",
+            sub: attendanceRate !== null ? (attendanceRate >= 75 ? "Good standing" : "Below threshold") : "No records yet",
+            icon: Clock,
+            color: attendanceRate !== null && attendanceRate < 75 ? "text-rose-600" : "text-indigo-600",
+            bg: attendanceRate !== null && attendanceRate < 75 ? "bg-rose-50" : "bg-indigo-50"
+          },
+        ].map((s, i) => (
+          <Card key={i} className="border border-slate-200 shadow-sm rounded-xl bg-white">
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${s.bg}`}>
+                  <s.icon className={`h-4 w-4 ${s.color}`} />
+                </div>
+                <p className="text-xs text-slate-400 text-right leading-tight">{s.label}</p>
               </div>
-            )}
-          </div>
-          <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-            <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-              <BookOpen className="h-5 w-5 text-blue-600" />
+              <p className={`text-xl font-bold leading-tight ${s.color}`}>{s.value}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{s.sub}</p>
+              {s.bar && (
+                <div className="mt-2 h-1 rounded-full bg-slate-100 overflow-hidden">
+                  <div className={`h-full rounded-full ${s.barColor}`} style={{ width: `${s.barVal}%` }} />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Recent Transactions */}
+        <div className="lg:col-span-2">
+          <Card className="border border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden h-full">
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-slate-800 flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-slate-400" /> Recent Transactions
+              </h2>
+              <Link href="/portal/finance" className="text-xs text-emerald-600 hover:underline flex items-center gap-0.5">
+                View all <ArrowRight className="h-3 w-3" />
+              </Link>
             </div>
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Current Program</p>
-              <p className="text-sm font-semibold text-slate-900">{student.appliedCourse || "General Admission"}</p>
+            <div className="divide-y divide-slate-100">
+              {isPaymentsLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-5 w-5 animate-spin text-slate-300" />
+                </div>
+              ) : ledger.length > 0 ? (
+                ledger.slice(0, 5).map((item) => (
+                  <div key={item.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${item.ledgerType === 'payment' ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+                      {item.ledgerType === 'payment'
+                        ? <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        : <AlertCircle className="h-4 w-4 text-rose-500" />
+                      }
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900 truncate">
+                        {item.description || (item.ledgerType === 'invoice' ? "Tuition Invoice" : "Fee Payment")}
+                      </p>
+                      <p className="text-xs text-slate-400 font-mono mt-0.5">
+                        {item.transactionReference || item.invoiceNumber || "—"}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={`text-sm font-bold ${item.ledgerType === 'payment' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {item.ledgerType === 'payment' ? '+' : '-'} KES {Number(item.amount).toLocaleString()}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {item.paymentDate || item.invoiceDate
+                          ? formatDistanceToNow(new Date(item.paymentDate || item.invoiceDate), { addSuffix: true })
+                          : "Recently"}
+                      </p>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <CreditCard className="h-7 w-7 text-slate-200 mb-2" />
+                  <p className="text-sm text-slate-400">No transactions yet.</p>
+                </div>
+              )}
             </div>
-          </div>
+          </Card>
+        </div>
+
+        {/* Student Info sidebar */}
+        <div className="space-y-4">
+          {/* Profile card */}
+          <Card className="border border-slate-200 shadow-sm rounded-xl bg-white">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3 mb-4 pb-4 border-b border-slate-100">
+                <div className="h-12 w-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-700 font-bold text-lg shrink-0">
+                  {student.firstName?.[0]}{student.lastName?.[0]}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-900 truncate">{student.firstName} {student.lastName}</p>
+                  <p className="text-xs text-slate-400 truncate">{student.contactEmail}</p>
+                </div>
+              </div>
+              <div className="space-y-3 text-sm">
+                {[
+                  { icon: Hash, label: "Admission No", value: student.admissionNumber || "Pending" },
+                  { icon: BookOpen, label: "Programme", value: student.appliedCourse || "General" },
+                  { icon: Calendar, label: "Joined", value: student.admissionDate || "—" },
+                  { icon: Activity, label: "Status", value: student.status || student.admissionStatus || "Active" },
+                ].map((row, i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="h-7 w-7 rounded-md bg-slate-100 flex items-center justify-center shrink-0">
+                      <row.icon className="h-3.5 w-3.5 text-slate-500" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">{row.label}</p>
+                      <p className="text-xs font-semibold text-slate-800 truncate">{row.value}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick links */}
+          <Card className="border border-slate-200 shadow-sm rounded-xl bg-white">
+            <CardContent className="p-3">
+              <p className="text-xs font-semibold text-slate-500 px-1 mb-2">Quick Access</p>
+              <div className="space-y-1">
+                {[
+                  { label: "My Academics", href: "/portal/academics", icon: GraduationCap },
+                  { label: "Fee Statement", href: "/portal/finance", icon: Wallet },
+                  { label: "My Grades", href: "/portal/grades", icon: TrendingUp },
+                  { label: "Attendance", href: "/portal/attendance", icon: Clock },
+                ].map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-emerald-50 text-slate-700 hover:text-emerald-700 transition-colors group"
+                  >
+                    <link.icon className="h-3.5 w-3.5 text-slate-400 group-hover:text-emerald-600" />
+                    <span className="text-xs font-medium">{link.label}</span>
+                    <ArrowRight className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </Link>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Financial Overview */}
-        <Card className="md:col-span-2 border shadow-sm rounded-2xl overflow-hidden">
-          <CardHeader className="border-b bg-slate-50/50 pb-4">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Wallet className="h-4 w-4 text-blue-600" />
-                Financial Overview
-              </CardTitle>
-              <Badge variant="outline" className="bg-white font-bold">
-                {feeStats.percentage}% Paid
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-slate-500">Total Billed</p>
-                  <p className="text-xl font-bold text-slate-900">KES {feeStats.billed.toLocaleString()}</p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-slate-500">Total Paid</p>
-                  <p className="text-xl font-bold text-emerald-600">KES {feeStats.paid.toLocaleString()}</p>
-                </div>
-                <div className="space-y-1 col-span-2 sm:col-span-1">
-                  <p className="text-xs font-semibold text-slate-500">Balance</p>
-                  <p className="text-xl font-bold text-rose-600">KES {feeStats.balance.toLocaleString()}</p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs font-bold text-slate-600">
-                  <span>Fee Payment Progress</span>
-                  <span>{feeStats.percentage}%</span>
-                </div>
-                <Progress value={feeStats.percentage} className="h-2 bg-slate-100" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Quick Details */}
-        <Card className="border shadow-sm rounded-2xl">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-xs font-bold uppercase text-slate-400 tracking-wider">Academic Record</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="flex items-start gap-3 pb-4 border-b border-slate-50">
-              <div className="flex-1 space-y-1">
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Current GPA</p>
-                <p className="text-2xl font-bold text-slate-900">{gpa || "0.00"}</p>
-              </div>
-              <div className="flex-1 space-y-1">
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Attendance</p>
-                <p className={`text-2xl font-bold ${attendanceRate >= 75 ? "text-emerald-600" : "text-rose-600"}`}>
-                  {attendanceRate}%
-                </p>
-              </div>
-            </div>
-            
-            <div className="flex items-start gap-3">
-              <div className="h-8 w-8 rounded-lg bg-slate-50 flex items-center justify-center shrink-0">
-                <Logo size={16} />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Admission No</p>
-                <p className="text-sm font-semibold text-slate-900">{student.admissionNumber || "Pending"}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="h-8 w-8 rounded-lg bg-slate-50 flex items-center justify-center shrink-0">
-                <Calendar className="h-4 w-4 text-slate-400" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Admission Date</p>
-                <p className="text-sm font-semibold text-slate-900">{student.admissionDate}</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3">
-              <div className="h-8 w-8 rounded-lg bg-slate-50 flex items-center justify-center shrink-0">
-                <Activity className="h-4 w-4 text-slate-400" />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Status</p>
-                <Badge variant="outline" className="text-[10px] font-bold border-slate-200 mt-1 uppercase">
-                  {student.status || student.admissionStatus}
-                </Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Activity */}
-      <Card className="border shadow-sm rounded-2xl overflow-hidden">
-        <CardHeader className="border-b bg-slate-50/50 pb-4">
-          <CardTitle className="text-base font-bold text-slate-900">Recent Transactions</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-slate-50/30">
-              <TableRow className="border-slate-100">
-                <TableHead className="font-bold text-slate-500 h-10 pl-6 text-xs uppercase">Reference</TableHead>
-                <TableHead className="font-bold text-slate-500 h-10 text-xs uppercase">Description</TableHead>
-                <TableHead className="font-bold text-slate-500 h-10 text-xs uppercase">Amount</TableHead>
-                <TableHead className="text-right font-bold text-slate-500 h-10 pr-6 text-xs uppercase">Date</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isPaymentsLoading ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="h-32 text-center text-slate-400 font-medium">Loading...</TableCell>
-                </TableRow>
-              ) : ledger && ledger.length > 0 ? (
-                ledger.slice(0, 5).map((item) => (
-                  <TableRow key={item.id} className="hover:bg-slate-50/50 transition-colors border-slate-100">
-                    <TableCell className="pl-6 py-4">
-                      <span className="font-mono text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                        {item.transactionReference || item.invoiceNumber || "N/A"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="py-4">
-                      <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-slate-900">{item.description || (item.ledgerType === 'invoice' ? "Tuition Fee" : "Fee Payment")}</span>
-                        <Badge variant="secondary" className={`w-fit text-[8px] h-3.5 px-1 font-bold uppercase mt-1 ${item.ledgerType === 'invoice' ? 'bg-slate-100 text-slate-600' : 'bg-emerald-50 text-emerald-700'}`}>
-                          {item.ledgerType}
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-4">
-                      <span className={`text-sm font-bold ${item.ledgerType === 'invoice' ? 'text-rose-600' : 'text-emerald-600'}`}>
-                        {item.ledgerType === 'invoice' ? '-' : '+'} KES {Number(item.amount).toLocaleString()}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right pr-6 py-4 text-xs font-medium text-slate-500">
-                      {item.date || item.paymentDate || item.invoiceDate ? formatDistanceToNow(new Date(item.date || item.paymentDate || item.invoiceDate), { addSuffix: true }) : "Recently"}
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={4} className="h-32 text-center text-slate-500 text-sm">No transactions found.</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
       {/* Hidden Admission Letter for PDF Capture */}
       <div className="fixed -left-[9999px] top-0 opacity-0 pointer-events-none">
-        <AdmissionLetter ref={letterRef} student={student} program={program} />
+        <AdmissionLetter
+          ref={letterRef}
+          student={student}
+          program={program}
+          templateImageUrl={letterUrl}
+        />
       </div>
     </div>
   )
