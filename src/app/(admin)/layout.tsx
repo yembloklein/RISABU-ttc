@@ -108,7 +108,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         
       } catch (error) {
         console.error("Error bootstrapping role:", error)
-      } finally {
         setIsCheckingRole(false)
       }
     }

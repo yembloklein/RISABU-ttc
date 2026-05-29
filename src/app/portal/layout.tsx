@@ -45,10 +45,10 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             router.push("/portal/login")
           } else {
             setStudentData({ id: snap.docs[0].id, ...snap.docs[0].data() })
+            setIsLoading(false)
           }
         } catch (e) {
           console.error(e)
-        } finally {
           setIsLoading(false)
         }
       }
