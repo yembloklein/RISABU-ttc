@@ -148,23 +148,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <header className="flex h-16 shrink-0 items-center gap-3 border-b border-slate-200/80 px-6 sticky top-0 bg-white/80 backdrop-blur-lg z-10 shadow-sm">
           <SidebarTrigger className="-ml-1 text-slate-500 hover:text-slate-900" />
           <div className="h-5 w-px bg-slate-200 mx-1" />
-          <div className="flex-1 hidden md:block">
-            <nav aria-label="Breadcrumb">
-              <ol className="flex items-center gap-1.5 text-xs font-medium text-slate-400">
-                <li className="font-semibold text-slate-700">Risabu Connect</li>
-                <li className="text-slate-300">/</li>
-                <li>ERP</li>
-                {pathname.split('/').filter(Boolean).pop() && (
-                  <>
-                    <li className="text-slate-300">/</li>
-                    <li className="capitalize font-semibold text-slate-600">
-                      {pathname.split('/').filter(Boolean).pop()?.replace(/-/g, ' ') || 'Dashboard'}
-                    </li>
-                  </>
-                )}
-              </ol>
-            </nav>
-          </div>
+          <div className="flex-1 hidden md:block"></div>
           <div className="flex flex-1 md:flex-none items-center justify-end gap-3">
             <button className="h-8 w-8 rounded-full bg-slate-50 ring-1 ring-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
               <Bell className="h-4 w-4" />
