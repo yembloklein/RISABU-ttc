@@ -218,8 +218,8 @@ export default function Dashboard() {
             Here is your executive overview of Risabu TTC for <span className="text-slate-700 font-bold">{dateStr}</span>.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button asChild className="rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold shadow-lg shadow-slate-900/20 px-6 h-11 group transition-all hover:-translate-y-0.5">
+        <div className="flex w-full md:w-auto items-center gap-3 mt-4 md:mt-0">
+          <Button asChild className="w-full md:w-auto rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold shadow-lg shadow-slate-900/20 px-6 h-11 group transition-all hover:-translate-y-0.5">
             <Link href="/admissions#new">
               <UserPlus className="h-4 w-4 mr-2 text-emerald-400" />
               Admit Scholar
@@ -301,8 +301,8 @@ export default function Dashboard() {
                 <TableRow className="border-slate-100 hover:bg-transparent">
                   <TableHead className="font-bold text-slate-400 h-11 pl-5 text-[11px] uppercase tracking-wider">Student</TableHead>
                   <TableHead className="font-bold text-slate-400 h-11 text-[11px] uppercase tracking-wider">Amount</TableHead>
-                  <TableHead className="font-bold text-slate-400 h-11 text-[11px] uppercase tracking-wider">Method</TableHead>
-                  <TableHead className="text-right font-bold text-slate-400 h-11 pr-5 text-[11px] uppercase tracking-wider">Time</TableHead>
+                  <TableHead className="hidden sm:table-cell font-bold text-slate-400 h-11 text-[11px] uppercase tracking-wider">Method</TableHead>
+                  <TableHead className="hidden md:table-cell text-right font-bold text-slate-400 h-11 pr-5 text-[11px] uppercase tracking-wider">Time</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -329,12 +329,12 @@ export default function Dashboard() {
                         <TableCell className="py-3.5">
                           <span className="font-black text-emerald-600">KES {Number(payment.amount).toLocaleString()}</span>
                         </TableCell>
-                        <TableCell className="py-3.5">
+                        <TableCell className="hidden sm:table-cell py-3.5">
                           <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-semibold text-[10px] uppercase rounded-full px-2.5">
                             {payment.paymentMethod || "Cash"}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right pr-5 py-3.5">
+                        <TableCell className="hidden md:table-cell text-right pr-5 py-3.5">
                           <span className="text-xs text-slate-400 font-medium">
                             {payment.paymentDate
                               ? formatDistanceToNow(new Date(payment.paymentDate), { addSuffix: true })
@@ -377,7 +377,7 @@ export default function Dashboard() {
               <CardDescription className="text-xs font-medium text-slate-500">Fast access to core operations</CardDescription>
             </CardHeader>
             <CardContent className="pt-0 pb-5 px-5">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 {quickLinks.map((ql) => (
                   <Link
                     key={ql.label}
@@ -457,7 +457,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Summary Strip ── */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Total Students", value: (students || []).length, icon: Users, color: "text-emerald-600 bg-emerald-50" },
           { label: "Active Programs", value: stats.totalPrograms, icon: BookOpen, color: "text-emerald-600 bg-emerald-50" },
