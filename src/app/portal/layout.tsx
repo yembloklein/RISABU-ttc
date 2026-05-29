@@ -11,8 +11,16 @@ import {
   SidebarTrigger 
 } from "@/components/ui/sidebar"
 import { PortalSidebar } from "@/components/layout/portal-sidebar"
-import { Loader2, ChevronRight } from "lucide-react"
+import { Loader2, ChevronRight, User as UserIcon, LogOut } from "lucide-react"
 import { NotificationBell } from "@/components/portal/notification-bell"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
 
@@ -24,6 +32,16 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname()
 
   const isLoginPage = pathname === "/portal/login"
+
+  const handleLogout = async () => {
+    try {
+      const { getAuth, signOut } = await import("firebase/auth")
+      await signOut(getAuth())
+      router.push("/portal/login")
+    } catch (e) {
+      console.error("Logout failed", e)
+    }
+  }
 
   useEffect(() => {
     async function checkAccess() {
@@ -82,9 +100,26 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 {studentData?.appliedCourse || 'Enrolled Student'}
               </span>
             </div>
-            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-              {(studentData?.firstName?.[0] || user?.email?.[0] || 'U').toUpperCase()}{(studentData?.lastName?.[0] || '').toUpperCase()}
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold hover:bg-primary/20 transition-colors cursor-pointer outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-primary">
+                  {(studentData?.firstName?.[0] || user?.email?.[0] || 'U').toUpperCase()}{(studentData?.lastName?.[0] || '').toUpperCase()}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => router.push("/portal/profile")} className="cursor-pointer">
+                  <UserIcon className="mr-2 h-4 w-4" />
+                  <span>Update Details</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
         <main className="p-6 md:p-8">
