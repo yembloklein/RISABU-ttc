@@ -16,8 +16,7 @@ import {
   ShieldCheck,
   FileUp,
   MessageSquare,
-  Settings,
-  CalendarCheck
+  Settings
 } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
 
@@ -94,11 +93,6 @@ const menuItems = [
         title: "Manage Units",
         icon: BookOpen,
         url: "/academics/units",
-      },
-      {
-        title: "Attendance Tracker",
-        icon: CalendarCheck,
-        url: "/academics/attendance",
       },
       {
         title: "Submissions",

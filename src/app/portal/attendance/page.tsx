@@ -1,16 +1,12 @@
 "use client"
 import { useMemo } from "react"
 
-import { useState } from "react"
-import { useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking } from "@/firebase"
-import { collection, query, where, limit, serverTimestamp } from "firebase/firestore"
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
+import { collection, query, where, limit } from "firebase/firestore"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { CalendarCheck, Users, Clock, AlertCircle, Info, CheckCircle2, XCircle, Loader2, Plus } from "lucide-react"
+import { CalendarCheck, Users, Clock, AlertCircle, Info, CheckCircle2, XCircle, Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { toast } from "@/hooks/use-toast"
 import {
   Table,
   TableBody,
@@ -23,8 +19,7 @@ import {
 export default function AttendancePage() {
   const { user } = useUser()
   const firestore = useFirestore()
-  const [selectedUnitId, setSelectedUnitId] = useState("")
-  const [isMarking, setIsMarking] = useState(false)
+
 
   // Fetch Student Data
   const studentQuery = useMemoFirebase(() => {
@@ -43,51 +38,7 @@ export default function AttendancePage() {
   
   const { data: attendance, isLoading: isAttendanceLoading } = useCollection(attendanceQuery)
 
-  const registeredUnitsQuery = useMemoFirebase(() => {
-    if (!firestore || !student?.id) return null
-    return query(collection(firestore, "unit_registrations"), where("studentId", "==", student.id))
-  }, [firestore, student])
-  const { data: registeredUnits } = useCollection(registeredUnitsQuery)
 
-  const handleMarkAttendance = async () => {
-    if (!selectedUnitId) {
-      toast({ title: "Error", description: "Please select a unit to mark attendance.", variant: "destructive" })
-      return
-    }
-    const unit = registeredUnits?.find(u => u.unitId === selectedUnitId)
-    if (!unit || !firestore) return
-
-    // Prevent marking multiple times a day (simple client-side check)
-    const today = new Date().toLocaleDateString()
-    const alreadyMarked = attendance?.find(a => a.unitId === selectedUnitId && a.date && new Date(a.date).toLocaleDateString() === today)
-    if (alreadyMarked) {
-      toast({ title: "Already Marked", description: "You have already marked attendance for this unit today.", variant: "destructive" })
-      return
-    }
-
-    setIsMarking(true)
-    try {
-      await addDocumentNonBlocking(collection(firestore, "attendance"), {
-        studentId: student?.id || "",
-        studentName: `${student?.firstName || ""} ${student?.lastName || ""}`.trim(),
-        studentEmail: student?.contactEmail || "",
-        unitId: unit?.unitId || selectedUnitId || "",
-        unitCode: unit?.unitCode || "",
-        unitName: unit?.unitName || "",
-        courseName: unit?.courseName || "",
-        date: new Date().toISOString(),
-        time: new Date().toLocaleTimeString(),
-        status: "Present",
-        timestamp: serverTimestamp()
-      })
-      toast({ title: "Success", description: "Attendance marked successfully." })
-      setSelectedUnitId("")
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message || "Failed to mark attendance.", variant: "destructive" })
-    } finally {
-      setIsMarking(false)
-    }
-  }
 
   const stats = useMemo(() => {
     if (!attendance || attendance.length === 0) return { total: 0, attended: 0, missed: 0, percentage: 0 }
@@ -115,41 +66,6 @@ export default function AttendancePage() {
           {stats.percentage}% Overall Rate
         </Badge>
       </div>
-
-      <Card className="border shadow-sm rounded-xl bg-gradient-to-r from-emerald-50 to-emerald-100/50">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-bold text-emerald-900 flex items-center gap-2">
-            <CalendarCheck className="h-5 w-5 text-emerald-600" />
-            Mark Today's Attendance
-          </CardTitle>
-          <CardDescription className="text-emerald-700/70">Select the unit you are currently attending to mark yourself present.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Select value={selectedUnitId} onValueChange={setSelectedUnitId}>
-              <SelectTrigger className="w-full sm:w-[300px] bg-white border-emerald-200">
-                <SelectValue placeholder="Select registered unit..." />
-              </SelectTrigger>
-              <SelectContent>
-                {(registeredUnits || []).map(unit => (
-                  <SelectItem key={unit.unitId} value={unit.unitId}>{unit.unitCode} - {unit.unitName}</SelectItem>
-                ))}
-                {(!registeredUnits || registeredUnits.length === 0) && (
-                  <SelectItem value="none" disabled>No units registered</SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-            <Button 
-              onClick={handleMarkAttendance} 
-              disabled={!selectedUnitId || isMarking || selectedUnitId === 'none'}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
-            >
-              {isMarking ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-              Mark Present
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="border shadow-sm rounded-xl">
