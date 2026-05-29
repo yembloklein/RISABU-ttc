@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth"
 import { useAuth, useFirestore } from "@/firebase"
 import { collection, query, where, getDocs, limit } from "firebase/firestore"
@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Loader2, UserPlus, LogIn, MailCheck, ShieldAlert, Eye, EyeOff } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
 
-export default function StudentLogin() {
+function StudentLoginForm() {
   const [isLogin, setIsLogin] = useState(true)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -235,5 +235,13 @@ export default function StudentLogin() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function StudentLogin() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-muted/30 p-4"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+      <StudentLoginForm />
+    </Suspense>
   )
 }
