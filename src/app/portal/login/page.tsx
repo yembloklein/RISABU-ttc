@@ -1,8 +1,8 @@
 "use client"
 
-import { useState, Suspense } from "react"
+import { useState, Suspense, useEffect } from "react"
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth"
-import { useAuth, useFirestore } from "@/firebase"
+import { useAuth, useFirestore, useUser } from "@/firebase"
 import { collection, query, where, getDocs, limit } from "firebase/firestore"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -25,6 +25,41 @@ function StudentLoginForm() {
   const searchParams = useSearchParams()
   const auth = useAuth()
   const firestore = useFirestore()
+  const { user } = useUser()
+
+  // Smart Redirection (Auto-routing if already logged in)
+  useEffect(() => {
+    if (!user || !user.email || !firestore) return
+    
+    const checkRoleAndRoute = async () => {
+      // 1. Check Superadmin
+      if (user.email === "clainyemblo@gmail.com") {
+        router.push("/")
+        return
+      }
+      
+      try {
+        // 2. Check Staff
+        const staffQuery = query(collection(firestore, "users"), where("email", "==", user.email.toLowerCase()), limit(1))
+        const staffSnap = await getDocs(staffQuery)
+        if (!staffSnap.empty) {
+          router.push("/")
+          return
+        }
+        
+        // 3. Check Student
+        const studentQuery = query(collection(firestore, "students"), where("contactEmail", "==", user.email.toLowerCase()), limit(1))
+        const studentSnap = await getDocs(studentQuery)
+        if (!studentSnap.empty) {
+          router.push("/portal/dashboard")
+        }
+      } catch (e) {
+        console.error("Auto-route check failed", e)
+      }
+    }
+    
+    checkRoleAndRoute()
+  }, [user, firestore, router])
 
   const urlError = searchParams.get("error")
 
@@ -99,6 +134,23 @@ function StudentLoginForm() {
       } else {
         await createUserWithEmailAndPassword(auth, email, password)
       }
+
+      // Smart Redirection (Manual Login Intercept)
+      if (email.toLowerCase() === "clainyemblo@gmail.com") {
+        router.push("/")
+        return
+      }
+      try {
+        const staffQuery = query(collection(firestore, "users"), where("email", "==", email.toLowerCase()), limit(1))
+        const staffSnap = await getDocs(staffQuery)
+        if (!staffSnap.empty) {
+          router.push("/")
+          return
+        }
+      } catch (e) {
+        console.error("Smart redirect check failed", e)
+      }
+
       router.push("/portal/dashboard")
     } catch (err: any) {
       console.error(err)
