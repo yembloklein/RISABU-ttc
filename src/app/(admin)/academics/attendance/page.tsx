@@ -46,7 +46,7 @@ export default function AdminAttendancePage() {
   const handleExport = () => {
     const headers = ["Date", "Time", "Student Name", "Email", "Unit Code", "Unit Name", "Course", "Status"]
     const rows = filteredLogs.map(log => [
-      log.date ? new Date(log.date).toLocaleDateString() : "",
+      log.date ? (typeof log.date === 'string' ? new Date(log.date).toLocaleDateString() : (log.date.seconds ? new Date(log.date.seconds * 1000).toLocaleDateString() : "")) : "",
       log.time || "",
       log.studentName || "",
       log.studentEmail || "",
@@ -148,7 +148,7 @@ export default function AdminAttendancePage() {
                 filteredLogs.map((log) => (
                   <TableRow key={log.id} className="hover:bg-slate-50/80 transition-colors border-slate-100">
                     <TableCell className="py-3 pl-5 text-xs text-slate-500 font-medium whitespace-nowrap">
-                      {log.date ? new Date(log.date).toLocaleDateString() : "N/A"}<br/>
+                      {log.date ? (typeof log.date === 'string' ? new Date(log.date).toLocaleDateString() : (log.date.seconds ? new Date(log.date.seconds * 1000).toLocaleDateString() : "N/A")) : "N/A"}<br/>
                       <span className="text-[10px] text-slate-400">{log.time || "N/A"}</span>
                     </TableCell>
                     <TableCell className="py-3">

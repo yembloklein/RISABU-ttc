@@ -21,6 +21,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Toaster } from "@/components/ui/toaster"
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
 
@@ -126,6 +127,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           {children}
         </main>
       </SidebarInset>
+      <Toaster />
     </SidebarProvider>
   )
 }

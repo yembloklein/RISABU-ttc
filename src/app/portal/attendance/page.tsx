@@ -68,13 +68,13 @@ export default function AttendancePage() {
     setIsMarking(true)
     try {
       await addDocumentNonBlocking(collection(firestore, "attendance"), {
-        studentId: student.id,
-        studentName: `${student.firstName} ${student.lastName}`,
-        studentEmail: student.contactEmail,
-        unitId: unit.unitId,
-        unitCode: unit.unitCode,
-        unitName: unit.unitName,
-        courseName: unit.courseName,
+        studentId: student?.id || "",
+        studentName: `${student?.firstName || ""} ${student?.lastName || ""}`.trim(),
+        studentEmail: student?.contactEmail || "",
+        unitId: unit?.unitId || selectedUnitId || "",
+        unitCode: unit?.unitCode || "",
+        unitName: unit?.unitName || "",
+        courseName: unit?.courseName || "",
         date: new Date().toISOString(),
         time: new Date().toLocaleTimeString(),
         status: "Present",
@@ -95,7 +95,7 @@ export default function AttendancePage() {
     const total = attendance.length
     const attended = attendance.filter(a => a.status === "Present").length
     const missed = total - attended
-    const percentage = Math.round((attended / total) * 100)
+    const percentage = Math.round((attended / total) * 100) || 0
 
     return { total, attended, missed, percentage }
   }, [attendance])
@@ -218,7 +218,7 @@ export default function AttendancePage() {
                 attendance.map((log, idx) => (
                   <TableRow key={idx} className="hover:bg-slate-50/50 transition-colors border-slate-100">
                     <TableCell className="pl-6 py-4 text-sm font-medium text-slate-600">
-                      {log.date ? new Date(log.date).toLocaleDateString() : "N/A"}
+                      {log.date ? (typeof log.date === 'string' ? new Date(log.date).toLocaleDateString() : (log.date.seconds ? new Date(log.date.seconds * 1000).toLocaleDateString() : "N/A")) : "N/A"}
                     </TableCell>
                     <TableCell className="py-4 text-sm font-semibold text-slate-900">
                       {log.unit || log.unitCode}
