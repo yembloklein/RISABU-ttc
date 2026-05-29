@@ -218,15 +218,7 @@ export default function Dashboard() {
             Here is your executive overview of Risabu TTC for <span className="text-slate-700 font-bold">{dateStr}</span>.
           </p>
         </div>
-        <div className="flex w-full md:w-auto items-center gap-3 mt-4 md:mt-0">
-          <Button asChild className="w-full md:w-auto rounded-full bg-slate-900 hover:bg-slate-800 text-white font-bold shadow-lg shadow-slate-900/20 px-6 h-11 group transition-all hover:-translate-y-0.5">
-            <Link href="/admissions#new">
-              <UserPlus className="h-4 w-4 mr-2 text-emerald-400" />
-              Admit Scholar
-              <ArrowRight className="h-4 w-4 ml-2 opacity-50 group-hover:translate-x-1 group-hover:opacity-100 transition-all" />
-            </Link>
-          </Button>
-        </div>
+
       </div>
 
       {/* ── KPI Cards ── */}
