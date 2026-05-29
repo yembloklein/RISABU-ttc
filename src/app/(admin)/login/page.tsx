@@ -101,6 +101,12 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
+
+          <div className="mt-8 text-center border-t border-slate-100 pt-4">
+            <a href="/portal/login" className="text-xs text-slate-400 hover:text-primary transition-colors">
+              Are you a student? Student Portal
+            </a>
+          </div>
         </CardContent>
       </Card>
     </div>

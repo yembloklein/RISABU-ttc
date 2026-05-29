@@ -232,6 +232,12 @@ function StudentLoginForm() {
               {isLogin ? "Need to activate your account? Click here" : "Already activated? Sign In"}
             </button>
           </div>
+          
+          <div className="mt-8 text-center border-t border-slate-100 pt-4">
+            <a href="/login" className="text-xs text-slate-400 hover:text-primary transition-colors">
+              Are you a staff member? Staff Login
+            </a>
+          </div>
         </CardContent>
       </Card>
     </div>
