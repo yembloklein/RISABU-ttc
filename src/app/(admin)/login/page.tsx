@@ -6,15 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Loader2, UserPlus, LogIn } from "lucide-react"
+import { Loader2, LogIn, Eye, EyeOff } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
-import { useAuth, useUser, initiateEmailSignIn, initiateEmailSignUp } from "@/firebase"
+import { useAuth, useUser, initiateEmailSignIn } from "@/firebase"
 
 export default function LoginPage() {
-  const [isSignUp, setIsSignUp] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const { user } = useUser()
   const auth = useAuth()
@@ -26,16 +26,12 @@ export default function LoginPage() {
     }
   }, [user, router])
 
-  const handleEmailAuth = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError(null)
     try {
-      if (isSignUp) {
-        initiateEmailSignUp(auth, email, password)
-      } else {
-        initiateEmailSignIn(auth, email, password)
-      }
+      initiateEmailSignIn(auth, email, password)
     } catch (err: any) {
       setError(err.message || "Authentication failed")
       setLoading(false)
@@ -51,19 +47,17 @@ export default function LoginPage() {
           </div>
           <div>
             <CardTitle className="text-2xl font-bold">Risabu Connect</CardTitle>
-            <CardDescription>
-              {isSignUp ? "Create an account to get started" : "Sign in to access the College ERP"}
-            </CardDescription>
+            <CardDescription>Sign in to access the College ERP</CardDescription>
           </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleEmailAuth} className="space-y-4">
+          <form onSubmit={handleSignIn} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                placeholder="admin@risabu.ac.ke" 
+              <Input
+                id="email"
+                type="email"
+                placeholder="admin@risabu.ac.ke"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -72,23 +66,34 @@ export default function LoginPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input 
-                id="password" 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  disabled={loading}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             {error && <p className="text-xs text-destructive font-medium bg-destructive/10 p-2 rounded">{error}</p>}
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={loading}>
+            <Button
+              type="submit"
+              className="w-full h-11 bg-primary hover:bg-primary/90 rounded-full font-semibold shadow-sm hover:shadow-md transition-all duration-200"
+              disabled={loading}
+            >
               {loading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : isSignUp ? (
-                <>
-                  <UserPlus className="mr-2 h-4 w-4" /> Create Account
-                </>
               ) : (
                 <>
                   <LogIn className="mr-2 h-4 w-4" /> Sign In
@@ -96,16 +101,6 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
-
-          <div className="mt-4 text-center">
-            <button 
-              type="button" 
-              className="text-sm text-primary hover:underline font-medium"
-              onClick={() => setIsSignUp(!isSignUp)}
-            >
-              {isSignUp ? "Already have an account? Sign In" : "Need an account? Sign Up"}
-            </button>
-          </div>
         </CardContent>
       </Card>
     </div>

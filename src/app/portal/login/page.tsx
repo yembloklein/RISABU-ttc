@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Loader2, UserPlus, LogIn, MailCheck, ShieldAlert } from "lucide-react"
+import { Loader2, UserPlus, LogIn, MailCheck, ShieldAlert, Eye, EyeOff } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
 
 export default function StudentLogin() {
@@ -17,6 +17,7 @@ export default function StudentLogin() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [resetSent, setResetSent] = useState(false)
   const [resetLoading, setResetLoading] = useState(false)
@@ -69,7 +70,7 @@ export default function StudentLogin() {
               limit(1)
             )
             const emailSnapshot = await getDocs(studentByEmailQuery)
-            
+
             if (emailSnapshot.empty) {
               // Not a registered student email
               throw new Error("This email is not registered in our student records.")
@@ -103,7 +104,7 @@ export default function StudentLogin() {
       console.error(err)
       const code = err?.code
       const message = err?.message
-      
+
       const friendlyMessages: Record<string, string> = {
         "auth/email-already-in-use": "This email is already registered. Please switch to Sign In instead.",
         "auth/user-not-found": "No account found. First-time users: Your password is your Registration Number.",
@@ -134,7 +135,7 @@ export default function StudentLogin() {
           <div>
             <CardTitle className="text-2xl font-bold text-slate-900">Student Portal</CardTitle>
             <CardDescription className="text-slate-500 font-medium">
-              {isLogin ? "Use your Admission No as your initial password" : "Create your account using your registered email"}
+              {isLogin ? "Sign in to access your academic portal" : "Create your account using your registered email"}
             </CardDescription>
           </div>
         </CardHeader>
@@ -172,14 +173,25 @@ export default function StudentLogin() {
                   </button>
                 )}
               </div>
-              <Input
-                id="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading}
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  disabled={isLoading}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
             {error && <p className="text-xs text-destructive font-medium bg-destructive/10 p-2 rounded text-center">{error}</p>}
             {resetSent && (
@@ -188,10 +200,10 @@ export default function StudentLogin() {
                 <span>Password reset email sent! Check your inbox and follow the link to set a new password.</span>
               </div>
             )}
-            
+
             <Button
               type="submit"
-              className="w-full bg-primary hover:bg-primary/90"
+              className="w-full h-11 bg-primary hover:bg-primary/90 rounded-full font-semibold shadow-sm hover:shadow-md transition-all duration-200"
               disabled={isLoading}
             >
               {isLoading ? (

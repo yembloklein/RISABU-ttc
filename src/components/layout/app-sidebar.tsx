@@ -95,11 +95,6 @@ const menuItems = [
         url: "/academics/units",
       },
       {
-        title: "Registrations",
-        icon: Users,
-        url: "/academics/registrations",
-      },
-      {
         title: "Submissions",
         icon: FileUp,
         url: "/academics/submissions",

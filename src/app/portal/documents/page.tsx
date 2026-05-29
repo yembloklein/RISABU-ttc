@@ -17,15 +17,14 @@ import {
   Briefcase,
   GraduationCap,
   Calendar,
-  Info,
   ArrowRight
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
-import { PaymentReceipt } from "@/components/payment-receipt"
-import { ExamPass } from "@/components/exam-pass"
-import { InternshipLetter } from "@/components/internship-letter"
+import { PaymentReceipt } from "@/components/documents/payment-receipt"
+import { ExamPass } from "@/components/documents/exam-pass"
+import { InternshipLetter } from "@/components/documents/internship-letter"
 
 export default function DocumentsPage() {
   const { user } = useUser()
@@ -47,12 +46,20 @@ export default function DocumentsPage() {
   }, [firestore])
   const { data: schoolDocs } = useCollection(schoolDocsQuery)
 
-  // Fetch Payments for Receipts
+  // Fetch payments for Receipts
   const paymentsQuery = useMemoFirebase(() => {
     if (!firestore || !student?.id) return null
     return query(collection(firestore, "payments"), where("studentId", "==", student.id))
   }, [firestore, student])
   const { data: payments, isLoading: isPaymentsLoading } = useCollection(paymentsQuery)
+
+  // Fetch programs to calculate tuition fee balance
+  const programQuery = useMemoFirebase(() => {
+    if (!firestore || !student?.appliedCourse) return null
+    return query(collection(firestore, "programs"), where("name", "==", student.appliedCourse), limit(1))
+  }, [firestore, student])
+  const { data: programsData, isLoading: isProgramLoading } = useCollection(programQuery)
+  const program = programsData?.[0]
 
   const [activeReceipt, setActiveReceipt] = useState<any>(null)
   const receiptRef = useRef<HTMLDivElement>(null)
@@ -121,7 +128,15 @@ export default function DocumentsPage() {
     }, 100)
   }
 
-  if (isStudentLoading) {
+  const feeStats = useMemo(() => {
+    const totalInvoiced = program ? Number(program.tuitionFee) : 0
+    const totalPaid = (payments || []).filter(p => p.type === "Fee").reduce((sum, p) => sum + (Number(p.amount) || 0), 0)
+    const balance = Math.max(0, totalInvoiced - totalPaid)
+    const isCleared = balance <= 0
+    return { totalInvoiced, totalPaid, balance, isCleared }
+  }, [program, payments])
+
+  if (isStudentLoading || isProgramLoading || isPaymentsLoading) {
     return (
       <div className="h-80 flex flex-col items-center justify-center gap-3">
         <Loader2 className="h-7 w-7 animate-spin text-emerald-600" />
@@ -130,10 +145,10 @@ export default function DocumentsPage() {
     )
   }
 
-  const officialDocs = (schoolDocs || []).filter(d => !d.type?.includes("template"))
   const paymentReceiptTemplate = schoolDocs?.find(d => d.type === "official_payment_receipt")?.downloadURL
   const examPassTemplate = schoolDocs?.find(d => d.type === "official_exam_pass")?.downloadURL
   const internshipTemplate = schoolDocs?.find(d => d.type === "official_internship_letter")?.downloadURL
+  const feeStructureTemplate = schoolDocs?.find(d => d.type === "official_fee_structure")?.downloadURL
 
   return (
     <div className="space-y-6 pb-10">
@@ -146,10 +161,10 @@ export default function DocumentsPage() {
         <p className="text-sm text-slate-500 mt-0.5">Access official institutional records and self-service documents.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="max-w-4xl space-y-6">
         {/* Main Content: Self-Service Documents */}
-        <div className="lg:col-span-2 space-y-6">
-          
+        <div className="space-y-6">
+
           {/* Generation section */}
           <section>
             <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
@@ -159,12 +174,15 @@ export default function DocumentsPage() {
               {[
                 {
                   title: "Examination Pass",
-                  desc: "Required for entry into examination rooms.",
+                  desc: feeStats.isCleared 
+                    ? "Required for entry into examination rooms." 
+                    : `Locked — Fee clearance required. Current balance: KES ${feeStats.balance.toLocaleString()}`,
                   icon: GraduationCap,
-                  color: "bg-blue-50 text-blue-600",
-                  btnColor: "text-blue-600 hover:bg-blue-50",
+                  color: feeStats.isCleared ? "bg-blue-50 text-blue-600" : "bg-rose-50 text-rose-500",
+                  btnColor: feeStats.isCleared ? "text-blue-600 hover:bg-blue-50" : "text-rose-500 hover:bg-rose-50",
                   action: generateExamPass,
-                  loading: isGeneratingExamPass
+                  loading: isGeneratingExamPass,
+                  locked: !feeStats.isCleared
                 },
                 {
                   title: "Internship Request",
@@ -173,27 +191,39 @@ export default function DocumentsPage() {
                   color: "bg-indigo-50 text-indigo-600",
                   btnColor: "text-indigo-600 hover:bg-indigo-50",
                   action: generateInternshipLetter,
-                  loading: isGeneratingInternship
+                  loading: isGeneratingInternship,
+                  locked: false
                 }
               ].map((doc, i) => (
-                <Card key={i} className="border border-slate-200 shadow-sm rounded-xl overflow-hidden hover:border-slate-300 transition-colors">
+                <Card key={i} className={`border shadow-sm rounded-xl overflow-hidden transition-colors ${doc.locked ? 'border-rose-100 bg-rose-50/10' : 'border-slate-200 hover:border-slate-300'}`}>
                   <CardContent className="p-4">
                     <div className="flex items-start gap-4">
                       <div className={`h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ${doc.color}`}>
                         <doc.icon className="h-5 w-5" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-sm font-bold text-slate-900">{doc.title}</h3>
-                        <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{doc.desc}</p>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-sm font-bold text-slate-900">{doc.title}</h3>
+                          {doc.locked && (
+                            <Badge variant="destructive" className="h-4 px-1.5 text-[9px] uppercase tracking-wider font-extrabold bg-rose-600 text-white rounded-full">
+                              Locked
+                            </Badge>
+                          )}
+                        </div>
+                        <p className={`text-xs mt-1 leading-relaxed ${doc.locked ? 'text-rose-500 font-semibold' : 'text-slate-400'}`}>{doc.desc}</p>
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className={`mt-3 h-8 px-2 text-xs font-bold ${doc.btnColor}`}
                           onClick={doc.action}
-                          disabled={doc.loading}
+                          disabled={doc.loading || doc.locked}
                         >
-                          {doc.loading ? <Loader2 className="h-3 w-3 mr-1.5 animate-spin" /> : <Download className="h-3 w-3 mr-1.5" />}
-                          Generate PDF
+                          {doc.loading ? (
+                            <Loader2 className="h-3 w-3 mr-1.5 animate-spin" />
+                          ) : (
+                            <Download className="h-3 w-3 mr-1.5" />
+                          )}
+                          {doc.locked ? 'Fee Clearance Required' : 'Generate PDF'}
                         </Button>
                       </div>
                     </div>
@@ -230,9 +260,9 @@ export default function DocumentsPage() {
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-sm font-bold text-slate-900">KES {Number(p.amount).toLocaleString()}</p>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           className="h-7 px-1.5 text-[10px] font-bold text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 mt-0.5"
                           onClick={() => downloadDynamicReceipt(p)}
                           disabled={isGenerating && activeReceipt?.id === p.id}
@@ -258,59 +288,6 @@ export default function DocumentsPage() {
             </Card>
           </section>
         </div>
-
-        {/* Sidebar: Official Records */}
-        <div className="space-y-6">
-          <section>
-            <h2 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-              <ShieldCheck className="h-3.5 w-3.5" /> Institutional Records
-            </h2>
-            <Card className="border border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
-              <div className="p-3 bg-slate-50 border-b border-slate-100">
-                <p className="text-[10px] font-bold text-slate-400 uppercase">Verified Documents</p>
-              </div>
-              <div className="divide-y divide-slate-100">
-                {officialDocs.length > 0 ? (
-                  officialDocs.map((doc) => (
-                    <div key={doc.id} className="p-3 flex items-center justify-between gap-3 group">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-8 w-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
-                          <FileBadge className="h-4 w-4 text-emerald-600" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-slate-800 truncate">{doc.label || doc.fileName}</p>
-                          <p className="text-[9px] text-slate-400 mt-0.5 uppercase tracking-wide">Official PDF</p>
-                        </div>
-                      </div>
-                      <Button size="icon" variant="ghost" className="h-7 w-7 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 shrink-0" asChild>
-                        <a href={doc.downloadURL} target="_blank" rel="noopener noreferrer">
-                          <Download className="h-3.5 w-3.5" />
-                        </a>
-                      </Button>
-                    </div>
-                  ))
-                ) : (
-                  <div className="p-8 text-center">
-                    <p className="text-xs text-slate-400">No official records published yet.</p>
-                  </div>
-                )}
-              </div>
-            </Card>
-          </section>
-
-          {/* Quick Help */}
-          <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <Info className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-xs font-bold text-emerald-800">Verification Notice</p>
-                <p className="text-[10px] text-emerald-600 mt-1 leading-relaxed">
-                  Generated documents include a digital seal for institutional verification. If you require a physical stamp, please visit the Registrar's Office.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Hidden Render Targets for PDF Generation */}
@@ -319,7 +296,7 @@ export default function DocumentsPage() {
           <PaymentReceipt ref={receiptRef} student={student} payment={activeReceipt} templateImageUrl={paymentReceiptTemplate} />
         )}
         {student && (
-          <ExamPass ref={examPassRef} student={student} program={{ name: student.appliedCourse, code: 'RTTC-01' }} templateImageUrl={examPassTemplate} />
+          <ExamPass ref={examPassRef} student={student} program={{ name: student.appliedCourse, code: 'RTTC-01' }} templateImageUrl={feeStructureTemplate || examPassTemplate} />
         )}
         {student && (
           <InternshipLetter ref={internshipLetterRef} student={student} program={{ name: student.appliedCourse, code: 'RTTC-01' }} templateImageUrl={internshipTemplate} />

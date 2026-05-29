@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -45,7 +45,9 @@ import {
   Users,
   Clock,
   IdCard,
-  User
+  User,
+  CreditCard,
+  UserPlus
 } from "lucide-react"
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, doc, serverTimestamp } from "firebase/firestore"
@@ -58,6 +60,14 @@ export default function AdmissionsPage() {
   const [isBulkOpen, setIsBulkOpen] = useState(false)
   const [bulkData, setBulkData] = useState("")
   const [currentStep, setCurrentStep] = useState(1)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash === '#new') {
+      setIsCreateOpen(true)
+      // Clean up the hash so it doesn't stay in the URL
+      window.history.replaceState(null, '', window.location.pathname)
+    }
+  }, [])
 
   // Enhanced Form Data
   const [formData, setFormData] = useState({
@@ -306,89 +316,111 @@ export default function AdmissionsPage() {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-10">
+    <div className="space-y-6 animate-in fade-in duration-500 pb-10">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">Admissions Hub</h1>
-          <p className="text-muted-foreground mt-1 font-medium">Manage the enrollment funnel for prospective scholars</p>
+          <p className="text-xs font-semibold text-emerald-600 uppercase tracking-widest mb-1">Admissions Management</p>
+          <h1 className="text-2xl font-bold text-slate-900">Admissions Hub</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Manage the enrollment funnel for prospective scholars</p>
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          <Button variant="outline" onClick={exportToCSV} disabled={filteredApplications.length === 0} className="rounded-full shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="outline" onClick={exportToCSV} disabled={filteredApplications.length === 0} className="border-slate-200 text-slate-700 hover:bg-slate-50 h-9 rounded-lg text-sm">
             <Download className="mr-2 h-4 w-4" /> Export CSV
           </Button>
 
           <Dialog open={isBulkOpen} onOpenChange={setIsBulkOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline" className="rounded-full shadow-sm">
-                <Upload className="mr-2 h-4 w-4" />Import Data
+              <Button variant="outline" className="border-slate-200 text-slate-700 hover:bg-slate-50 h-9 rounded-lg text-sm">
+                <Upload className="mr-2 h-4 w-4" />Import
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[600px] border-0 shadow-2xl rounded-2xl p-0 overflow-hidden">
-              <div className="bg-slate-50 p-6 border-b">
-                <DialogTitle className="text-xl font-bold text-slate-900">Bulk Import Applications</DialogTitle>
-                <DialogDescription className="mt-1.5">
+            <DialogContent className="sm:max-w-[600px] border border-slate-200 shadow-lg rounded-xl p-0 overflow-hidden">
+              <div className="bg-slate-50 p-6 border-b border-slate-100">
+                <DialogTitle className="text-lg font-bold text-slate-900">Bulk Import Applications</DialogTitle>
+                <DialogDescription className="mt-1.5 text-sm text-slate-500">
                   Paste comma-separated values (CSV format) below. <br />
                   Format: <span className="font-mono text-slate-700 bg-slate-200 px-1 py-0.5 rounded text-xs">FirstName, LastName, Email, Phone, Course</span>
                 </DialogDescription>
               </div>
               <div className="p-6 bg-white">
                 <textarea
-                  className="w-full h-48 p-4 text-sm font-mono border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none shadow-inner"
+                  className="w-full h-48 p-4 text-sm font-mono border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-none"
                   placeholder="John, Doe, john@example.com, 0712345678, Diploma in ICT&#10;Jane, Smith, jane@example.com, 0798765432, Web Design"
                   value={bulkData}
                   onChange={(e) => setBulkData(e.target.value)}
                 />
               </div>
               <DialogFooter className="p-6 pt-0 bg-white">
-                <Button onClick={handleBulkImport} className="w-full bg-slate-900 text-white rounded-xl h-11 font-bold hover:bg-slate-800">Start Import</Button>
+                <Button onClick={handleBulkImport} className="w-full bg-emerald-600 text-white rounded-lg h-10 font-medium hover:bg-emerald-700">Start Import</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
 
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-slate-900 hover:bg-slate-800 text-white shadow-lg rounded-full px-6 transition-all active:scale-95">
+              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm rounded-lg h-9 px-4 text-sm transition-all">
                 <Plus className="mr-2 h-4 w-4" /> New Application
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[550px] border-0 shadow-2xl rounded-2xl p-0 overflow-hidden">
-              <div className="bg-slate-50 p-6 border-b">
-                <DialogTitle className="text-xl font-bold text-slate-900">Application Entry</DialogTitle>
-                <DialogDescription className="mt-1.5 flex items-center justify-between">
-                  <span>Register New Student</span>
-                  <span className="font-bold text-blue-600">Step {currentStep} of 3</span>
-                </DialogDescription>
+            <DialogContent className="sm:max-w-[550px] border border-slate-200 shadow-2xl shadow-slate-900/10 rounded-2xl p-0 overflow-hidden">
+              <div className="bg-slate-50 p-6 pb-5 border-b border-slate-100">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center shrink-0 shadow-sm border border-emerald-200/50">
+                    <UserPlus className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-xl font-black text-slate-900 tracking-tight">New Scholar Application</DialogTitle>
+                    <DialogDescription className="text-xs text-slate-500 mt-0.5 font-medium">
+                      Register a new student into the admission funnel.
+                    </DialogDescription>
+                  </div>
+                </div>
 
-                {/* Progress Bar */}
-                <div className="mt-4 flex gap-2">
-                  <div className={`h-2 flex-1 rounded-full transition-all duration-500 ${currentStep >= 1 ? 'bg-blue-600' : 'bg-slate-200'}`} />
-                  <div className={`h-2 flex-1 rounded-full transition-all duration-500 ${currentStep >= 2 ? 'bg-blue-600' : 'bg-slate-200'}`} />
-                  <div className={`h-2 flex-1 rounded-full transition-all duration-500 ${currentStep >= 3 ? 'bg-blue-600' : 'bg-slate-200'}`} />
+                {/* Modern Stepper */}
+                <div className="mt-6 flex items-center justify-between relative px-2">
+                  <div className="absolute left-6 right-6 top-4 h-0.5 bg-slate-200 -z-10 rounded-full" />
+                  <div className="absolute left-6 top-4 h-0.5 bg-emerald-500 -z-10 rounded-full transition-all duration-500" style={{ width: `calc(${(currentStep - 1) * 50}% - 12px)` }} />
+                  
+                  {[
+                    { step: 1, label: 'Profile', icon: User },
+                    { step: 2, label: 'Academics', icon: BookOpen },
+                    { step: 3, label: 'Fees', icon: CreditCard }
+                  ].map(s => (
+                    <div key={s.step} className="flex flex-col items-center gap-2 bg-slate-50 relative z-10 px-2">
+                      <div className={`h-8 w-8 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${currentStep >= s.step ? 'bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20' : 'bg-white border-slate-200 text-slate-400'}`}>
+                        <s.icon className="h-4 w-4" />
+                      </div>
+                      <span className={`text-[10px] font-bold uppercase tracking-wider ${currentStep >= s.step ? 'text-emerald-700' : 'text-slate-400'}`}>{s.label}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              <div className="p-6 bg-white min-h-[380px]">
+              <div className="p-6 bg-white min-h-[360px]">
                 {currentStep === 1 && (
-                  <div className="space-y-5 animate-in slide-in-from-right-4 fade-in duration-300">
-                    <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight mb-2">1. Applicant Profile</h4>
-                    <div className="grid grid-cols-2 gap-5">
+                  <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-bold text-slate-900">Applicant Details</h4>
+                      <p className="text-xs text-slate-500 font-medium">Provide the student's personal information. National ID is required.</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="firstName" className="text-xs font-bold uppercase text-slate-500">First Name</Label>
-                        <Input id="firstName" value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} placeholder="e.g. Klein" className="h-11 bg-slate-50 border-slate-200" />
+                        <Label htmlFor="firstName" className="text-xs font-semibold text-slate-700">First Name</Label>
+                        <Input id="firstName" value={formData.firstName} onChange={(e) => setFormData({ ...formData, firstName: e.target.value })} placeholder="e.g. Klein" className="h-10 bg-slate-50/50 border-slate-200 focus-visible:ring-emerald-500" />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="lastName" className="text-xs font-bold uppercase text-slate-500">Last Name</Label>
-                        <Input id="lastName" value={formData.lastName} onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} placeholder="e.g. Koech" className="h-11 bg-slate-50 border-slate-200" />
+                        <Label htmlFor="lastName" className="text-xs font-semibold text-slate-700">Last Name</Label>
+                        <Input id="lastName" value={formData.lastName} onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} placeholder="e.g. Koech" className="h-10 bg-slate-50/50 border-slate-200 focus-visible:ring-emerald-500" />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-5">
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="gender" className="text-xs font-bold uppercase text-slate-500">Gender</Label>
+                        <Label htmlFor="gender" className="text-xs font-semibold text-slate-700">Gender</Label>
                         <Select onValueChange={(v) => setFormData({ ...formData, gender: v })} value={formData.gender}>
-                          <SelectTrigger className="h-11 bg-slate-50 border-slate-200">
+                          <SelectTrigger className="h-10 bg-slate-50/50 border-slate-200 focus:ring-emerald-500">
                             <SelectValue placeholder="Select gender" />
                           </SelectTrigger>
                           <SelectContent>
@@ -398,60 +430,63 @@ export default function AdmissionsPage() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="dob" className="text-xs font-bold uppercase text-slate-500">Date of Birth</Label>
-                        <Input id="dob" type="date" value={formData.dob} onChange={(e) => setFormData({ ...formData, dob: e.target.value })} className="h-11 bg-slate-50 border-slate-200" />
+                        <Label htmlFor="dob" className="text-xs font-semibold text-slate-700">Date of Birth</Label>
+                        <Input id="dob" type="date" value={formData.dob} onChange={(e) => setFormData({ ...formData, dob: e.target.value })} className="h-10 bg-slate-50/50 border-slate-200 focus-visible:ring-emerald-500" />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-5">
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="nationalId" className="text-xs font-bold uppercase text-slate-500">National ID / Passport <span className="text-rose-500">*</span></Label>
-                        <Input id="nationalId" value={formData.nationalId} onChange={(e) => setFormData({ ...formData, nationalId: e.target.value })} placeholder="Required" className="h-11 bg-slate-50 border-rose-100 focus-visible:ring-rose-500" />
+                        <Label htmlFor="nationalId" className="text-xs font-semibold text-slate-700">National ID / Passport <span className="text-rose-500">*</span></Label>
+                        <Input id="nationalId" value={formData.nationalId} onChange={(e) => setFormData({ ...formData, nationalId: e.target.value })} placeholder="Required" className="h-10 bg-slate-50/50 border-slate-200 focus-visible:ring-emerald-500" />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="phone" className="text-xs font-bold uppercase text-slate-500">Applicant Phone</Label>
-                        <Input id="phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="e.g. 0712345678" className="h-11 bg-slate-50 border-slate-200" />
+                        <Label htmlFor="phone" className="text-xs font-semibold text-slate-700">Applicant Phone</Label>
+                        <Input id="phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="e.g. 0712345678" className="h-10 bg-slate-50/50 border-slate-200 focus-visible:ring-emerald-500" />
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="email" className="text-xs font-bold uppercase text-slate-500">Email Address</Label>
-                      <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="applicant@example.com" className="h-11 bg-slate-50 border-slate-200" />
+                      <Label htmlFor="email" className="text-xs font-semibold text-slate-700">Email Address</Label>
+                      <Input id="email" type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="applicant@example.com" className="h-10 bg-slate-50/50 border-slate-200 focus-visible:ring-emerald-500" />
                     </div>
                   </div>
                 )}
 
                 {currentStep === 2 && (
-                  <div className="space-y-5 animate-in slide-in-from-right-4 fade-in duration-300">
-                    <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight mb-2">2. Guardian & Academics</h4>
+                  <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-bold text-slate-900">Guardian & Course Selection</h4>
+                      <p className="text-xs text-slate-500 font-medium">Emergency contacts and the intended program of study.</p>
+                    </div>
                     <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-5">
+                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="guardianName" className="text-xs font-bold uppercase text-slate-500">Guardian Name</Label>
-                          <Input id="guardianName" value={formData.guardianName} onChange={(e) => setFormData({ ...formData, guardianName: e.target.value })} placeholder="e.g. John Doe" className="h-11 bg-slate-50 border-slate-200" />
+                          <Label htmlFor="guardianName" className="text-xs font-semibold text-slate-700">Guardian Name</Label>
+                          <Input id="guardianName" value={formData.guardianName} onChange={(e) => setFormData({ ...formData, guardianName: e.target.value })} placeholder="e.g. John Doe" className="h-10 bg-slate-50/50 border-slate-200 focus-visible:ring-emerald-500" />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="guardianPhone" className="text-xs font-bold uppercase text-slate-500">Guardian Phone</Label>
-                          <Input id="guardianPhone" value={formData.guardianPhone} onChange={(e) => setFormData({ ...formData, guardianPhone: e.target.value })} placeholder="e.g. 0712345678" className="h-11 bg-slate-50 border-slate-200" />
+                          <Label htmlFor="guardianPhone" className="text-xs font-semibold text-slate-700">Guardian Phone</Label>
+                          <Input id="guardianPhone" value={formData.guardianPhone} onChange={(e) => setFormData({ ...formData, guardianPhone: e.target.value })} placeholder="e.g. 0712345678" className="h-10 bg-slate-50/50 border-slate-200 focus-visible:ring-emerald-500" />
                         </div>
                       </div>
 
-                      <div className="space-y-2 pt-4 border-t border-slate-100">
-                        <Label htmlFor="course" className="text-xs font-bold uppercase text-slate-500">Target Course</Label>
+                      <div className="space-y-2 pt-2">
+                        <Label htmlFor="course" className="text-xs font-semibold text-slate-700">Target Course</Label>
                         <Select onValueChange={(v) => setFormData({ ...formData, course: v })} value={formData.course}>
-                          <SelectTrigger className="h-12 bg-blue-50/50 border-blue-200">
+                          <SelectTrigger className="h-11 bg-emerald-50/30 border-slate-200 focus:ring-emerald-500 font-medium">
                             <SelectValue placeholder="Select intended program..." />
                           </SelectTrigger>
                           <SelectContent>
                             {isLoadingPrograms ? (
                               <div className="flex items-center justify-center py-4">
-                                <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                                <Loader2 className="h-4 w-4 animate-spin text-emerald-600" />
                               </div>
                             ) : (programs || []).length > 0 ? (
                               programs?.map((program) => (
                                 <SelectItem key={program.id} value={program.name}>
-                                  <div className="flex items-center gap-2 font-medium">
-                                    <BookOpen className="h-4 w-4 text-blue-500" />
+                                  <div className="flex items-center gap-2 text-sm font-medium">
+                                    <BookOpen className="h-4 w-4 text-emerald-600" />
                                     <span>{program.name}</span>
                                   </div>
                                 </SelectItem>
@@ -469,23 +504,26 @@ export default function AdmissionsPage() {
                 )}
 
                 {currentStep === 3 && (
-                  <div className="space-y-5 animate-in slide-in-from-right-4 fade-in duration-300">
-                    <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight mb-2">3. Upfront Application Fees</h4>
-                    <div className="space-y-4">
+                  <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-300">
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-bold text-slate-900">Initial Fees Collection</h4>
+                      <p className="text-xs text-slate-500 font-medium">Record upfront payments for admission and ID processing.</p>
+                    </div>
+                    <div className="bg-emerald-50/50 p-5 rounded-xl border border-emerald-100 space-y-5">
                       <div className="grid grid-cols-2 gap-5">
                         <div className="space-y-2">
-                          <Label htmlFor="admissionFee" className="text-xs font-bold uppercase text-slate-500">Admission Fee (KES)</Label>
-                          <Input id="admissionFee" type="number" value={formData.admissionFee} onChange={(e) => setFormData({ ...formData, admissionFee: e.target.value })} className="h-11 bg-emerald-50/50 border-emerald-200 font-bold" />
+                          <Label htmlFor="admissionFee" className="text-xs font-bold text-emerald-900">Admission Fee (KES)</Label>
+                          <Input id="admissionFee" type="number" value={formData.admissionFee} onChange={(e) => setFormData({ ...formData, admissionFee: e.target.value })} className="h-10 bg-white border-emerald-200 focus-visible:ring-emerald-500 font-mono text-sm shadow-sm" />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="idFee" className="text-xs font-bold uppercase text-slate-500">ID Card Fee (KES)</Label>
-                          <Input id="idFee" type="number" value={formData.idFee} onChange={(e) => setFormData({ ...formData, idFee: e.target.value })} className="h-11 bg-emerald-50/50 border-emerald-200 font-bold" />
+                          <Label htmlFor="idFee" className="text-xs font-bold text-emerald-900">ID Card Fee (KES)</Label>
+                          <Input id="idFee" type="number" value={formData.idFee} onChange={(e) => setFormData({ ...formData, idFee: e.target.value })} className="h-10 bg-white border-emerald-200 focus-visible:ring-emerald-500 font-mono text-sm shadow-sm" />
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="paymentMethod" className="text-xs font-bold uppercase text-slate-500">Payment Method</Label>
+                      <div className="space-y-2 pt-2 border-t border-emerald-100/50">
+                        <Label htmlFor="paymentMethod" className="text-xs font-bold text-emerald-900">Payment Method</Label>
                         <Select onValueChange={(v) => setFormData({ ...formData, paymentMethod: v })} value={formData.paymentMethod}>
-                          <SelectTrigger className="h-11 bg-slate-50 border-slate-200">
+                          <SelectTrigger className="h-10 bg-white border-emerald-200 focus:ring-emerald-500 shadow-sm">
                             <SelectValue placeholder="Select method" />
                           </SelectTrigger>
                           <SelectContent>
@@ -502,13 +540,13 @@ export default function AdmissionsPage() {
 
               <DialogFooter className="p-6 pt-0 bg-white flex flex-row items-center justify-between sm:justify-between w-full">
                 {currentStep > 1 ? (
-                  <Button variant="outline" onClick={() => setCurrentStep(prev => prev - 1)} className="h-11 px-6 rounded-xl font-bold">Back</Button>
+                  <Button variant="outline" onClick={() => setCurrentStep(prev => prev - 1)} className="h-11 px-6 rounded-xl text-sm border-slate-200 text-slate-700 hover:bg-slate-50 font-bold">Back</Button>
                 ) : <div />}
 
                 {currentStep < 3 ? (
-                  <Button onClick={() => setCurrentStep(prev => prev + 1)} className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl h-11 px-8 font-bold">Next Step</Button>
+                  <Button onClick={() => setCurrentStep(prev => prev + 1)} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-11 px-8 text-sm font-bold shadow-lg shadow-emerald-600/20">Next Step</Button>
                 ) : (
-                  <Button onClick={handleCreateApplication} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl h-11 px-8 font-bold shadow-md shadow-blue-600/20">
+                  <Button onClick={handleCreateApplication} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-11 px-8 text-sm font-bold shadow-lg shadow-emerald-600/20">
                     Submit Application
                   </Button>
                 )}
@@ -519,129 +557,136 @@ export default function AdmissionsPage() {
       </div>
 
       {/* KPI Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <Card className="border-0 shadow-sm ring-1 ring-slate-200 bg-amber-50/50 overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-4 opacity-10">
-            <Clock className="h-20 w-20 -mt-2 -mr-2 text-amber-900" />
-          </div>
-          <CardContent className="p-6">
-            <p className="text-xs font-bold uppercase tracking-wider text-amber-700 mb-1">Awaiting Review</p>
-            <div className="text-3xl font-black text-amber-950">{stats.pending}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-sm ring-1 ring-slate-200 bg-blue-50/50 overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-4 opacity-10">
-            <UserCheck className="h-20 w-20 -mt-2 -mr-2 text-blue-900" />
-          </div>
-          <CardContent className="p-6">
-            <p className="text-xs font-bold uppercase tracking-wider text-blue-700 mb-1">Admitted (Pending Enrollment)</p>
-            <div className="text-3xl font-black text-blue-950">{stats.admitted}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-sm ring-1 ring-slate-200 bg-emerald-50/50 overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-4 opacity-10">
-            <Users className="h-20 w-20 -mt-2 -mr-2 text-emerald-900" />
-          </div>
-          <CardContent className="p-6">
-            <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 mb-1">Total Enrolled</p>
-            <div className="text-3xl font-black text-emerald-950">{stats.enrolled}</div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {[
+          {
+            label: "Awaiting Review",
+            value: stats.pending,
+            icon: Clock,
+            color: "text-amber-600",
+            bg: "bg-amber-50"
+          },
+          {
+            label: "Admitted (Pending Enrollment)",
+            value: stats.admitted,
+            icon: UserCheck,
+            color: "text-blue-600",
+            bg: "bg-blue-50"
+          },
+          {
+            label: "Total Enrolled",
+            value: stats.enrolled,
+            icon: Users,
+            color: "text-emerald-600",
+            bg: "bg-emerald-50"
+          }
+        ].map((kpi, idx) => (
+          <Card key={idx} className="border border-slate-200 shadow-sm rounded-xl bg-white">
+            <CardContent className="p-4">
+               <div className="flex items-start justify-between gap-2 mb-2">
+                 <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${kpi.bg}`}>
+                   <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
+                 </div>
+                 <p className="text-xs text-slate-400 text-right leading-tight">{kpi.label}</p>
+               </div>
+               <p className={`text-2xl font-bold leading-tight text-slate-900`}>{kpi.value}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Main Content Area */}
-      <Card className="border-0 ring-1 ring-slate-200 shadow-sm overflow-hidden rounded-2xl bg-white">
-        <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <Card className="border border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <Tabs defaultValue="All" onValueChange={setActiveTab} className="w-full md:w-auto">
-            <TabsList className="bg-slate-200/50 p-1 h-10 rounded-full">
-              <TabsTrigger value="All" className="rounded-full px-4 text-xs font-bold data-[state=active]:bg-white data-[state=active]:shadow-sm">All Applicants</TabsTrigger>
-              <TabsTrigger value="Pending" className="rounded-full px-4 text-xs font-bold data-[state=active]:bg-amber-100 data-[state=active]:text-amber-800 data-[state=active]:shadow-sm">Pending Review</TabsTrigger>
-              <TabsTrigger value="Admitted" className="rounded-full px-4 text-xs font-bold data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800 data-[state=active]:shadow-sm">Admitted</TabsTrigger>
-              <TabsTrigger value="Rejected" className="rounded-full px-4 text-xs font-bold data-[state=active]:bg-rose-100 data-[state=active]:text-rose-800 data-[state=active]:shadow-sm">Rejected</TabsTrigger>
+            <TabsList className="bg-slate-100 p-1 h-auto min-h-9 rounded-lg flex-wrap">
+              <TabsTrigger value="All" className="rounded-md px-3 text-xs font-medium data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">All Applicants</TabsTrigger>
+              <TabsTrigger value="Pending" className="rounded-md px-3 text-xs font-medium data-[state=active]:bg-white data-[state=active]:text-amber-700 data-[state=active]:shadow-sm">Pending</TabsTrigger>
+              <TabsTrigger value="Admitted" className="rounded-md px-3 text-xs font-medium data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-sm">Admitted</TabsTrigger>
+              <TabsTrigger value="Rejected" className="rounded-md px-3 text-xs font-medium data-[state=active]:bg-white data-[state=active]:text-rose-700 data-[state=active]:shadow-sm">Rejected</TabsTrigger>
             </TabsList>
           </Tabs>
 
           <div className="relative w-full md:w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
-              placeholder="Search by name, email or course..."
-              className="pl-9 h-10 bg-white border-slate-200 rounded-full text-sm focus-visible:ring-slate-300"
+              placeholder="Search applications..."
+              className="pl-9 h-9 border-slate-200 rounded-lg text-sm focus-visible:ring-emerald-500"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
         </div>
 
-        <CardContent className="p-0">
+        <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="bg-white hover:bg-white border-slate-100">
-                <TableHead className="font-bold text-slate-500 h-12 w-[80px] pl-6">ID</TableHead>
-                <TableHead className="font-bold text-slate-500 h-12">Applicant Profile</TableHead>
-                <TableHead className="font-bold text-slate-500 h-12">Intended Program</TableHead>
-                <TableHead className="font-bold text-slate-500 h-12">Status</TableHead>
-                <TableHead className="text-right font-bold text-slate-500 h-12 pr-6">Action</TableHead>
+              <TableRow className="hover:bg-transparent border-slate-100 bg-slate-50/50">
+                <TableHead className="font-semibold text-slate-500 h-10 text-xs pl-5">ID</TableHead>
+                <TableHead className="font-semibold text-slate-500 h-10 text-xs">Applicant Profile</TableHead>
+                <TableHead className="font-semibold text-slate-500 h-10 text-xs">Intended Program</TableHead>
+                <TableHead className="font-semibold text-slate-500 h-10 text-xs">Status</TableHead>
+                <TableHead className="text-right font-semibold text-slate-500 h-10 text-xs pr-5">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-64 text-center">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-slate-300" />
-                    <p className="mt-2 text-sm text-slate-500 font-medium">Fetching applications...</p>
+                  <TableCell colSpan={5} className="h-48 text-center">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-emerald-600 mb-2" />
+                    <p className="text-sm text-slate-500">Fetching applications...</p>
                   </TableCell>
                 </TableRow>
               ) : filteredApplications.length > 0 ? (
                 filteredApplications.map((app) => (
-                  <TableRow key={app.id} className="hover:bg-slate-50/80 transition-colors border-slate-100 group">
-                    <TableCell className="pl-6 py-4">
-                      <span className="font-mono text-[10px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded uppercase">
+                  <TableRow key={app.id} className="hover:bg-slate-50/80 transition-colors border-slate-100">
+                    <TableCell className="pl-5 py-3">
+                      <span className="font-mono text-xs font-medium text-slate-500">
                         #{app.id.substring(0, 5)}
                       </span>
                     </TableCell>
-                    <TableCell className="py-4">
+                    <TableCell className="py-3">
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-600 font-bold text-sm ring-1 ring-slate-200/50">
+                        <div className="h-9 w-9 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-700 font-semibold text-sm">
                           {app.firstName[0]}{app.lastName[0]}
                         </div>
                         <div className="flex flex-col">
-                          <span className="font-bold text-slate-900">{app.firstName} {app.lastName}</span>
-                          <span className="text-[11px] text-slate-500 font-medium">{app.contactEmail} {app.contactPhone && `• ${app.contactPhone}`}</span>
+                          <span className="font-semibold text-sm text-slate-900">{app.firstName} {app.lastName}</span>
+                          <span className="text-xs text-slate-500">{app.contactEmail} {app.contactPhone && `• ${app.contactPhone}`}</span>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="py-4">
-                      <div className="flex items-center text-sm font-semibold text-slate-700">
-                        <BookOpen className="h-3.5 w-3.5 mr-1.5 text-slate-400" />
+                    <TableCell className="py-3">
+                      <div className="flex items-center text-sm font-medium text-slate-700">
+                        <BookOpen className="h-3.5 w-3.5 mr-2 text-slate-400" />
                         {app.appliedCourse || 'General'}
                       </div>
                     </TableCell>
-                    <TableCell className="py-4">
-                      <Badge variant="outline" className={`border-0 font-bold text-[10px] uppercase tracking-wider px-2 py-0.5 ${app.admissionStatus === "Admitted" ? "bg-blue-100 text-blue-700" :
-                        app.admissionStatus === "Pending" ? "bg-amber-100 text-amber-700" :
-                          app.admissionStatus === "Rejected" ? "bg-rose-100 text-rose-700" :
-                            "bg-slate-100 text-slate-700"
-                        }`}>
+                    <TableCell className="py-3">
+                      <Badge variant="outline" className={`border-0 font-semibold text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                        app.admissionStatus === "Admitted" ? "bg-blue-50 text-blue-700" :
+                        app.admissionStatus === "Pending" ? "bg-amber-50 text-amber-700" :
+                        app.admissionStatus === "Rejected" ? "bg-rose-50 text-rose-700" :
+                        "bg-slate-100 text-slate-700"
+                      }`}>
                         {app.admissionStatus}
                       </Badge>
-                      <div className="text-[10px] text-slate-400 font-medium mt-1">
+                      <div className="text-[11px] text-slate-400 mt-1">
                         Applied: {app.admissionDate}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right pr-6 py-4">
-                      <div className="flex justify-end gap-2 opacity-100 transition-opacity">
+                    <TableCell className="text-right pr-5 py-3">
+                      <div className="flex justify-end gap-2">
                         {app.admissionStatus === "Pending" && (
                           <>
                             <Button
-                              size="sm" className="h-8 bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 font-bold px-3 border-0"
+                              size="sm" className="h-8 bg-blue-50 text-blue-700 hover:bg-blue-100 font-medium px-3 text-xs border-0 rounded-md"
                               onClick={() => handleStatusUpdate(app.id, "Admitted")}
                             >
-                              <UserCheck className="h-4 w-4 mr-1" /> Offer Admission
+                              <UserCheck className="h-3.5 w-3.5 mr-1.5" /> Admit
                             </Button>
                             <Button
-                              size="sm" variant="ghost" className="h-8 text-rose-500 hover:bg-rose-50 hover:text-rose-600 px-2"
+                              size="sm" variant="ghost" className="h-8 text-rose-500 hover:bg-rose-50 hover:text-rose-600 px-2 rounded-md"
                               onClick={() => handleStatusUpdate(app.id, "Rejected")}
                               title="Reject Application"
                             >
@@ -651,18 +696,18 @@ export default function AdmissionsPage() {
                         )}
                         {app.admissionStatus === "Admitted" && (
                           <Button
-                            size="sm" className="h-8 bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-4 shadow-sm"
+                            size="sm" className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 text-xs rounded-md shadow-sm"
                             onClick={() => handleStatusUpdate(app.id, "Enrolled")}
                           >
-                            <CheckCircle2 className="h-4 w-4 mr-1" /> Finalize Enrollment
+                            <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Finalize
                           </Button>
                         )}
                         {app.admissionStatus === "Rejected" && (
                           <Button
-                            size="sm" variant="ghost" className="h-8 text-slate-400 hover:bg-slate-100 hover:text-slate-600 px-3 text-xs font-bold"
+                            size="sm" variant="outline" className="h-8 border-slate-200 text-slate-600 hover:bg-slate-50 px-3 text-xs font-medium rounded-md"
                             onClick={() => handleStatusUpdate(app.id, "Pending")}
                           >
-                            Revert Status
+                            Revert
                           </Button>
                         )}
                       </div>
@@ -671,14 +716,12 @@ export default function AdmissionsPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-48 text-center text-slate-500">
-                    <div className="flex flex-col items-center justify-center space-y-3">
-                      <div className="h-12 w-12 rounded-full bg-slate-50 flex items-center justify-center">
-                        <Users className="h-5 w-5 text-slate-400" />
-                      </div>
-                      <p className="text-sm font-medium">No applications found in this category.</p>
+                  <TableCell colSpan={5} className="h-32 text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <Users className="h-6 w-6 text-slate-300 mb-2" />
+                      <p className="text-sm text-slate-500">No applications found.</p>
                       {activeTab !== "All" && (
-                        <Button variant="link" size="sm" onClick={() => setActiveTab("All")} className="text-blue-600">
+                        <Button variant="link" size="sm" onClick={() => setActiveTab("All")} className="text-emerald-600 p-0 h-auto mt-1 text-xs">
                           Clear filters
                         </Button>
                       )}
@@ -688,7 +731,7 @@ export default function AdmissionsPage() {
               )}
             </TableBody>
           </Table>
-        </CardContent>
+        </div>
       </Card>
     </div>
   )

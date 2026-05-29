@@ -8,19 +8,81 @@ import { Card, CardContent } from "@/components/ui/card"
 import {
   BookOpen, FileText, Download, GraduationCap, Clock, Loader2,
   FileSpreadsheet, CheckCircle2, PlusCircle, UploadCloud, FileUp,
-  Send, AlertCircle, Video, BookMarked
+  Send, AlertCircle, Video, BookMarked, ExternalLink, PlayCircle, FileSearch
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger
 } from "@/components/ui/dialog"
+import { useRouter } from "next/navigation"
 
+// ── Resource Viewer Dialog ────────────────────────────────────────────────────
+function ResourceDialog({
+  open,
+  onClose,
+  title,
+  icon: Icon,
+  resources,
+}: {
+  open: boolean
+  onClose: () => void
+  title: string
+  icon: React.ElementType
+  resources: any[]
+}) {
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-[480px] rounded-xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base font-bold">
+            <Icon className="h-4 w-4 text-emerald-600" />
+            {title}
+          </DialogTitle>
+          <DialogDescription className="text-sm text-slate-500">
+            Uploaded materials for your course.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2 py-2 max-h-80 overflow-y-auto">
+          {resources.length === 0 ? (
+            <div className="py-12 text-center text-slate-400 flex flex-col items-center gap-2">
+              <FileSearch className="h-8 w-8 text-slate-200" />
+              <p className="text-sm font-medium">No materials uploaded yet.</p>
+              <p className="text-xs">Check back later or contact your instructor.</p>
+            </div>
+          ) : (
+            resources.map((res) => (
+              <a
+                key={res.id}
+                href={res.fileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all group"
+              >
+                <div className="h-9 w-9 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0 text-emerald-600">
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-900 truncate">{res.title}</p>
+                  <p className="text-xs text-slate-400 truncate">{res.fileName || res.type}</p>
+                </div>
+                <ExternalLink className="h-3.5 w-3.5 text-slate-300 group-hover:text-emerald-500 shrink-0 transition-colors" />
+              </a>
+            ))
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
 export default function AcademicsPage() {
   const { user } = useUser()
   const firestore = useFirestore()
   const storage = useStorage()
   const { toast } = useToast()
+  const router = useRouter()
 
   const [isStudentLoading, setIsStudentLoading] = useState(true)
   const [student, setStudent] = useState<any>(null)
@@ -28,6 +90,10 @@ export default function AcademicsPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false)
   const [targetUnit, setTargetUnit] = useState<any>(null)
+
+  // Resource viewer state
+  const [notesDialog, setNotesDialog] = useState<{ open: boolean; unitName: string }>({ open: false, unitName: "" })
+  const [videosDialog, setVideosDialog] = useState<{ open: boolean; unitName: string }>({ open: false, unitName: "" })
 
   useEffect(() => {
     async function fetchStudent() {
@@ -142,8 +208,30 @@ export default function AcademicsPage() {
     ? Math.round((registrations || []).reduce((s, r) => s + (r.progress || 0), 0) / totalUnits)
     : 0
 
+  // Filtered resource helpers
+  const notesResources = (resources || []).filter(r => r.type === "Notes" || r.type === "Reference")
+  const videoResources = (resources || []).filter(r => r.type === "Video")
+
   return (
     <div className="space-y-6 pb-10">
+      {/* Notes Dialog */}
+      <ResourceDialog
+        open={notesDialog.open}
+        onClose={() => setNotesDialog({ open: false, unitName: "" })}
+        title={`Lecture Notes${notesDialog.unitName ? ` — ${notesDialog.unitName}` : ""}`}
+        icon={FileText}
+        resources={notesResources}
+      />
+
+      {/* Videos Dialog */}
+      <ResourceDialog
+        open={videosDialog.open}
+        onClose={() => setVideosDialog({ open: false, unitName: "" })}
+        title={`Video Resources${videosDialog.unitName ? ` — ${videosDialog.unitName}` : ""}`}
+        icon={PlayCircle}
+        resources={videoResources}
+      />
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
         <div>
@@ -197,11 +285,8 @@ export default function AcademicsPage() {
                   const submission = (studentSubmissions || []).find(s => s.unitId === reg.unitId)
                   const isGraded = submission?.status === 'Graded'
                   return (
-                    <div
-                      key={reg.id}
-                      className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-sm transition-all"
-                    >
-                      {/* Unit header row */}
+                    <div key={reg.id} className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-sm transition-all">
+                      {/* Unit header */}
                       <div className="flex items-start justify-between gap-3 mb-3">
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
@@ -226,14 +311,11 @@ export default function AcademicsPage() {
                           <span className="text-emerald-600">{reg.progress || 0}%</span>
                         </div>
                         <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                          <div
-                            className="h-full bg-emerald-500 rounded-full transition-all"
-                            style={{ width: `${reg.progress || 0}%` }}
-                          />
+                          <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${reg.progress || 0}%` }} />
                         </div>
                       </div>
 
-                      {/* Assignment submission status */}
+                      {/* Submission status */}
                       {submission && (
                         <div className={`rounded-lg px-3 py-2 mb-3 flex items-center gap-2 ${
                           isGraded ? 'bg-emerald-50 border border-emerald-100' : 'bg-amber-50 border border-amber-100'
@@ -255,6 +337,7 @@ export default function AcademicsPage() {
 
                       {/* Actions */}
                       <div className="flex gap-2 flex-wrap">
+                        {/* Submit Work */}
                         <Dialog open={submitDialogOpen && targetUnit?.id === reg.id} onOpenChange={(open) => {
                           setSubmitDialogOpen(open)
                           if (open) { setTargetUnit(reg); setSelectedFile(null) }
@@ -295,11 +378,35 @@ export default function AcademicsPage() {
                             </DialogFooter>
                           </DialogContent>
                         </Dialog>
-                        <Button size="sm" variant="ghost" className="h-8 text-xs text-slate-500 hover:bg-slate-100">
+
+                        {/* Notes — opens resource dialog filtered to Notes */}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 text-xs text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                          onClick={() => setNotesDialog({ open: true, unitName: reg.unitName })}
+                        >
                           <FileText className="h-3 w-3 mr-1.5" /> Notes
+                          {notesResources.length > 0 && (
+                            <span className="ml-1.5 bg-emerald-100 text-emerald-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                              {notesResources.length}
+                            </span>
+                          )}
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-8 text-xs text-slate-500 hover:bg-slate-100">
+
+                        {/* Videos — opens resource dialog filtered to Videos */}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 text-xs text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                          onClick={() => setVideosDialog({ open: true, unitName: reg.unitName })}
+                        >
                           <Video className="h-3 w-3 mr-1.5" /> Videos
+                          {videoResources.length > 0 && (
+                            <span className="ml-1.5 bg-blue-100 text-blue-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full">
+                              {videoResources.length}
+                            </span>
+                          )}
                         </Button>
                       </div>
                     </div>
@@ -367,9 +474,12 @@ export default function AcademicsPage() {
                       className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors group"
                     >
                       <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
-                        res.type === 'Assignment' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'
+                        res.type === 'Assignment' ? 'bg-amber-50 text-amber-600' :
+                        res.type === 'Video' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'
                       }`}>
-                        {res.type === 'Assignment' ? <FileSpreadsheet className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+                        {res.type === 'Assignment' ? <FileSpreadsheet className="h-4 w-4" /> :
+                         res.type === 'Video' ? <PlayCircle className="h-4 w-4" /> :
+                         <FileText className="h-4 w-4" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-900 truncate leading-tight">{res.title}</p>
@@ -392,7 +502,11 @@ export default function AcademicsPage() {
           <div className="bg-emerald-600 rounded-xl p-5 text-white">
             <h4 className="text-sm font-bold mb-1">Academic Support</h4>
             <p className="text-xs text-emerald-50 leading-relaxed mb-4">Need help with your units? Our instructors are available to assist.</p>
-            <Button size="sm" className="w-full bg-white text-emerald-700 hover:bg-emerald-50 text-xs font-semibold h-9 rounded-lg">
+            <Button
+              size="sm"
+              className="w-full bg-white text-emerald-700 hover:bg-emerald-50 text-xs font-semibold h-9 rounded-lg"
+              onClick={() => router.push("/portal/support")}
+            >
               Open Support Ticket
             </Button>
           </div>

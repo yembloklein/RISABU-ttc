@@ -11,7 +11,7 @@ import {
 } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
 import { Button } from "@/components/ui/button"
-import { AdmissionLetter } from "@/components/admission-letter"
+import { AdmissionLetter } from "@/components/documents/admission-letter"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
 import { toast } from "@/hooks/use-toast"
@@ -133,7 +133,11 @@ export default function StudentDashboard() {
 
   if (!student) return null
 
-  const letterUrl = studentSpecificOfficialLetter?.downloadURL || officialAdmissionLetter?.downloadURL || customAdmissionLetter?.downloadURL
+  const specificLetterUrl = studentSpecificOfficialLetter?.downloadURL || customAdmissionLetter?.downloadURL
+  const templateLetterUrl = officialAdmissionLetter?.downloadURL
+  
+  // For the generator component background
+  const letterUrl = specificLetterUrl || templateLetterUrl
 
   return (
     <div className="space-y-6 pb-10">
@@ -146,14 +150,14 @@ export default function StudentDashboard() {
         </div>
 
         {(student.admissionStatus === "Enrolled" || student.admissionNumber) && (
-          letterUrl ? (
+          specificLetterUrl ? (
             <Button asChild className="bg-emerald-600 hover:bg-emerald-700 text-white h-9 text-sm shrink-0">
-              <a href={letterUrl} target="_blank" rel="noopener noreferrer">
+              <a href={specificLetterUrl} target="_blank" rel="noopener noreferrer">
                 <Download className="h-4 w-4 mr-2" /> Download Admission Letter
               </a>
             </Button>
           ) : (
-            <Button onClick={handleDownloadLetter} disabled={isGenerating} variant="outline" className="h-9 text-sm shrink-0 border-slate-200">
+            <Button onClick={handleDownloadLetter} disabled={isGenerating} variant={templateLetterUrl ? "default" : "outline"} className={`h-9 text-sm shrink-0 ${templateLetterUrl ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'border-slate-200'}`}>
               {isGenerating ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
               Download Admission Letter
             </Button>

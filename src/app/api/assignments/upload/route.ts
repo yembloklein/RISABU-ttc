@@ -14,6 +14,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
+    // Sanitize parameters to prevent path traversal
+    if (
+      studentId.includes('..') || studentId.includes('/') || studentId.includes('\\') ||
+      unitId.includes('..') || unitId.includes('/') || unitId.includes('\\')
+    ) {
+      return NextResponse.json({ error: "Invalid parameters" }, { status: 400 });
+    }
+
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
 
@@ -25,8 +33,14 @@ export async function POST(request: NextRequest) {
       await mkdir(uploadDir, { recursive: true });
     } catch (e) {}
 
-    // Generate a filename: studentId_timestamp_originalName
-    const safeName = file.name.replace(/\s+/g, '_');
+    // Generate a filename safely, stripping any directory markers
+    const rawSafeName = file.name.replace(/\s+/g, '_');
+    const safeName = join('/', rawSafeName).substring(1); // strips path markers
+    
+    if (safeName.includes('..')) {
+      return NextResponse.json({ error: "Invalid filename" }, { status: 400 });
+    }
+
     const filename = `${studentId}_${Date.now()}_${safeName}`;
     const path = join(uploadDir, filename);
 

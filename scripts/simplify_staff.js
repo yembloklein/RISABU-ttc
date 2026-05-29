@@ -1,313 +1,14 @@
-"use client"
+const fs = require('fs');
+const path = require('path');
 
-import { useState, useMemo, useEffect, useRef } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Label } from "@/components/ui/label"
-import { 
-  Search, 
-  ShieldCheck, 
-  Mail, 
-  UserCog, 
-  Loader2, 
-  MoreVertical, 
-  ShieldAlert,
-  Trash2,
-  Lock,
-  CheckCircle2,
-  Plus,
-  Briefcase,
-  Phone,
-  Download,
-  AlertCircle,
-  LayoutGrid,
-  List,
-  Users
-} from "lucide-react"
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from "@/components/ui/table"
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuLabel, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
-} from "@/components/ui/dropdown-menu"
-import { Edit2 } from "lucide-react"
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
-} from "@/components/ui/dialog"
-import { 
-  Sheet, 
-  SheetContent, 
-  SheetDescription, 
-  SheetHeader, 
-  SheetTitle 
-} from "@/components/ui/sheet"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useFirestore, useCollection, useMemoFirebase, setDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from "@/firebase"
-import { collection, doc, serverTimestamp, getDoc } from "firebase/firestore"
-import { toast } from "@/hooks/use-toast"
+const filePath = path.join(process.cwd(), 'src', 'app', '(admin)', 'staff', 'page.tsx');
+let code = fs.readFileSync(filePath, 'utf8');
 
-const DEPARTMENTS = [
-  "Administration",
-  "Registrar",
-  "Finance",
-  "ICT & Computing",
-  "Engineering",
-  "Business Studies",
-  "Hospitality",
-  "Security",
-  "Maintenance"
-]
+const returnMatch = code.indexOf('return (');
 
-export default function StaffPage() {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [formData, setFormData] = useState<any>({ 
-    role: "Staff", 
-    department: "Administration",
-    employeeId: "",
-    status: "Active",
-    joinDate: "",
-    qualifications: "",
-    bio: "",
-    specialization: "",
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    password: ""
-  })
-  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null)
-  const [isEditOpen, setIsEditOpen] = useState(false)
-  const [isViewOpen, setIsViewOpen] = useState(false)
-  
-  const firestore = useFirestore()
-  const { user } = useUser()
-  const [isStaff, setIsStaff] = useState(false)
-  const checkedRef = useRef(false)
+let topPart = code.substring(0, returnMatch);
 
-  // Gate the `users` list query behind a role check to prevent permission
-  // errors when a student is temporarily in the admin layout during redirect.
-  useEffect(() => {
-    if (!user || !firestore || checkedRef.current) return
-    checkedRef.current = true
-    const verify = async () => {
-      const adminSnap = await getDoc(doc(firestore, "roles_admin", user.uid)).catch(() => null)
-      if (adminSnap?.exists()) { setIsStaff(true); return }
-      const staffSnap = await getDoc(doc(firestore, "roles_staff", user.uid)).catch(() => null)
-      if (staffSnap?.exists()) setIsStaff(true)
-    }
-    verify()
-  }, [user, firestore])
-
-  const usersRef = useMemoFirebase(() => {
-    if (!firestore || !user || !isStaff) return null;
-    return collection(firestore, "users");
-  }, [firestore, user, isStaff]);
-
-  const { data: users, isLoading } = useCollection(usersRef);
-
-  const activeStaff = useMemo(() => {
-    return (users || []).find(u => u.id === selectedStaffId) || null;
-  }, [users, selectedStaffId]);
-
-  const currentUserRecord = useMemo(() => {
-    return (users || []).find(u => u.id === user?.uid);
-  }, [users, user]);
-
-  const isAuthorizedToManage = currentUserRecord?.role === "Admin" || user?.email === "clainyemblo@gmail.com";
-
-  const filteredStaff = useMemo(() => {
-    return (users || []).filter(u => {
-      const searchStr = `${u.firstName} ${u.lastName} ${u.email} ${u.department} ${u.employeeId}`.toLowerCase()
-      return searchStr.includes(searchTerm.toLowerCase());
-    }).sort((a, b) => (a.role === "Admin" ? -1 : 1));
-  }, [users, searchTerm]);
-
-  const handleAddEmployee = async () => {
-    if (!firestore || !isAuthorizedToManage) return;
-    
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
-      toast({ title: "Error", description: "Please fill in all required fields, including a password.", variant: "destructive" });
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      toast({ title: "Error", description: "Password must be at least 6 characters long.", variant: "destructive" });
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const { initializeApp } = await import('firebase/app');
-      const { getAuth, createUserWithEmailAndPassword, signOut } = await import('firebase/auth');
-      const { firebaseConfig } = await import('@/firebase/config');
-      
-      const secondaryApp = initializeApp(firebaseConfig, `SecondaryApp-${Date.now()}`);
-      const secondaryAuth = getAuth(secondaryApp);
-      
-      const userCredential = await createUserWithEmailAndPassword(secondaryAuth, formData.email, formData.password);
-      const newUserId = userCredential.user.uid;
-      
-      await signOut(secondaryAuth);
-      
-      const employeeId = `RTTC/STF/${Math.floor(1000 + Math.random() * 9000)}`;
-      const userDocRef = doc(firestore, "users", newUserId);
-
-      setDocumentNonBlocking(userDocRef, {
-        id: newUserId,
-        employeeId,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        email: formData.email,
-        phone: formData.phone,
-        role: formData.role,
-        department: formData.department,
-        status: "Active",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-
-      toast({ title: "Employee Added", description: `${formData.firstName} has been registered and can now log in.` });
-      setIsCreateOpen(false);
-      setFormData({ firstName: "", lastName: "", email: "", phone: "", password: "", role: "Staff", department: "Administration", status: "Active", joinDate: "", qualifications: "", bio: "", specialization: "", employeeId: "" });
-    } catch (error: any) {
-      console.error("Error registering employee:", error);
-      toast({ title: "Registration Failed", description: error.message, variant: "destructive" });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleUpdateStaff = () => {
-    if (!firestore || !isAuthorizedToManage || !activeStaff) return;
-    
-    const docRef = doc(firestore, "users", activeStaff.id);
-    updateDocumentNonBlocking(docRef, {
-      firstName: formData.firstName,
-      lastName: formData.lastName,
-      email: formData.email,
-      phone: formData.phone,
-      department: formData.department,
-      role: formData.role,
-      joinDate: formData.joinDate || "",
-      qualifications: formData.qualifications || "",
-      bio: formData.bio || "",
-      specialization: formData.specialization || "",
-      updatedAt: serverTimestamp(),
-    });
-
-    toast({ title: "Profile Updated", description: "Record has been saved successfully." });
-    setIsEditOpen(false);
-  };
-
-  const handleOpenEdit = (staff: any) => {
-    setSelectedStaffId(staff.id);
-    setFormData({
-      firstName: staff.firstName || "",
-      lastName: staff.lastName || "",
-      email: staff.email || "",
-      phone: staff.phone || "",
-      role: staff.role || "Staff",
-      department: staff.department || "Administration",
-      employeeId: staff.employeeId || "",
-      status: staff.status || "Active",
-      joinDate: staff.joinDate || "",
-      qualifications: staff.qualifications || "",
-      bio: staff.bio || "",
-      specialization: staff.specialization || ""
-    });
-    setIsEditOpen(true);
-  };
-
-
-  const handleUpdateRole = (userId: string, newRole: string) => {
-    if (!firestore || !isAuthorizedToManage) return;
-    const docRef = doc(firestore, "users", userId);
-    updateDocumentNonBlocking(docRef, {
-      role: newRole,
-      updatedAt: serverTimestamp(),
-    });
-    toast({
-      title: "Role Updated",
-      description: `User role changed to ${newRole}.`,
-    });
-  };
-
-  const handleDeleteUser = (userId: string) => {
-    if (!firestore || !isAuthorizedToManage) return;
-    if (confirm("Are you sure you want to remove this employee record?")) {
-      deleteDocumentNonBlocking(doc(firestore, "users", userId));
-      toast({
-        title: "User Removed",
-        description: "The employee record has been removed.",
-      });
-    }
-  };
-
-  const exportToCSV = () => {
-    if (!filteredStaff.length) return;
-    
-    const headers = ["ID", "First Name", "Last Name", "Email", "Phone", "Role", "Department"];
-    const rows = filteredStaff.map(staff => [
-      staff.id,
-      staff.firstName,
-      staff.lastName,
-      staff.email,
-      staff.phone || "N/A",
-      staff.role || "Staff",
-      staff.department || "N/A"
-    ]);
-
-    const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute("download", `staff_directory_export_${new Date().toISOString().split('T')[0]}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    toast({
-      title: "Export Complete",
-      description: "Employee directory has been exported to CSV."
-    });
-  };
-
-
-  const stats = useMemo(() => {
-    return {
-      total: (users || []).length,
-      active: (users || []).filter(u => u.status !== 'Suspended').length,
-      admins: (users || []).filter(u => u.role === 'Admin').length,
-      departments: new Set((users || []).map(u => u.department).filter(Boolean)).size
-    }
-  }, [users])
-
-  return (
+const newJSX = `  return (
     <div className="space-y-6 pb-10">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -343,7 +44,7 @@ export default function StaffPage() {
         ].map((stat, i) => (
           <Card key={i} className="border border-slate-200 shadow-sm rounded-xl bg-white">
             <CardContent className="p-4 flex items-center gap-4">
-              <div className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${stat.bg} ${stat.color}`}>
+              <div className={\`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 \${stat.bg} \${stat.color}\`}>
                 <stat.icon className="h-5 w-5" />
               </div>
               <div>
@@ -358,10 +59,10 @@ export default function StaffPage() {
       {/* Control Bar */}
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-2 rounded-xl shadow-sm border border-slate-200">
         <div className="flex items-center bg-slate-100 p-1 rounded-lg w-full md:w-auto">
-          <Button variant="ghost" size="sm" className={`h-8 px-4 rounded-md text-xs font-medium transition-all ${viewMode === 'grid' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`} onClick={() => setViewMode('grid')}>
+          <Button variant="ghost" size="sm" className={\`h-8 px-4 rounded-md text-xs font-medium transition-all \${viewMode === 'grid' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}\`} onClick={() => setViewMode('grid')}>
             <LayoutGrid className="mr-2 h-3.5 w-3.5" /> Grid
           </Button>
-          <Button variant="ghost" size="sm" className={`h-8 px-4 rounded-md text-xs font-medium transition-all ${viewMode === 'list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`} onClick={() => setViewMode('list')}>
+          <Button variant="ghost" size="sm" className={\`h-8 px-4 rounded-md text-xs font-medium transition-all \${viewMode === 'list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}\`} onClick={() => setViewMode('list')}>
             <List className="mr-2 h-3.5 w-3.5" /> List
           </Button>
         </div>
@@ -396,7 +97,7 @@ export default function StaffPage() {
                   
                   <div className="flex flex-col items-center text-center">
                     <Avatar className="h-16 w-16 mb-3">
-                      <AvatarFallback className={`text-lg font-bold ${staff.role === 'Admin' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
+                      <AvatarFallback className={\`text-lg font-bold \${staff.role === 'Admin' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}\`}>
                         {staff.firstName?.[0]}{staff.lastName?.[0]}
                       </AvatarFallback>
                     </Avatar>
@@ -460,7 +161,7 @@ export default function StaffPage() {
                       <TableCell className="py-3 pl-4">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-8 w-8">
-                            <AvatarFallback className={`text-xs font-bold ${staff.role === 'Admin' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
+                            <AvatarFallback className={\`text-xs font-bold \${staff.role === 'Admin' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'}\`}>
                               {staff.firstName?.[0]}{staff.lastName?.[0]}
                             </AvatarFallback>
                           </Avatar>
@@ -474,12 +175,12 @@ export default function StaffPage() {
                         <span className="text-sm text-slate-700">{staff.department || "General"}</span>
                       </TableCell>
                       <TableCell className="py-3">
-                        <Badge variant="secondary" className={`rounded-md px-2 py-0.5 text-[10px] font-medium ${staff.role === "Admin" ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'}`}>
+                        <Badge variant="secondary" className={\`rounded-md px-2 py-0.5 text-[10px] font-medium \${staff.role === "Admin" ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-700'}\`}>
                           {staff.role}
                         </Badge>
                       </TableCell>
                       <TableCell className="py-3">
-                        <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-medium ${staff.status === 'Suspended' ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
+                        <div className={\`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-medium \${staff.status === 'Suspended' ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}\`}>
                           {staff.status === 'Suspended' ? 'Suspended' : 'Active'}
                         </div>
                       </TableCell>
@@ -630,19 +331,13 @@ export default function StaffPage() {
                 <Input id="lName" className="h-10" value={formData.lastName} onChange={(e) => setFormData({...formData, lastName: e.target.value})} placeholder="Doe" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="email" className="text-xs font-medium text-slate-700">Work Email</Label>
-                <Input id="email" type="email" className="h-10" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="j.doe@risabu.ac.ke" />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="phone" className="text-xs font-medium text-slate-700">Phone Number</Label>
-                <Input id="phone" className="h-10" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} placeholder="+254..." />
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="email" className="text-xs font-medium text-slate-700">Work Email</Label>
+              <Input id="email" type="email" className="h-10" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="j.doe@risabu.ac.ke" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-xs font-medium text-slate-700">Account Password</Label>
-              <Input id="password" type="password" className="h-10" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} placeholder="Secure password for login" />
+              <Label htmlFor="phone" className="text-xs font-medium text-slate-700">Phone Number</Label>
+              <Input id="phone" className="h-10" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} placeholder="+254..." />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
@@ -671,8 +366,8 @@ export default function StaffPage() {
                 </Select>
               </div>
             </div>
-            <Button onClick={handleAddEmployee} disabled={isSubmitting} className="w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg mt-2">
-              {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Registering...</> : "Complete Registration"}
+            <Button onClick={handleAddEmployee} className="w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg mt-2">
+              Complete Registration
             </Button>
           </div>
         </DialogContent>
@@ -749,3 +444,8 @@ export default function StaffPage() {
     </div>
   )
 }
+`;
+
+const finalContent = topPart + newJSX;
+fs.writeFileSync(filePath, finalContent, 'utf8');
+console.log('Successfully simplified file content');

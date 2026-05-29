@@ -579,7 +579,7 @@ export default function FeesPage() {
       {/* Main Table Section */}
       <Tabs defaultValue="balances" className="w-full">
         <div className="flex items-center justify-between mb-4">
-          <TabsList className="bg-slate-100 p-1 h-10 rounded-lg">
+          <TabsList className="bg-slate-100 p-1 h-auto min-h-10 rounded-lg flex-wrap">
             <TabsTrigger value="balances" className="rounded-md px-4 text-xs font-semibold h-full data-[state=active]:bg-white data-[state=active]:shadow-sm">Student Balances</TabsTrigger>
             <TabsTrigger value="ledger" className="rounded-md px-4 text-xs font-semibold h-full data-[state=active]:bg-white data-[state=active]:shadow-sm">Transactions Ledger</TabsTrigger>
           </TabsList>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { unlink } from 'fs/promises';
-import { join } from 'path';
+import { join, basename } from 'path';
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,9 +10,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file URL provided" }, { status: 400 });
     }
 
-    // Extract the filename from the URL
-    const filename = fileUrl.split('/').pop();
-    if (!filename) {
+    // Extract only the filename to prevent directory traversal
+    const filename = basename(fileUrl);
+    if (!filename || filename.includes('..') || filename === '/' || filename === '\\') {
       return NextResponse.json({ error: "Invalid file URL" }, { status: 400 });
     }
 

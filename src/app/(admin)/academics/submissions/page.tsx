@@ -32,7 +32,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 
-import { Search, Download, CheckCircle, Clock, Loader2, FileText, User, GraduationCap, Filter, Trash2 } from "lucide-react"
+import { Search, Download, CheckCircle, Clock, Loader2, FileText, User, GraduationCap, Filter, Trash2, BookOpen } from "lucide-react"
 
 import { ref, deleteObject } from "firebase/storage"
 import { useFirestore, useCollection, useMemoFirebase, useUser, useStorage, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase"
@@ -51,8 +51,6 @@ export default function SubmissionsPage() {
   const firestore = useFirestore()
   const storage = useStorage()
   const { user } = useUser()
-
-
 
   // 1. Fetch Submissions
   const subsRef = useMemoFirebase(() => (firestore && user) ? query(collection(firestore, "submissions"), orderBy("submittedAt", "desc")) : null, [firestore, user])
@@ -107,8 +105,6 @@ export default function SubmissionsPage() {
     }
   }
 
-
-
   const handleDeleteSubmission = async (submission: any) => {
     if (!firestore || !storage || !confirm("Are you sure you want to permanently delete this submission and its file?")) return
     
@@ -136,32 +132,31 @@ export default function SubmissionsPage() {
     }
   }
 
-
-
   return (
     <div className="space-y-6 pb-10 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 uppercase">Student Submissions</h1>
-          <p className="text-slate-500 font-medium">Review and manage student assignment uploads</p>
+          <p className="text-xs font-semibold text-emerald-600 uppercase tracking-widest mb-1">Academic Submissions</p>
+          <h1 className="text-2xl font-bold text-slate-900">Student Submissions</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Review, grade, and manage student assignment uploads.</p>
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4">
+      <div className="flex flex-col md:flex-row gap-3 bg-slate-50/50 p-1.5 rounded-xl border border-slate-200">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input 
             placeholder="Search student, unit or email..." 
-            className="pl-10 h-12 rounded-xl bg-white border-slate-200 shadow-sm"
+            className="pl-9 h-10 rounded-lg bg-white border-slate-200 shadow-sm text-sm focus-visible:ring-emerald-500"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
         <div className="w-full md:w-64">
           <Select value={selectedUnit} onValueChange={setSelectedUnit}>
-            <SelectTrigger className="h-12 rounded-xl bg-white border-slate-200 shadow-sm">
+            <SelectTrigger className="h-10 rounded-lg bg-white border-slate-200 shadow-sm text-sm">
               <div className="flex items-center gap-2">
-                <Filter className="h-4 w-4 text-slate-400" />
+                <BookOpen className="h-3.5 w-3.5 text-slate-400" />
                 <SelectValue placeholder="Filter by Unit" />
               </div>
             </SelectTrigger>
@@ -175,67 +170,67 @@ export default function SubmissionsPage() {
         </div>
       </div>
 
-      <Card className="border-0 shadow-sm ring-1 ring-slate-200 overflow-hidden rounded-2xl bg-white">
+      <Card className="border border-slate-200 shadow-sm overflow-hidden rounded-xl bg-white">
         <CardContent className="p-0">
           <Table>
             <TableHeader className="bg-slate-50/50">
-              <TableRow className="border-slate-100">
-                <TableHead className="font-bold text-slate-500 h-12 uppercase text-[11px] tracking-wider pl-6">Student</TableHead>
-                <TableHead className="font-bold text-slate-500 h-12 uppercase text-[11px] tracking-wider">Unit</TableHead>
-                <TableHead className="font-bold text-slate-500 h-12 uppercase text-[11px] tracking-wider">Assignment File</TableHead>
-                <TableHead className="font-bold text-slate-500 h-12 uppercase text-[11px] tracking-wider text-center">Status</TableHead>
-                <TableHead className="font-bold text-slate-500 h-12 uppercase text-[11px] tracking-wider text-right pr-6">Action</TableHead>
+              <TableRow className="border-slate-100 hover:bg-transparent">
+                <TableHead className="font-semibold text-slate-500 h-10 text-xs pl-5">Student</TableHead>
+                <TableHead className="font-semibold text-slate-500 h-10 text-xs">Unit</TableHead>
+                <TableHead className="font-semibold text-slate-500 h-10 text-xs">Assignment File</TableHead>
+                <TableHead className="font-semibold text-slate-500 h-10 text-xs text-center w-[120px]">Status</TableHead>
+                <TableHead className="font-semibold text-slate-500 h-10 text-xs text-right pr-5 w-[140px]">Action</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loadingSubs ? (
                 <TableRow>
                   <TableCell colSpan={5} className="h-64 text-center">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-slate-200" />
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-emerald-600" />
                   </TableCell>
                 </TableRow>
               ) : filteredSubs.length > 0 ? (
                 filteredSubs.map((sub) => (
-                  <TableRow key={sub.id} className="hover:bg-slate-50/30 transition-colors border-slate-100">
-                    <TableCell className="py-4 pl-6">
+                  <TableRow key={sub.id} className="hover:bg-slate-50/80 transition-colors border-slate-100">
+                    <TableCell className="py-3 pl-5">
                       <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-                          <User className="h-5 w-5" />
+                        <div className="h-8 w-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+                          <User className="h-4 w-4" />
                         </div>
                         <div className="flex flex-col">
-                          <span className="font-bold text-slate-900">{sub.studentName}</span>
-                          <span className="text-[10px] font-medium text-slate-400 uppercase tracking-tight">{sub.studentEmail}</span>
+                          <span className="font-semibold text-slate-900 text-sm">{sub.studentName}</span>
+                          <span className="text-[10px] font-medium text-slate-500">{sub.studentEmail}</span>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="py-4">
+                    <TableCell className="py-3">
                       <div className="flex flex-col">
-                        <span className="text-xs font-bold text-slate-700">{sub.unitName}</span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{sub.unitCode}</span>
+                        <span className="text-xs font-semibold text-slate-800">{sub.unitName}</span>
+                        <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-tighter mt-0.5">{sub.unitCode}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="py-4">
+                    <TableCell className="py-3">
                       <a 
                         href={sub.fileUrl} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-blue-600 hover:text-blue-700 transition-colors group"
+                        className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-2 py-1 rounded-md transition-colors group"
                       >
-                        <FileText className="h-4 w-4" />
-                        <span className="text-xs font-bold underline underline-offset-4 decoration-blue-200 group-hover:decoration-blue-400 line-clamp-1 max-w-[150px]">
+                        <FileText className="h-4 w-4 shrink-0" />
+                        <span className="text-xs font-medium underline underline-offset-4 decoration-blue-200 group-hover:decoration-blue-400 line-clamp-1 max-w-[150px]">
                           {sub.fileName}
                         </span>
                       </a>
                     </TableCell>
-                    <TableCell className="py-4 text-center">
-                      <Badge className={`border-0 font-bold uppercase text-[9px] px-2 py-0.5 shadow-none ${
-                        sub.status === 'Graded' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                    <TableCell className="py-3 text-center">
+                      <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                        sub.status === 'Graded' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
                       }`}>
                         {sub.status || 'Pending'}
-                      </Badge>
+                      </span>
                     </TableCell>
-                    <TableCell className="py-4 text-right pr-6">
-                      <div className="flex justify-end gap-2">
+                    <TableCell className="py-3 text-right pr-5">
+                      <div className="flex items-center justify-end gap-1">
                         {sub.status !== 'Graded' && (
                           <Dialog open={isFeedbackDialogOpen && activeSub?.id === sub.id} onOpenChange={(open) => {
                             setIsFeedbackDialogOpen(open)
@@ -245,42 +240,41 @@ export default function SubmissionsPage() {
                               <Button 
                                 variant="outline" 
                                 size="sm" 
-                                className="h-8 rounded-lg text-[10px] font-bold border-emerald-100 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+                                className="h-7 rounded-md text-[10px] font-semibold border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 transition-colors"
                               >
-                                <CheckCircle className="h-3 w-3 mr-1" /> Mark Graded
+                                <CheckCircle className="h-3 w-3 mr-1.5" /> Grade
                               </Button>
                             </DialogTrigger>
-                            <DialogContent>
+                            <DialogContent className="sm:max-w-[425px] border border-slate-200 shadow-lg rounded-xl">
                               <DialogHeader>
-                                <DialogTitle>Provide Feedback</DialogTitle>
-                                <DialogDescription>
-                                  Add a note for {sub.studentName} regarding their submission for {sub.unitName}.
+                                <DialogTitle className="text-lg font-bold text-slate-900">Provide Feedback</DialogTitle>
+                                <DialogDescription className="text-sm text-slate-500 mt-1">
+                                  Add an optional note for <strong>{sub.studentName}</strong> regarding their submission for {sub.unitName}.
                                 </DialogDescription>
                               </DialogHeader>
                               <div className="py-4 space-y-2">
-                                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Instructor Note</Label>
+                                <Label className="text-xs font-medium text-slate-700">Instructor Note (Optional)</Label>
                                 <Textarea 
                                   placeholder="e.g. Great work on the typography! Next time, focus more on..." 
                                   value={feedbackNote}
                                   onChange={(e) => setFeedbackNote(e.target.value)}
-                                  className="min-h-[120px]"
+                                  className="min-h-[120px] rounded-lg border-slate-200 focus-visible:ring-emerald-500"
                                 />
                               </div>
-                              <DialogFooter>
+                              <DialogFooter className="bg-slate-50 p-4 -mx-6 -mb-6 border-t border-slate-100 mt-2">
                                 <Button 
-                                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                                  className="w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg shadow-sm"
                                   onClick={() => handleUpdateStatus(sub, 'Graded', feedbackNote)}
                                 >
-                                  Finalize & Send Feedback
+                                  Finalize & Mark Graded
                                 </Button>
                               </DialogFooter>
-
                             </DialogContent>
                           </Dialog>
                         )}
 
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg text-slate-400 hover:text-rose-600" onClick={() => handleDeleteSubmission(sub)}>
-                          <Trash2 className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleDeleteSubmission(sub)}>
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </TableCell>
@@ -289,8 +283,11 @@ export default function SubmissionsPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-48 text-center text-slate-400 italic">
-                    No submissions found matching your search.
+                  <TableCell colSpan={5} className="h-48 text-center text-slate-400 text-sm italic">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <FileText className="h-8 w-8 text-slate-200" />
+                      <p>No submissions found matching your search.</p>
+                    </div>
                   </TableCell>
                 </TableRow>
               )}

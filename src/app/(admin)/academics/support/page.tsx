@@ -14,8 +14,8 @@ import {
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Logo } from "@/components/ui/logo"
-import { Search, MessageSquare, CheckCircle2, Loader2, Send, User, Filter, AlertCircle, Clock, Inbox, MailOpen } from "lucide-react"
-import { useFirestore, useCollection, useMemoFirebase, useUser, updateDocumentNonBlocking } from "@/firebase"
+import { Search, MessageSquare, CheckCircle2, Loader2, Send, User, Filter, AlertCircle, Clock, Inbox, MailOpen, Trash2 } from "lucide-react"
+import { useFirestore, useCollection, useMemoFirebase, useUser, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase"
 import { collection, query, orderBy, doc, addDoc, serverTimestamp, arrayUnion } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
 import { formatDistanceToNow } from "date-fns"
@@ -119,6 +119,18 @@ export default function AdminSupportPage() {
     }
   }
 
+  const handleDeleteTicket = () => {
+    if (!firestore || !activeTicket || !confirm("Are you sure you want to permanently delete this support ticket?")) return
+    try {
+      const ticketRef = doc(firestore, "tickets", activeTicket.id)
+      deleteDocumentNonBlocking(ticketRef)
+      toast({ title: "Deleted", description: "The support ticket has been removed." })
+      setActiveTicketId(null)
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" })
+    }
+  }
+
   return (
     <div className="h-[calc(100vh-8rem)] flex flex-col space-y-4 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 shrink-0">
@@ -164,7 +176,7 @@ export default function AdminSupportPage() {
             <div className="flex-1 overflow-y-auto overflow-x-hidden">
               {loadingTickets ? (
                 <div className="flex justify-center items-center h-32">
-                  <Loader2 className="h-6 w-6 animate-spin text-slate-300" />
+                  <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
                 </div>
               ) : filteredTickets.length > 0 ? (
                 <div className="divide-y divide-slate-100">
@@ -172,7 +184,7 @@ export default function AdminSupportPage() {
                     <button
                       key={ticket.id}
                       onClick={() => setActiveTicketId(ticket.id)}
-                      className={`w-full text-left p-4 transition-all hover:bg-slate-50 focus:outline-none ${activeTicketId === ticket.id ? 'bg-primary/5 border-l-4 border-primary' : 'border-l-4 border-transparent'}`}
+                      className={`w-full text-left p-4 transition-all hover:bg-slate-50 focus:outline-none ${activeTicketId === ticket.id ? 'bg-emerald-50/50 border-l-4 border-emerald-500' : 'border-l-4 border-transparent'}`}
                     >
                       <div className="flex justify-between items-start mb-2">
                         <span className="font-bold text-slate-900 text-sm truncate pr-2">{ticket.studentName}</span>
@@ -180,7 +192,7 @@ export default function AdminSupportPage() {
                           {ticket.updatedAt?.seconds ? formatDistanceToNow(ticket.updatedAt.seconds * 1000, { addSuffix: true }) : 'Now'}
                         </span>
                       </div>
-                      <h4 className={`text-xs font-semibold mb-1 truncate ${activeTicketId === ticket.id ? 'text-primary' : 'text-slate-700'}`}>
+                      <h4 className={`text-xs font-semibold mb-1 truncate ${activeTicketId === ticket.id ? 'text-emerald-700' : 'text-slate-700'}`}>
                         {ticket.title}
                       </h4>
                       <p className="text-[11px] text-slate-500 line-clamp-2 mb-3 leading-relaxed">
@@ -236,57 +248,81 @@ export default function AdminSupportPage() {
                   </div>
                 </div>
                 
-                {activeTicket.status !== 'Closed' && (
+                <div className="flex items-center gap-2">
+                  {activeTicket.status !== 'Closed' && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="h-9 rounded-xl text-xs font-bold text-slate-600 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-colors"
+                      onClick={handleCloseTicket}
+                    >
+                      <CheckCircle2 className="h-4 w-4 mr-2" /> Mark Resolved
+                    </Button>
+                  )}
                   <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="h-9 rounded-xl text-xs font-bold text-slate-600 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-colors"
-                    onClick={handleCloseTicket}
+                    variant="ghost" 
+                    size="icon"
+                    className="h-9 w-9 rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                    onClick={handleDeleteTicket}
                   >
-                    <CheckCircle2 className="h-4 w-4 mr-2" /> Mark Resolved
+                    <Trash2 className="h-4 w-4" />
                   </Button>
-                )}
+                </div>
               </div>
 
               {/* Chat Thread */}
               <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/50 flex flex-col gap-6">
                 {/* Original Message */}
-                <div className="flex gap-4 max-w-[85%]">
-                  <div className="h-8 w-8 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
+                <div className="flex gap-4 max-w-[85%] self-start">
+                  <div className="h-8 w-8 rounded-full bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-sm">
                     <span className="text-xs font-bold text-slate-500">{activeTicket.studentName?.[0]}</span>
                   </div>
-                  <div className="space-y-1">
+                  <div className="space-y-1 flex flex-col items-start">
                     <div className="flex items-baseline gap-2">
                       <span className="text-sm font-bold text-slate-900">{activeTicket.studentName}</span>
                       <span className="text-[10px] font-bold text-slate-400">
                         {activeTicket.createdAt?.seconds ? formatDistanceToNow(activeTicket.createdAt.seconds * 1000, { addSuffix: true }) : 'Recently'}
                       </span>
                     </div>
-                    <div className="bg-white border border-slate-200 p-4 rounded-2xl rounded-tl-sm shadow-sm">
-                      <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{activeTicket.message}</p>
+                    <div className="bg-white border border-slate-200 p-4 rounded-2xl rounded-tl-sm shadow-sm text-slate-700">
+                      <p className="text-sm whitespace-pre-wrap leading-relaxed">{activeTicket.message}</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Responses */}
-                {activeTicket.responses?.map((resp: any, idx: number) => (
-                  <div key={idx} className="flex gap-4 max-w-[85%] self-end flex-row-reverse">
-                    <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center shrink-0 shadow-md">
-                      <Logo size={16} className="text-white brightness-0 invert" />
-                    </div>
-                    <div className="space-y-1 flex flex-col items-end">
-                      <div className="flex items-baseline gap-2 flex-row-reverse">
-                        <span className="text-sm font-bold text-slate-900">Support Team</span>
-                        <span className="text-[10px] font-bold text-slate-400">
-                          {resp.createdAt?.seconds ? formatDistanceToNow(resp.createdAt.seconds * 1000, { addSuffix: true }) : 'Recently'}
-                        </span>
+                {activeTicket.responses?.map((resp: any, idx: number) => {
+                  const isAdmin = resp.author === "Admin"
+                  return (
+                    <div key={idx} className={`flex gap-4 max-w-[85%] ${isAdmin ? 'self-end flex-row-reverse' : 'self-start'}`}>
+                      {isAdmin ? (
+                        <div className="h-8 w-8 rounded-full bg-emerald-600 flex items-center justify-center shrink-0 shadow-md">
+                          <Logo size={16} className="text-white brightness-0 invert" />
+                        </div>
+                      ) : (
+                        <div className="h-8 w-8 rounded-full bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-sm">
+                          <span className="text-xs font-bold text-slate-500">{activeTicket.studentName?.[0]}</span>
+                        </div>
+                      )}
+                      
+                      <div className={`space-y-1 flex flex-col ${isAdmin ? 'items-end' : 'items-start'}`}>
+                        <div className={`flex items-baseline gap-2 ${isAdmin ? 'flex-row-reverse' : ''}`}>
+                          <span className="text-sm font-bold text-slate-900">{isAdmin ? 'Support Team' : activeTicket.studentName}</span>
+                          <span className="text-[10px] font-bold text-slate-400">
+                            {resp.createdAt?.seconds ? formatDistanceToNow(resp.createdAt.seconds * 1000, { addSuffix: true }) : 'Recently'}
+                          </span>
+                        </div>
+                        <div className={`p-4 shadow-sm ${
+                          isAdmin 
+                            ? 'bg-emerald-600 text-white rounded-2xl rounded-tr-sm shadow-md' 
+                            : 'bg-white border border-slate-200 rounded-2xl rounded-tl-sm text-slate-700'
+                        }`}>
+                          <p className="text-sm whitespace-pre-wrap leading-relaxed">{resp.message}</p>
+                        </div>
                       </div>
-                      <div className="bg-primary text-primary-foreground p-4 rounded-2xl rounded-tr-sm shadow-md">
-                        <p className="text-sm whitespace-pre-wrap leading-relaxed">{resp.message}</p>
-                      </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
 
               {/* Reply Box */}
@@ -295,7 +331,7 @@ export default function AdminSupportPage() {
                   <div className="flex gap-3">
                     <Textarea 
                       placeholder="Type your reply to the student..." 
-                      className="min-h-[80px] resize-none rounded-xl bg-slate-50 border-slate-200 focus-visible:ring-primary/20 text-sm p-3"
+                      className="min-h-[80px] resize-none rounded-xl bg-slate-50 border-slate-200 focus-visible:ring-emerald-500/20 text-sm p-3"
                       value={replyMessage}
                       onChange={(e) => setReplyMessage(e.target.value)}
                       onKeyDown={(e) => {
@@ -306,7 +342,7 @@ export default function AdminSupportPage() {
                       }}
                     />
                     <Button 
-                      className="h-auto w-14 shrink-0 rounded-xl bg-primary hover:bg-primary/90 shadow-md"
+                      className="h-auto w-14 shrink-0 rounded-xl bg-emerald-600 hover:bg-emerald-700 shadow-md"
                       onClick={handleSendReply}
                       disabled={!replyMessage.trim()}
                     >

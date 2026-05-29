@@ -34,6 +34,7 @@ export const AdmissionLetter = React.forwardRef<HTMLDivElement, AdmissionLetterP
   if (templateImageUrl) {
     return (
       <div ref={ref} className="relative w-[793px] h-[1122px] mx-auto bg-white overflow-hidden text-slate-900 font-serif print:m-0">
+        {/* Letterhead Background */}
         <img 
           src={templateImageUrl} 
           alt="Official Template" 
@@ -41,36 +42,86 @@ export const AdmissionLetter = React.forwardRef<HTMLDivElement, AdmissionLetterP
           crossOrigin="anonymous"
         />
         
-        <div className="absolute z-10 top-[28%] left-[12%] right-[12%] text-lg leading-relaxed text-slate-800">
-          <div className="flex justify-between items-end mb-8">
+        {/* 
+          Letter Content Container 
+          Positioned using exact pixels for a 793x1122 A4 page.
+          Top: 260px (Leaves ample room for school header)
+          Left/Right: 85px (Standard 1-inch margins)
+          Bottom: 100px (Leaves room for footer)
+        */}
+        <div className="absolute z-10 text-[15px] leading-[1.6] text-slate-800 flex flex-col" style={{ top: '260px', left: '85px', right: '85px', bottom: '100px' }}>
+          
+          <div className="flex justify-between items-end mb-10">
             <div>
-              <p className="font-bold">Ref: {student.admissionNumber || 'RTTC/ADM/TEMP'}</p>
+              <p className="font-bold text-slate-900 tracking-wide">REF: {student.admissionNumber || 'RTTC/ADM/TEMP'}</p>
             </div>
             <div>
-              <p className="font-bold">Date: {today}</p>
+              <p className="font-bold text-slate-900 tracking-wide">DATE: {today}</p>
             </div>
           </div>
           
-          <p className="font-bold text-xl mb-6">Dear {student.firstName} {student.lastName},</p>
+          <p className="font-bold text-[17px] mb-6 text-slate-900">Dear {student.firstName} {student.lastName},</p>
           
-          <p className="mb-6">
-            On behalf of the Board of Governors and the Academic Board, I am delighted to offer you admission to 
-            <strong> Risabu Technical Training College</strong>.
-          </p>
+          <div className="space-y-5 flex-1 text-justify">
+            <p>
+              Congratulations! We are pleased to inform you that you have been offered admission to 
+              <strong className="text-slate-900 font-bold"> Risabu Technical Training College</strong>.
+            </p>
 
-          <p className="mb-6">
-            You have been selected to pursue <strong>{student.appliedCourse || program?.name || program?.code}</strong>. Your performance 
-            and application demonstrated a commitment to excellence that aligns with our college values.
-          </p>
+            <p>
+              You have been selected to pursue <strong className="text-slate-900 font-bold">{student.appliedCourse || program?.name || 'your chosen program'}</strong>. 
+              Your application and academic record demonstrated a commitment to excellence that aligns perfectly with our institutional values.
+            </p>
 
-          <p className="mb-6">
-            You are required to report for orientation and registration on <strong>{student.admissionDate || today}</strong>. 
-            Please ensure you bring your original academic certificates and your national ID ({student.nationalId || 'Verified'}).
-          </p>
-          
-          <p className="mb-12">
-            Congratulations on your admission, and we look forward to seeing you excel in your chosen field of study.
-          </p>
+            {/* Admission Details Table */}
+            <div className="my-8">
+              <h3 className="font-bold text-slate-900 mb-2 uppercase text-sm tracking-widest text-center">Admission Details</h3>
+              <div className="border-t-2 border-b-2 border-slate-800 py-3 bg-slate-50/50">
+                <table className="w-full text-sm">
+                  <tbody>
+                    <tr className="border-b border-slate-200">
+                      <td className="py-2.5 font-bold text-slate-700 w-2/5 pl-2">Admitted Program:</td>
+                      <td className="py-2.5 font-bold text-slate-900">{student.appliedCourse || program?.name || 'General'}</td>
+                    </tr>
+                    <tr className="border-b border-slate-200">
+                      <td className="py-2.5 font-bold text-slate-700 w-2/5 pl-2">Intake Period:</td>
+                      <td className="py-2.5 font-bold text-slate-900">May 2026 Intake</td>
+                    </tr>
+                    <tr className="border-b border-slate-200">
+                      <td className="py-2.5 font-bold text-slate-700 w-2/5 pl-2">Reporting Date:</td>
+                      <td className="py-2.5 font-bold text-slate-900">{student.admissionDate || today}</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2.5 font-bold text-slate-700 w-2/5 pl-2">Student ID:</td>
+                      <td className="py-2.5 font-bold text-slate-900">{student.admissionNumber || 'Pending Registration'}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <p>
+              You are required to report for orientation and registration on the date indicated above. 
+              Please ensure you bring your original academic certificates, your national ID, and the required fee payment as outlined in the fee structure.
+            </p>
+            
+            <p>
+              We look forward to welcoming you to our vibrant academic community and seeing you excel in your chosen field of study.
+            </p>
+          </div>
+
+          {/* Signatures */}
+          <div className="mt-4 pt-4">
+            <p className="mb-10">Yours Sincerely,</p>
+            <div className="h-12 w-56 border-b border-slate-800 relative mb-2">
+              {/* Fake signature placeholder */}
+              <svg className="absolute bottom-1 left-2 h-16 w-32 text-slate-800 opacity-60" viewBox="0 0 100 40" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10 20c10-15 20 10 30-5s20 15 30-5 20 15 25 5" />
+              </svg>
+            </div>
+            <p className="font-bold text-slate-900 uppercase text-xs tracking-widest mt-3">Office of the Registrar</p>
+            <p className="text-[11px] text-slate-600 uppercase">Risabu Technical Training College</p>
+          </div>
         </div>
       </div>
     );
@@ -167,7 +218,7 @@ export const AdmissionLetter = React.forwardRef<HTMLDivElement, AdmissionLetterP
           <p className="font-bold text-slate-900">Dear {student.firstName},</p>
           
           <p>
-            On behalf of the Board of Governors and the Academic Board, I am delighted to offer you admission to 
+            Congratulations! I am delighted to offer you admission to 
             <strong> Risabu Technical Training College</strong> for the 2026 Academic Year.
           </p>
 

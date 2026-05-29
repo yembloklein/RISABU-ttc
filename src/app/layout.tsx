@@ -9,6 +9,10 @@ const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' });
 export const metadata: Metadata = {
   title: 'Risabu Connect ERP',
   description: 'Enterprise Resource Planning for Risabu Technical Training College',
+  icons: {
+    icon: '/risabuu.png',
+    apple: '/risabuu.png',
+  },
 };
 
 export default function RootLayout({

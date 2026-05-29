@@ -15,9 +15,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid path traversal attempt" }, { status: 400 });
     }
 
-    // Normalize and restrict target to the submissions folder only
+    // Normalize and restrict target to the school_documents folder only
     const relativePath = fileUrl.startsWith('/') ? fileUrl.substring(1) : fileUrl;
-    if (!relativePath.startsWith('submissions/')) {
+    if (!relativePath.startsWith('school_documents/')) {
       return NextResponse.json({ error: "Access denied to target directory" }, { status: 403 });
     }
 
@@ -27,12 +27,12 @@ export async function POST(request: NextRequest) {
     try {
       await unlink(path);
     } catch (e) {
-      console.warn("Assignment file already deleted or not found on disk:", path);
+      console.warn("File already deleted or not found on disk:", path);
     }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error("Assignment Delete API error:", error);
+    console.error("School Documents Delete API error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

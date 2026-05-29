@@ -25,16 +25,17 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { BookOpen, FileText, Upload, Trash2, Loader2, Download, Search, Plus, FileSpreadsheet } from "lucide-react"
-import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from "@/firebase"
+import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, useUser, useStorage } from "@/firebase"
 import { collection, doc, serverTimestamp } from "firebase/firestore"
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage"
 import { toast } from "@/hooks/use-toast"
-
 
 export default function AcademicResourcesPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [file, setFile] = useState<File | null>(null)
+  const [progress, setProgress] = useState(0)
   
   const [formData, setFormData] = useState({
     title: "",
@@ -43,8 +44,8 @@ export default function AcademicResourcesPage() {
   })
 
   const firestore = useFirestore()
+  const storage = useStorage()
   const { user } = useUser()
-
 
   const resourcesRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "academic_resources") : null, [firestore, user])
   const coursesRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "programs") : null, [firestore, user])
@@ -66,41 +67,44 @@ export default function AcademicResourcesPage() {
   }
 
   const handleUpload = async () => {
-    if (!file || !formData.title || !formData.courseName || !resourcesRef) {
+    if (!file || !formData.title || !formData.courseName || !resourcesRef || !storage) {
       toast({ title: "Missing Fields", description: "Please fill all fields and select a file.", variant: "destructive" })
       return
     }
 
     setIsUploading(true)
+    setProgress(0)
     try {
-      // 1. Upload to local API
-      const uploadFormData = new FormData();
-      uploadFormData.append('file', file);
+      const storagePath = `academic_resources/${formData.courseName}/${Date.now()}_${file.name}`
+      const storageRef = ref(storage, storagePath)
+      const uploadTask = uploadBytesResumable(storageRef, file)
 
-      const response = await fetch('/api/resources/upload', {
-        method: 'POST',
-        body: uploadFormData,
-      });
+      await new Promise<void>((resolve, reject) => {
+        uploadTask.on("state_changed", 
+          (snap) => setProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
+          (err) => reject(err),
+          () => resolve()
+        )
+      })
 
-      const uploadResult = await response.json();
+      const downloadURL = await getDownloadURL(uploadTask.snapshot.ref)
 
-      if (!response.ok) throw new Error(uploadResult.error || "Upload failed");
-
-      // 2. Save metadata to Firestore
       await addDocumentNonBlocking(resourcesRef, {
         title: formData.title,
         type: formData.type,
         courseName: formData.courseName,
         fileName: file.name,
-        fileUrl: uploadResult.fileUrl, // Relative local URL
-        uploadedBy: user?.email,
+        fileUrl: downloadURL,
+        storagePath: storagePath,
+        uploadedBy: user?.email || "Admin",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })
 
-      toast({ title: "Success", description: "Resource uploaded successfully (Local storage)." })
+      toast({ title: "Success", description: "Resource uploaded securely to Firebase Storage." })
       setIsDialogOpen(false)
       setFile(null)
+      setProgress(0)
       setFormData({ title: "", type: "Notes", courseName: "" })
     } catch (error: any) {
       console.error("Upload error:", error)
@@ -114,16 +118,10 @@ export default function AcademicResourcesPage() {
     if (!confirm("Are you sure you want to delete this resource?") || !firestore) return
 
     try {
-      // 1. Delete from local filesystem via API
-      if (resource.fileUrl) {
-        await fetch('/api/resources/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileUrl: resource.fileUrl }),
-        });
+      if (resource.storagePath && storage) {
+        await deleteObject(ref(storage, resource.storagePath)).catch(e => console.error("Error deleting from storage:", e));
       }
       
-      // 2. Delete from Firestore
       const docRef = doc(firestore, "academic_resources", resource.id)
       deleteDocumentNonBlocking(docRef)
       
@@ -133,45 +131,45 @@ export default function AcademicResourcesPage() {
     }
   }
 
-
   return (
     <div className="space-y-6 pb-10 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 uppercase">Academic Resources</h1>
-          <p className="text-slate-500 font-medium">Manage assignments and lecture notes for all courses</p>
+          <p className="text-xs font-semibold text-emerald-600 uppercase tracking-widest mb-1">Course Materials</p>
+          <h1 className="text-2xl font-bold text-slate-900">Academic Resources</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Manage assignments and lecture notes for all courses.</p>
         </div>
 
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button className="bg-slate-900 hover:bg-slate-800 text-white shadow-lg rounded-full h-11 px-6 transition-all active:scale-95">
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm rounded-lg h-10 px-6 transition-all">
               <Plus className="mr-2 h-4 w-4" /> Upload Material
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden border-0 shadow-2xl rounded-2xl">
-            <div className="bg-slate-50 p-6 border-b">
-              <DialogTitle className="text-xl font-bold text-slate-900">Upload New Material</DialogTitle>
-              <DialogDescription className="mt-1">
+          <DialogContent className="sm:max-w-[500px] border border-slate-200 shadow-lg rounded-xl">
+            <DialogHeader>
+              <DialogTitle className="text-lg font-bold text-slate-900">Upload New Material</DialogTitle>
+              <DialogDescription className="text-sm text-slate-500 mt-1">
                 Add assignments or notes to a specific course.
               </DialogDescription>
-            </div>
+            </DialogHeader>
             
-            <div className="p-6 space-y-5">
-              <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Title</Label>
+            <div className="py-4 space-y-5">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-700">Title</Label>
                 <Input 
                   placeholder="e.g. Introduction to Typography" 
                   value={formData.title}
                   onChange={(e) => setFormData({...formData, title: e.target.value})}
-                  className="h-11 bg-slate-50 border-slate-200"
+                  className="h-10 border-slate-200 focus-visible:ring-emerald-500 rounded-lg"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Resource Type</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-700">Resource Type</Label>
                   <Select value={formData.type} onValueChange={(v) => setFormData({...formData, type: v})}>
-                    <SelectTrigger className="h-11 bg-slate-50 border-slate-200">
+                    <SelectTrigger className="h-10 border-slate-200 focus:ring-emerald-500 rounded-lg">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -181,10 +179,10 @@ export default function AcademicResourcesPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Target Course</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-700">Target Course</Label>
                   <Select value={formData.courseName} onValueChange={(v) => setFormData({...formData, courseName: v})}>
-                    <SelectTrigger className="h-11 bg-slate-50 border-slate-200">
+                    <SelectTrigger className="h-10 border-slate-200 focus:ring-emerald-500 rounded-lg">
                       <SelectValue placeholder="Select Course" />
                     </SelectTrigger>
                     <SelectContent>
@@ -196,8 +194,8 @@ export default function AcademicResourcesPage() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Select File</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-medium text-slate-700">Select File</Label>
                 <div className="relative">
                   <input 
                     type="file" 
@@ -215,14 +213,14 @@ export default function AcademicResourcesPage() {
               </div>
             </div>
 
-            <DialogFooter className="p-6 pt-0">
+            <DialogFooter className="bg-slate-50 p-4 -mx-6 -mb-6 border-t border-slate-100 mt-2">
               <Button 
                 onClick={handleUpload} 
-                className="w-full h-12 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl shadow-lg"
+                className="w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg shadow-sm"
                 disabled={isUploading}
               >
-                {isUploading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Upload className="h-5 w-5 mr-2" />}
-                {isUploading ? "Uploading..." : "Publish Resource"}
+                {isUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                {isUploading ? `Uploading... ${progress}%` : "Publish Resource"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -233,21 +231,21 @@ export default function AcademicResourcesPage() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
         <Input 
           placeholder="Search by title or course..." 
-          className="pl-10 h-12 rounded-xl bg-white border-slate-200 shadow-sm"
+          className="pl-9 h-10 rounded-lg bg-white border-slate-200 shadow-sm text-sm focus-visible:ring-emerald-500"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
         />
       </div>
 
-      <Card className="border-0 shadow-sm ring-1 ring-slate-200 overflow-hidden rounded-2xl">
-        <CardContent className="p-0">
+      <Card className="border border-slate-200 shadow-sm overflow-hidden rounded-xl bg-white">
+        <div className="overflow-x-auto">
           <Table>
-            <TableHeader className="bg-slate-50">
-              <TableRow className="border-slate-100">
-                <TableHead className="font-bold text-slate-500 h-12 uppercase text-[11px] tracking-wider">Resource</TableHead>
-                <TableHead className="font-bold text-slate-500 h-12 uppercase text-[11px] tracking-wider">Course</TableHead>
-                <TableHead className="font-bold text-slate-500 h-12 uppercase text-[11px] tracking-wider">Type</TableHead>
-                <TableHead className="font-bold text-slate-500 h-12 uppercase text-[11px] tracking-wider text-right">Date</TableHead>
+            <TableHeader className="bg-slate-50/50">
+              <TableRow className="border-slate-100 hover:bg-transparent">
+                <TableHead className="font-semibold text-slate-500 h-10 text-xs pl-5">Resource</TableHead>
+                <TableHead className="font-semibold text-slate-500 h-10 text-xs">Course</TableHead>
+                <TableHead className="font-semibold text-slate-500 h-10 text-xs">Type</TableHead>
+                <TableHead className="font-semibold text-slate-500 h-10 text-xs text-right">Date</TableHead>
                 <TableHead className="w-20"></TableHead>
               </TableRow>
             </TableHeader>
@@ -255,44 +253,51 @@ export default function AcademicResourcesPage() {
               {loadingResources ? (
                 <TableRow>
                   <TableCell colSpan={5} className="h-64 text-center">
-                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-slate-200" />
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto text-emerald-600" />
                   </TableCell>
                 </TableRow>
               ) : filteredResources.length > 0 ? (
                 filteredResources.map((res) => (
-                  <TableRow key={res.id} className="hover:bg-slate-50/50 transition-colors border-slate-100">
-                    <TableCell className="py-4">
+                  <TableRow key={res.id} className="hover:bg-slate-50/80 transition-colors border-slate-100">
+                    <TableCell className="py-3 pl-5">
                       <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400">
-                          {res.type === 'Assignment' ? <FileSpreadsheet className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                        <div className="h-9 w-9 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+                          {res.type === 'Assignment' ? <FileSpreadsheet className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
                         </div>
                         <div className="flex flex-col">
-                          <span className="font-bold text-slate-900">{res.title}</span>
-                          <span className="text-[10px] font-medium text-slate-400 uppercase tracking-tight">{res.fileName}</span>
+                          <span className="font-semibold text-sm text-slate-900">{res.title}</span>
+                          <span className="text-[10px] text-slate-500">{res.fileName}</span>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="py-4">
-                      <Badge variant="secondary" className="bg-slate-100 text-slate-600 hover:bg-slate-100 border-0 font-bold uppercase text-[10px]">
+                    <TableCell className="py-3">
+                      <Badge variant="secondary" className="bg-slate-100 text-slate-700 hover:bg-slate-100 border-0 font-medium text-xs">
                         {res.courseName}
                       </Badge>
                     </TableCell>
-                    <TableCell className="py-4">
-                      <span className={`text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                        res.type === 'Assignment' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+                    <TableCell className="py-3">
+                      <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                        res.type === 'Assignment' ? 'bg-amber-50 text-amber-700' : 
+                        res.type === 'Reference' ? 'bg-indigo-50 text-indigo-700' :
+                        'bg-blue-50 text-blue-700'
                       }`}>
                         {res.type}
                       </span>
                     </TableCell>
-                    <TableCell className="py-4 text-right">
-                      <span className="text-xs font-bold text-slate-500">
+                    <TableCell className="py-3 text-right">
+                      <span className="text-xs font-medium text-slate-500">
                         {res.createdAt?.seconds ? new Date(res.createdAt.seconds * 1000).toLocaleDateString() : "Recently"}
                       </span>
                     </TableCell>
-                    <TableCell className="py-4">
+                    <TableCell className="py-3 pr-5">
                       <div className="flex justify-end gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-rose-600" onClick={() => handleDelete(res)}>
-                          <Trash2 className="h-4 w-4" />
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md" asChild>
+                          <a href={res.fileUrl} target="_blank" rel="noopener noreferrer">
+                            <Download className="h-3.5 w-3.5" />
+                          </a>
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md" onClick={() => handleDelete(res)}>
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </TableCell>
@@ -300,14 +305,14 @@ export default function AcademicResourcesPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-48 text-center text-slate-400 italic">
+                  <TableCell colSpan={5} className="h-48 text-center text-slate-400 text-sm">
                     No resources found.
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
           </Table>
-        </CardContent>
+        </div>
       </Card>
     </div>
   )

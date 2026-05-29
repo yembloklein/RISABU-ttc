@@ -3,7 +3,7 @@
 import { useUser, useFirestore, setDocumentNonBlocking } from "@/firebase"
 import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
-import { Loader2 } from "lucide-react"
+import { Loader2, Bell } from "lucide-react"
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/layout/app-sidebar"
 import { Toaster } from "@/components/ui/toaster"
@@ -33,10 +33,52 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       }
 
       try {
-        // Robust Student Check (Case-insensitive)
+        const { getDoc } = await import("firebase/firestore")
+        const userDocRef = doc(firestore, "users", user.uid)
+        const userDocSnap = await getDoc(userDocRef)
+
+        // 1. Is the user explicitly registered as Staff or Admin in the `users` collection?
+        if (userDocSnap.exists()) {
+          const userData = userDocSnap.data()
+          if (userData.role === "Admin" || user.email === "clainyemblo@gmail.com") {
+            const adminRoleRef = doc(firestore, "roles_admin", user.uid)
+            await setDoc(adminRoleRef, { email: user.email, assignedAt: serverTimestamp() }, { merge: true })
+          } else {
+            const staffRoleRef = doc(firestore, "roles_staff", user.uid)
+            await setDoc(staffRoleRef, { email: user.email, assignedAt: serverTimestamp() }, { merge: true })
+          }
+          setIsCheckingRole(false)
+          return
+        }
+
+        // 2. Superadmin fallback (if clainyemblo@gmail.com logs in for the first time)
+        if (user.email === "clainyemblo@gmail.com") {
+          const adminRoleRef = doc(firestore, "roles_admin", user.uid)
+          await setDoc(adminRoleRef, { email: user.email, assignedAt: serverTimestamp() }, { merge: true })
+          await setDoc(userDocRef, {
+            id: user.uid,
+            email: user.email,
+            firstName: "Super",
+            lastName: "Admin",
+            role: "Admin",
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          }, { merge: true })
+          setIsCheckingRole(false)
+          return
+        }
+
+        // 3. User is NOT staff. Are they a student?
         if (user.email) {
           const studentsRef = collection(firestore, "students")
-          const emailVariants = [user.email, user.email.toLowerCase()]
+          
+          // Query multiple exact-match variations (case sensitivity in Firestore)
+          const emailVariants = [
+            user.email, 
+            user.email.toLowerCase(), 
+            user.email.trim(), 
+            user.email.trim().toLowerCase()
+          ]
           const uniqueVariants = Array.from(new Set(emailVariants))
           
           let studentDoc = null
@@ -57,63 +99,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           }
         }
 
-        // If we reach here, user is likely Staff or Admin
-        const userDocRef = doc(firestore, "users", user.uid)
+        // 4. Unauthorized User (Neither Staff nor Student)
+        console.warn("Unauthorized access attempt. Logging out.")
+        const { getAuth, signOut } = await import("firebase/auth")
+        const auth = getAuth()
+        await signOut(auth)
+        router.push("/login?error=unauthorized")
         
-        if (user.email === "clainyemblo@gmail.com") {
-          const adminRoleRef = doc(firestore, "roles_admin", user.uid)
-          // Use direct setDoc to avoid the global error emitter from setDocumentNonBlocking
-          try {
-            await setDoc(adminRoleRef, {
-              email: user.email,
-              assignedAt: serverTimestamp(),
-            }, { merge: true })
-
-            await setDoc(userDocRef, {
-              id: user.uid,
-              firebaseUid: user.uid,
-              email: user.email,
-              firstName: user.displayName?.split(' ')[0] || "Super",
-              lastName: user.displayName?.split(' ').slice(1).join(' ') || "Admin",
-              role: "Admin",
-              updatedAt: serverTimestamp(),
-              createdAt: serverTimestamp(),
-            }, { merge: true })
-          } catch (e) {
-            console.warn("Bootstrap: Admin role write failed (likely missing permissions):", e)
-          }
-        } 
-        else {
-          const staffRoleRef = doc(firestore, "roles_staff", user.uid)
-          
-          try {
-            // Silently attempt to bootstrap as staff
-            // We use setDoc directly instead of setDocumentNonBlocking to avoid triggering the global error popup
-            await setDoc(staffRoleRef, {
-              email: user.email || "staff@risabu.ac.ke",
-              assignedAt: serverTimestamp(),
-            }, { merge: true })
-
-            await setDoc(userDocRef, {
-              id: user.uid,
-              firebaseUid: user.uid,
-              email: user.email || "staff@risabu.ac.ke",
-              firstName: user.displayName?.split(' ')[0] || "College",
-              lastName: user.displayName?.split(' ').slice(1).join(' ') || "Staff",
-              role: "Staff",
-              updatedAt: serverTimestamp(),
-              createdAt: serverTimestamp(),
-            }, { merge: true })
-          } catch (e) {
-            console.warn("Bootstrap: Staff role write failed. This is expected if the user is a student or not authorized staff.", e)
-            
-            // FALLBACK: If bootstrapping as staff fails, it's highly likely this user 
-            // is actually a student (whose record might be missing) or an unauthorized user.
-            // Redirect them to the portal dashboard as a safe default.
-            router.push("/portal/dashboard")
-            return
-          }
-        }
       } catch (error) {
         console.error("Error bootstrapping role:", error)
       } finally {
@@ -154,26 +146,46 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-6 sticky top-0 bg-background/80 backdrop-blur-md z-10">
-          <SidebarTrigger className="-ml-1" />
-          <div className="flex-1">
+        <header className="flex h-16 shrink-0 items-center gap-3 border-b border-slate-200/80 px-6 sticky top-0 bg-white/80 backdrop-blur-lg z-10 shadow-sm">
+          <SidebarTrigger className="-ml-1 text-slate-500 hover:text-slate-900" />
+          <div className="h-5 w-px bg-slate-200 mx-1" />
+          <div className="flex-1 hidden md:block">
             <nav aria-label="Breadcrumb">
-              <ol className="flex items-center space-x-2 text-sm text-muted-foreground">
-                <li>Risabu Connect</li>
-                <li className="before:content-['/'] before:mr-2">ERP</li>
-                <li className="before:content-['/'] before:mr-2 capitalize">{pathname.split('/').pop() || 'Dashboard'}</li>
+              <ol className="flex items-center gap-1.5 text-xs font-medium text-slate-400">
+                <li className="font-semibold text-slate-700">Risabu Connect</li>
+                <li className="text-slate-300">/</li>
+                <li>ERP</li>
+                {pathname.split('/').filter(Boolean).pop() && (
+                  <>
+                    <li className="text-slate-300">/</li>
+                    <li className="capitalize font-semibold text-slate-600">
+                      {pathname.split('/').filter(Boolean).pop()?.replace(/-/g, ' ') || 'Dashboard'}
+                    </li>
+                  </>
+                )}
               </ol>
             </nav>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex flex-col items-end">
-              <span className="text-sm font-medium">{user?.displayName || user?.email?.split('@')[0] || 'College User'}</span>
-              <span className="text-xs text-muted-foreground">
-                {user?.email === "clainyemblo@gmail.com" ? 'Super Admin' : 'Authorized Staff'}
-              </span>
-            </div>
-            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-              {(user?.displayName?.[0] || user?.email?.[0] || 'U').toUpperCase()}
+          <div className="flex flex-1 md:flex-none items-center justify-end gap-3">
+            <button className="h-8 w-8 rounded-full bg-slate-50 ring-1 ring-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+              <Bell className="h-4 w-4" />
+            </button>
+            <div className="flex items-center gap-2.5">
+              <div className="hidden sm:flex flex-col items-end">
+                <span className="text-sm font-semibold text-slate-800 leading-tight">
+                  {user?.displayName || user?.email?.split('@')[0] || 'College User'}
+                </span>
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none mt-0.5 ${
+                  user?.email === 'clainyemblo@gmail.com'
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : 'bg-blue-100 text-blue-700'
+                }`}>
+                  {user?.email === "clainyemblo@gmail.com" ? '✦ Super Admin' : 'Staff'}
+                </span>
+              </div>
+              <div className="h-9 w-9 rounded-full bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center text-white font-black text-sm shadow-md">
+                {(user?.displayName?.[0] || user?.email?.[0] || 'U').toUpperCase()}
+              </div>
             </div>
           </div>
         </header>
