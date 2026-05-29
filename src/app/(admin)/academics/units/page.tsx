@@ -208,7 +208,7 @@ export default function ManageUnitsPage() {
                 <Plus className="mr-2 h-4 w-4" /> Add Unit
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] border border-slate-200 shadow-lg rounded-xl">
+            <DialogContent className="w-[95vw] sm:w-full sm:max-w-[500px] max-h-[85vh] overflow-y-auto border border-slate-200 shadow-lg rounded-xl">
               <DialogHeader>
                 <DialogTitle className="text-lg font-bold text-slate-900">{editingUnitId ? "Edit Unit Details" : "Register New Unit"}</DialogTitle>
                 <DialogDescription className="text-sm text-slate-500 mt-1">
@@ -216,8 +216,8 @@ export default function ManageUnitsPage() {
                 </DialogDescription>
               </DialogHeader>
               
-              <div className="py-4 space-y-5">
-                <div className="grid grid-cols-2 gap-4">
+              <div className="py-4 space-y-5 px-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium text-slate-700">Unit Code</Label>
                     <div className="relative">
@@ -258,7 +258,7 @@ export default function ManageUnitsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium text-slate-700">Assigned Instructor</Label>
                     <div className="relative">
