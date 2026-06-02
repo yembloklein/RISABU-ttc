@@ -35,14 +35,15 @@ export function middleware(req: NextRequest) {
 
   // --- PORTAL ROUTING ---
   if (isPortalDomain) {
-    // If the URL already starts with /portal, we don't need to rewrite
-    // This prevents infinite rewriting loops like /portal/portal/dashboard
+    // If they visit the root domain (e.g. risabu-ttc-portal.vercel.app/),
+    // redirect them to /login because there is no root page in the portal folder.
+    if (url.pathname === '/') {
+      return NextResponse.redirect(new URL('/login', req.url));
+    }
+
+    // If the URL does not start with /portal, rewrite it so Next.js finds it
     if (!url.pathname.startsWith('/portal')) {
-      // If they go to the root of the portal domain (/), maybe they should go to /dashboard or /login
-      // By rewriting to /portal${url.pathname}, a visit to `/login` becomes `/portal/login`
-      
-      // If the root is visited, we can rewrite it to /portal/dashboard or just /portal
-      const newPath = `/portal${url.pathname === '/' ? '' : url.pathname}`;
+      const newPath = `/portal${url.pathname}`;
       return NextResponse.rewrite(new URL(newPath, req.url));
     }
   }
