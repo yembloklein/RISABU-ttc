@@ -19,6 +19,7 @@ import {
   Settings
 } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
+import { ClipboardCheck } from "lucide-react"
 
 
 
@@ -98,6 +99,11 @@ const menuItems = [
         title: "Submissions",
         icon: FileUp,
         url: "/academics/submissions",
+      },
+      {
+        title: "Examinations & Grades",
+        icon: ClipboardCheck,
+        url: "/academics/exams",
       },
       {
         title: "Support Tickets",

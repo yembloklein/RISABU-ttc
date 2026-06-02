@@ -47,6 +47,9 @@ export default function StudentSupportPage() {
   const [replyMessage, setReplyMessage] = useState("")
   const scrollRef = useRef<HTMLDivElement>(null)
 
+  // Mobile view state: 'list' shows ticket list, 'chat' shows the active ticket chat
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>('list')
+
   useEffect(() => {
     async function fetchStudent() {
       if (!firestore || !user?.email) return
@@ -174,12 +177,12 @@ export default function StudentSupportPage() {
               <Plus className="mr-2 h-4 w-4" /> NEW TICKET
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px] rounded-3xl border-0 shadow-2xl">
+          <DialogContent className="w-[95vw] sm:max-w-[500px] max-h-[90vh] overflow-y-auto rounded-3xl border-0 shadow-2xl p-5 sm:p-6">
             <DialogHeader>
               <DialogTitle className="text-2xl font-black tracking-tight">How can we help?</DialogTitle>
               <DialogDescription className="font-medium text-slate-400">Fill in the details below and we'll get right on it.</DialogDescription>
             </DialogHeader>
-            <div className="space-y-5 py-6">
+            <div className="space-y-4 sm:space-y-5 py-4 sm:py-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Subject</label>
                 <Input placeholder="What's the issue about?" value={title} onChange={(e) => setTitle(e.target.value)} className="h-12 rounded-xl bg-slate-50 border-0 focus-visible:ring-emerald-500 font-medium" />
@@ -203,8 +206,8 @@ export default function StudentSupportPage() {
                 <Textarea placeholder="Explain your problem..." value={message} onChange={(e) => setMessage(e.target.value)} className="min-h-[140px] rounded-xl bg-slate-50 border-0 focus-visible:ring-emerald-500 font-medium" />
               </div>
             </div>
-            <DialogFooter>
-              <Button onClick={handleSubmitTicket} disabled={isSubmitting || !title || !message} className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl shadow-lg">
+            <DialogFooter className="mt-2 sm:mt-0">
+              <Button onClick={handleSubmitTicket} disabled={isSubmitting || !title || !message} className="w-full h-12 sm:h-14 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-2xl shadow-lg">
                 {isSubmitting ? <Loader2 className="h-6 w-6 animate-spin mr-2" /> : <Send className="h-6 w-6 mr-2" />}
                 {isSubmitting ? "SENDING..." : "SUBMIT REQUEST"}
               </Button>
@@ -215,7 +218,7 @@ export default function StudentSupportPage() {
 
       <div className="flex flex-1 gap-6 min-h-0">
         {/* Left Sidebar - Ticket List */}
-        <div className="w-full md:w-80 lg:w-96 flex flex-col gap-4 shrink-0">
+        <div className={`${mobileView === 'chat' ? 'hidden' : 'flex'} md:flex w-full md:w-80 lg:w-96 flex-col gap-4 shrink-0`}>
           <Card className="flex-1 border border-slate-200 shadow-sm rounded-2xl bg-white overflow-hidden flex flex-col">
             <div className="p-3 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center shrink-0">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Your Tickets</span>
@@ -233,7 +236,10 @@ export default function StudentSupportPage() {
                   {tickets.map((ticket) => (
                     <button
                       key={ticket.id}
-                      onClick={() => setActiveTicketId(ticket.id)}
+                      onClick={() => {
+                        setActiveTicketId(ticket.id)
+                        setMobileView('chat')
+                      }}
                       className={`w-full text-left p-4 transition-all hover:bg-slate-50 focus:outline-none ${activeTicketId === ticket.id ? 'bg-emerald-50/50 border-l-4 border-emerald-500' : 'border-l-4 border-transparent'}`}
                     >
                       <div className="flex justify-between items-start mb-2">
@@ -271,13 +277,21 @@ export default function StudentSupportPage() {
         </div>
 
         {/* Right Pane - Chat View */}
-        <Card className="hidden md:flex flex-1 border border-slate-200 shadow-sm rounded-2xl bg-white flex-col overflow-hidden relative">
+        <Card className={`${mobileView === 'list' ? 'hidden' : 'flex'} md:flex flex-1 border border-slate-200 shadow-sm rounded-2xl bg-white flex-col overflow-hidden relative w-full`}>
           {activeTicket ? (
             <>
               {/* Chat Header */}
               <div className="p-4 md:p-6 border-b border-slate-100 flex justify-between items-start bg-slate-50/30 shrink-0">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 mb-2">
+                <div className="space-y-1 flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    {/* Back button — mobile only */}
+                    <button
+                      onClick={() => setMobileView('list')}
+                      className="md:hidden flex items-center gap-1 text-emerald-600 font-bold text-xs uppercase tracking-wide mr-1"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                      Back
+                    </button>
                     <Badge className={`border-0 font-bold uppercase text-[9px] px-2 py-0.5 shadow-none ${
                       activeTicket.status === 'Open' ? 'bg-amber-100 text-amber-700' : 
                       activeTicket.status === 'Closed' ? 'bg-slate-200 text-slate-600' : 'bg-emerald-100 text-emerald-700'
@@ -288,7 +302,7 @@ export default function StudentSupportPage() {
                       REF: #{activeTicket.id.slice(0, 8).toUpperCase()}
                     </span>
                   </div>
-                  <h2 className="text-xl font-black text-slate-900 tracking-tight">{activeTicket.title}</h2>
+                  <h2 className="text-lg md:text-xl font-black text-slate-900 tracking-tight truncate">{activeTicket.title}</h2>
                   <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
                     <History className="h-3 w-3" /> Created {activeTicket.createdAt?.seconds ? new Date(activeTicket.createdAt.seconds * 1000).toLocaleDateString() : 'Recently'}
                   </div>
@@ -298,7 +312,7 @@ export default function StudentSupportPage() {
               {/* Chat Thread */}
               <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/50 flex flex-col gap-6">
                 {/* Original Message (Student) */}
-                <div className="flex gap-4 max-w-[85%] self-end flex-row-reverse">
+                <div className="flex gap-3 md:gap-4 max-w-[90%] md:max-w-[85%] self-end flex-row-reverse">
                   <div className="h-8 w-8 rounded-full bg-emerald-600 flex items-center justify-center shrink-0 shadow-md">
                     <span className="text-xs font-bold text-white">{student?.firstName?.[0]}</span>
                   </div>
@@ -309,7 +323,7 @@ export default function StudentSupportPage() {
                         {activeTicket.createdAt?.seconds ? formatDistanceToNow(activeTicket.createdAt.seconds * 1000, { addSuffix: true }) : 'Recently'}
                       </span>
                     </div>
-                    <div className="bg-emerald-600 text-white p-4 rounded-2xl rounded-tr-sm shadow-md">
+                    <div className="bg-emerald-600 text-white p-3 md:p-4 rounded-2xl rounded-tr-sm shadow-md">
                       <p className="text-sm whitespace-pre-wrap leading-relaxed">{activeTicket.message}</p>
                     </div>
                   </div>
@@ -319,7 +333,7 @@ export default function StudentSupportPage() {
                 {activeTicket.responses?.map((resp: any, idx: number) => {
                   const isAdmin = resp.author === "Admin"
                   return (
-                    <div key={idx} className={`flex gap-4 max-w-[85%] ${isAdmin ? 'self-start' : 'self-end flex-row-reverse'}`}>
+                    <div key={idx} className={`flex gap-3 md:gap-4 max-w-[90%] md:max-w-[85%] ${isAdmin ? 'self-start' : 'self-end flex-row-reverse'}`}>
                       {isAdmin ? (
                         <div className="h-8 w-8 rounded-full bg-white border border-slate-200 flex items-center justify-center shrink-0 shadow-sm">
                           <Logo size={16} className="text-primary" />
@@ -337,7 +351,7 @@ export default function StudentSupportPage() {
                             {resp.createdAt?.seconds ? formatDistanceToNow(resp.createdAt.seconds * 1000, { addSuffix: true }) : 'Recently'}
                           </span>
                         </div>
-                        <div className={`p-4 shadow-sm ${
+                        <div className={`p-3 md:p-4 shadow-sm ${
                           isAdmin 
                             ? 'bg-white border border-slate-200 rounded-2xl rounded-tl-sm text-slate-700' 
                             : 'bg-emerald-600 text-white rounded-2xl rounded-tr-sm shadow-md'
@@ -352,11 +366,11 @@ export default function StudentSupportPage() {
 
               {/* Reply Box */}
               {activeTicket.status !== 'Closed' ? (
-                <div className="p-4 md:p-6 border-t border-slate-100 bg-white shrink-0">
-                  <div className="flex gap-3">
+                <div className="p-3 md:p-6 border-t border-slate-100 bg-white shrink-0">
+                  <div className="flex gap-2 md:gap-3">
                     <Textarea 
                       placeholder="Type your reply to support..." 
-                      className="min-h-[80px] resize-none rounded-xl bg-slate-50 border-slate-200 focus-visible:ring-emerald-500/20 text-sm p-3"
+                      className="min-h-[64px] md:min-h-[80px] resize-none rounded-xl bg-slate-50 border-slate-200 focus-visible:ring-emerald-500/20 text-sm p-3"
                       value={replyMessage}
                       onChange={(e) => setReplyMessage(e.target.value)}
                       onKeyDown={(e) => {
@@ -367,14 +381,14 @@ export default function StudentSupportPage() {
                       }}
                     />
                     <Button 
-                      className="h-auto w-14 shrink-0 rounded-xl bg-emerald-600 hover:bg-emerald-700 shadow-md"
+                      className="h-auto w-12 md:w-14 shrink-0 rounded-xl bg-emerald-600 hover:bg-emerald-700 shadow-md"
                       onClick={handleSendReply}
                       disabled={!replyMessage.trim()}
                     >
-                      <Send className="h-5 w-5" />
+                      <Send className="h-4 w-4 md:h-5 md:w-5" />
                     </Button>
                   </div>
-                  <p className="text-[10px] font-medium text-slate-400 mt-2 ml-1">Press <kbd className="font-mono bg-slate-100 px-1 py-0.5 rounded">Enter</kbd> to send, <kbd className="font-mono bg-slate-100 px-1 py-0.5 rounded">Shift + Enter</kbd> for new line</p>
+                  <p className="text-[10px] font-medium text-slate-400 mt-2 ml-1 hidden md:block">Press <kbd className="font-mono bg-slate-100 px-1 py-0.5 rounded">Enter</kbd> to send, <kbd className="font-mono bg-slate-100 px-1 py-0.5 rounded">Shift + Enter</kbd> for new line</p>
                 </div>
               ) : (
                 <div className="p-4 md:p-6 border-t border-slate-100 bg-slate-50 flex justify-center items-center text-slate-500 text-sm font-medium shrink-0">

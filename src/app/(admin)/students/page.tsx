@@ -75,7 +75,7 @@ export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [activeTab, setActiveTab] = useState("Active")
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null)
-  const [printMode, setPrintMode] = useState<'id' | 'certificate' | null>(null)
+  const [printMode, setPrintMode] = useState<'id' | 'certificate' | 'record' | 'master_list' | null>(null)
 
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -345,6 +345,21 @@ export default function StudentsPage() {
     }, 100);
   };
 
+  const handlePrintRecord = (student: any) => {
+    setSelectedStudentId(student.id);
+    setPrintMode('record');
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  };
+
+  const handlePrintMasterList = () => {
+    setPrintMode('master_list');
+    setTimeout(() => {
+      window.print();
+    }, 100);
+  };
+
   return (
     <div className="space-y-6">
       {activeStudent && printMode === 'id' && (
@@ -419,6 +434,57 @@ export default function StudentsPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {activeStudent && printMode === 'record' && (
+        <div id="record-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999] p-8">
+          <div className="max-w-[8.5in] mx-auto bg-white print:m-0 space-y-8">
+            <header className="flex items-center gap-6 border-b-2 border-emerald-700 pb-6">
+              <Logo size={80} />
+              <div>
+                <h1 className="text-3xl font-black text-emerald-800 uppercase tracking-tight">Risabu Technical Training College</h1>
+                <h2 className="text-lg font-semibold text-slate-600 uppercase tracking-widest mt-1">Official Student Record</h2>
+              </div>
+            </header>
+            
+            <main className="space-y-10">
+              <section className="grid grid-cols-2 gap-8">
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-wider border-b pb-2 mb-4 text-emerald-700">Personal Information</h3>
+                  <div className="space-y-3 text-sm">
+                    <p><span className="font-semibold text-slate-500 w-32 inline-block">Full Name:</span> <span className="font-bold text-slate-900">{activeStudent.firstName} {activeStudent.lastName}</span></p>
+                    <p><span className="font-semibold text-slate-500 w-32 inline-block">Gender:</span> {activeStudent.gender || 'N/A'}</p>
+                    <p><span className="font-semibold text-slate-500 w-32 inline-block">Date of Birth:</span> {activeStudent.dateOfBirth || 'N/A'}</p>
+                    <p><span className="font-semibold text-slate-500 w-32 inline-block">Address:</span> {activeStudent.address || 'N/A'}</p>
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="text-sm font-bold uppercase tracking-wider border-b pb-2 mb-4 text-emerald-700">Academic Information</h3>
+                  <div className="space-y-3 text-sm">
+                    <p><span className="font-semibold text-slate-500 w-32 inline-block">Admission No:</span> <span className="font-mono font-bold text-slate-900">{activeStudent.admissionNumber || 'N/A'}</span></p>
+                    <p><span className="font-semibold text-slate-500 w-32 inline-block">Program:</span> <span className="font-bold">{activeStudent.appliedCourse || 'N/A'}</span></p>
+                    <p><span className="font-semibold text-slate-500 w-32 inline-block">Admission Date:</span> {activeStudent.admissionDate || 'N/A'}</p>
+                    <p><span className="font-semibold text-slate-500 w-32 inline-block">Status:</span> <span className="uppercase font-bold text-emerald-700">{activeStudent.status || 'Active'}</span></p>
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <h3 className="text-sm font-bold uppercase tracking-wider border-b pb-2 mb-4 text-emerald-700">Contact Details</h3>
+                <div className="space-y-3 text-sm">
+                  <p><span className="font-semibold text-slate-500 w-32 inline-block">Email Address:</span> {activeStudent.contactEmail || 'N/A'}</p>
+                  <p><span className="font-semibold text-slate-500 w-32 inline-block">Phone Number:</span> {activeStudent.contactPhone || 'N/A'}</p>
+                </div>
+              </section>
+            </main>
+
+            <footer className="mt-16 pt-8 border-t border-slate-200 text-sm text-slate-500 flex justify-between">
+              <p>Generated on {new Date().toLocaleDateString()}</p>
+              <p>Risabu TTC • Official Record</p>
+            </footer>
           </div>
         </div>
       )}
@@ -514,6 +580,49 @@ export default function StudentsPage() {
         </div>
       )}
 
+      {printMode === 'master_list' && (
+        <div id="master-list-print-container" className="hidden print:block fixed inset-0 bg-white z-[9999] p-8 text-black overflow-visible">
+          <div className="max-w-[8.5in] mx-auto bg-white print:m-0 space-y-6">
+            <header className="flex flex-col items-center justify-center border-b-2 border-emerald-700 pb-4 mb-4">
+              <Logo size={60} />
+              <h1 className="text-2xl font-black text-emerald-800 uppercase tracking-tight mt-2">Risabu Technical Training College</h1>
+              <h2 className="text-md font-bold text-slate-600 uppercase tracking-widest mt-1">Official Master Student List</h2>
+              <p className="text-xs text-slate-500 mt-1">Showing {filteredStudents.length} {activeTab !== "All" ? activeTab : ""} scholars</p>
+            </header>
+
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b-2 border-emerald-700/50 bg-emerald-50/50">
+                  <th className="py-2 px-2 font-bold">#</th>
+                  <th className="py-2 px-2 font-bold">Admission No</th>
+                  <th className="py-2 px-2 font-bold">Full Name</th>
+                  <th className="py-2 px-2 font-bold">Course</th>
+                  <th className="py-2 px-2 font-bold">Status</th>
+                  <th className="py-2 px-2 font-bold">Contact</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredStudents.map((student, i) => (
+                  <tr key={student.id} className="border-b border-slate-200 break-inside-avoid">
+                    <td className="py-2 px-2 text-slate-500">{i + 1}</td>
+                    <td className="py-2 px-2 font-mono font-medium">{student.admissionNumber || "N/A"}</td>
+                    <td className="py-2 px-2 font-bold">{student.firstName} {student.lastName}</td>
+                    <td className="py-2 px-2">{student.appliedCourse || "General"}</td>
+                    <td className="py-2 px-2 uppercase text-[9px] font-bold">{student.status || "Active"}</td>
+                    <td className="py-2 px-2 text-[10px]">{student.contactPhone || student.contactEmail || "N/A"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <footer className="pt-6 border-t border-slate-200 text-xs text-slate-500 flex justify-between">
+              <p>Generated on {new Date().toLocaleString()}</p>
+              <p>Risabu TTC • Official Record</p>
+            </footer>
+          </div>
+        </div>
+      )}
+
       {/* Header & Stats Dashboard */}
       <div className="flex flex-col gap-6 no-print animate-in fade-in slide-in-from-bottom-4 duration-700">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -527,39 +636,39 @@ export default function StudentsPage() {
         {/* Minimalist Stats Row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden">
-            <CardContent className="p-4">
-              <div className="flex justify-between items-start mb-4">
-                <p className="text-slate-500 font-medium text-sm">Total Enrolled</p>
-                <div className="bg-blue-50 p-2 rounded-xl"><UserCircle className="h-5 w-5 text-blue-600" /></div>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex justify-between items-start mb-2 sm:mb-4">
+                <p className="text-slate-500 font-medium text-[10px] sm:text-sm">Total Enrolled</p>
+                <div className="bg-blue-50 p-1.5 sm:p-2 rounded-xl"><UserCircle className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" /></div>
               </div>
-              <h3 className="text-2xl font-bold text-slate-900">{stats.total}</h3>
+              <h3 className="text-xl sm:text-2xl font-bold text-slate-900">{stats.total}</h3>
             </CardContent>
           </Card>
           <Card className="bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden">
-            <CardContent className="p-4">
-              <div className="flex justify-between items-start mb-4">
-                <p className="text-slate-500 font-medium text-sm">Active Now</p>
-                <div className="bg-emerald-50 p-2 rounded-xl"><CheckCircle2 className="h-5 w-5 text-emerald-600" /></div>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex justify-between items-start mb-2 sm:mb-4">
+                <p className="text-slate-500 font-medium text-[10px] sm:text-sm">Active Now</p>
+                <div className="bg-emerald-50 p-1.5 sm:p-2 rounded-xl"><CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" /></div>
               </div>
-              <h3 className="text-2xl font-bold text-slate-900">{stats.active}</h3>
+              <h3 className="text-xl sm:text-2xl font-bold text-slate-900">{stats.active}</h3>
             </CardContent>
           </Card>
           <Card className="bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden">
-            <CardContent className="p-4">
-              <div className="flex justify-between items-start mb-4">
-                <p className="text-slate-500 font-medium text-sm">Graduated</p>
-                <div className="bg-slate-100 p-2 rounded-xl"><Award className="h-5 w-5 text-slate-700" /></div>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex justify-between items-start mb-2 sm:mb-4">
+                <p className="text-slate-500 font-medium text-[10px] sm:text-sm">Graduated</p>
+                <div className="bg-slate-100 p-1.5 sm:p-2 rounded-xl"><Award className="h-4 w-4 sm:h-5 sm:w-5 text-slate-700" /></div>
               </div>
-              <h3 className="text-2xl font-bold text-slate-900">{stats.graduated}</h3>
+              <h3 className="text-xl sm:text-2xl font-bold text-slate-900">{stats.graduated}</h3>
             </CardContent>
           </Card>
           <Card className="bg-white border border-slate-200 shadow-sm rounded-xl overflow-hidden">
-            <CardContent className="p-4">
-              <div className="flex justify-between items-start mb-4">
-                <p className="text-slate-500 font-medium text-sm">On Leave</p>
-                <div className="bg-orange-50 p-2 rounded-xl"><Clock className="h-5 w-5 text-orange-600" /></div>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex justify-between items-start mb-2 sm:mb-4">
+                <p className="text-slate-500 font-medium text-[10px] sm:text-sm">On Leave</p>
+                <div className="bg-orange-50 p-1.5 sm:p-2 rounded-xl"><Clock className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600" /></div>
               </div>
-              <h3 className="text-2xl font-bold text-slate-900">{stats.onLeave}</h3>
+              <h3 className="text-xl sm:text-2xl font-bold text-slate-900">{stats.onLeave}</h3>
             </CardContent>
           </Card>
         </div>
@@ -586,10 +695,13 @@ export default function StudentsPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
+          <Button variant="outline" className="h-9 px-3 sm:px-4 rounded-lg text-sm font-medium shadow-sm border-slate-200 text-slate-700 hover:bg-slate-50 transition-all flex" onClick={handlePrintMasterList}>
+            <Printer className="sm:mr-2 h-4 w-4" /> <span className="hidden sm:inline">Print List</span>
+          </Button>
           <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="h-9 px-4 rounded-lg text-sm font-medium shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white transition-all">
-                <UploadCloud className="mr-2 h-4 w-4" /> Import
+              <Button className="h-9 px-3 sm:px-4 rounded-lg text-sm font-medium shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white transition-all">
+                <UploadCloud className="sm:mr-2 h-4 w-4" /> <span className="hidden sm:inline">Import</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px] border border-slate-200 shadow-lg rounded-xl">
@@ -643,36 +755,36 @@ export default function StudentsPage() {
           <Table>
             <TableHeader className="bg-slate-50/50">
               <TableRow className="border-slate-100 hover:bg-transparent">
-                <TableHead className="font-semibold text-slate-500 h-10 text-xs pl-5 w-[280px]">Student Info</TableHead>
-                <TableHead className="font-semibold text-slate-500 h-10 text-xs">Contact Details</TableHead>
-                <TableHead className="font-semibold text-slate-500 h-10 text-xs">Program</TableHead>
+                <TableHead className="font-semibold text-slate-500 h-10 text-xs pl-4 sm:pl-5 w-[200px] sm:w-[280px]">Student Info</TableHead>
+                <TableHead className="hidden md:table-cell font-semibold text-slate-500 h-10 text-xs">Contact Details</TableHead>
+                <TableHead className="hidden sm:table-cell font-semibold text-slate-500 h-10 text-xs">Program</TableHead>
                 <TableHead className="font-semibold text-slate-500 h-10 text-xs">Status</TableHead>
-                <TableHead className="text-right font-semibold text-slate-500 h-10 text-xs pr-5">Actions</TableHead>
+                <TableHead className="text-right font-semibold text-slate-500 h-10 text-xs pr-4 sm:pr-5">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredStudents.length > 0 ? (
                 filteredStudents.map((student) => (
                   <TableRow key={student.id} className="hover:bg-slate-50/80 transition-colors border-slate-100">
-                    <TableCell className="py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-700 font-semibold text-sm shrink-0">
+                    <TableCell className="py-3 pl-4 sm:pl-5">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-700 font-semibold text-xs sm:text-sm shrink-0">
                           {student.firstName[0]}{student.lastName[0]}
                         </div>
                         <div>
-                          <div className="font-bold text-slate-900 leading-tight">{student.firstName} {student.lastName}</div>
-                          <div className="font-mono text-[10px] text-slate-500 uppercase tracking-widest mt-0.5">{student.admissionNumber || student.id.substring(0, 8)}</div>
+                          <div className="font-bold text-slate-900 leading-tight text-xs sm:text-sm line-clamp-1">{student.firstName} {student.lastName}</div>
+                          <div className="font-mono text-[9px] sm:text-[10px] text-slate-500 uppercase tracking-widest mt-0.5">{student.admissionNumber || student.id.substring(0, 8)}</div>
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell className="py-3">
+                    <TableCell className="hidden md:table-cell py-3">
                       <div className="flex flex-col gap-0.5">
                         <span className="text-sm font-medium text-slate-700 truncate max-w-[180px]" title={student.contactEmail}>{student.contactEmail || "No Email"}</span>
                         <span className="text-xs text-slate-500">{student.contactPhone || "No Phone"}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="py-3">
-                      <span className="text-sm font-medium text-slate-700 truncate max-w-[150px] block" title={student.appliedCourse || "General Studies"}>
+                    <TableCell className="hidden sm:table-cell py-3">
+                      <span className="text-xs sm:text-sm font-medium text-slate-700 truncate max-w-[120px] sm:max-w-[150px] block" title={student.appliedCourse || "General Studies"}>
                         {student.appliedCourse || "General Studies"}
                       </span>
                     </TableCell>
@@ -788,13 +900,24 @@ export default function StudentsPage() {
                                   <div className="flex gap-2">
                                     <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg h-10" onClick={() => handlePrintID(activeStudent)}>
                                       <Printer className="h-4 w-4 mr-2" />
-                                      Print ID Card
+                                      Print ID
                                     </Button>
                                     <Button
                                       variant="outline"
-                                      className="flex-1 rounded-lg border-slate-200 text-slate-700 hover:bg-slate-50 h-10"
+                                      className="flex-1 rounded-lg border-emerald-200 text-emerald-700 hover:bg-emerald-50 h-10"
+                                      onClick={() => handlePrintRecord(activeStudent)}
+                                    >
+                                      <FileBadge className="h-4 w-4 mr-2" />
+                                      PDF Record
+                                    </Button>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      variant="outline"
+                                      className="w-full rounded-lg border-slate-200 text-slate-700 hover:bg-slate-50 h-10 mt-1"
                                       onClick={() => handleOpenEditDialog(activeStudent)}
                                     >
+                                      <Edit2 className="h-4 w-4 mr-2" />
                                       Edit Records
                                     </Button>
                                   </div>
@@ -832,6 +955,9 @@ export default function StudentsPage() {
                             )}
                             <DropdownMenuItem onClick={() => handlePrintID(student)} className="font-medium cursor-pointer text-sm">
                               <Printer className="mr-2 h-4 w-4 text-slate-500" /> Print ID Card
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handlePrintRecord(student)} className="font-medium cursor-pointer text-sm">
+                              <FileBadge className="mr-2 h-4 w-4 text-slate-500" /> Download PDF Record
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuLabel className="font-bold text-slate-400 text-[10px] uppercase tracking-widest">Status</DropdownMenuLabel>

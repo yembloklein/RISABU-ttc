@@ -211,7 +211,7 @@ export default function Dashboard() {
       {/* ── Header ── */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-2">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 flex items-center gap-3">
+          <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-slate-900 flex flex-wrap items-center gap-2 sm:gap-3">
             {greeting}, {user?.displayName?.split(" ")[0] || "Admin"} <span className="text-2xl sm:text-3xl origin-bottom-right animate-pulse">👋</span>
           </h1>
           <p className="text-slate-500 mt-2 font-medium text-sm sm:text-base">
@@ -222,34 +222,34 @@ export default function Dashboard() {
       </div>
 
       {/* ── KPI Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {kpis.map((kpi) => (
           <Card
             key={kpi.label}
             className="border-0 shadow-sm ring-1 ring-slate-200/60 bg-white overflow-hidden group hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 rounded-2xl"
           >
-            <CardContent className="p-5 flex flex-col gap-3">
+            <CardContent className="p-3 sm:p-5 flex flex-col gap-2 sm:gap-3">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className={`h-8 w-8 ${kpi.bg} ${kpi.iconColor} rounded-lg flex items-center justify-center`}>
-                    <kpi.icon className="h-4 w-4" />
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1.5 sm:gap-2">
+                  <div className={`h-6 w-6 sm:h-8 sm:w-8 ${kpi.bg} ${kpi.iconColor} rounded-lg flex items-center justify-center shrink-0`}>
+                    <kpi.icon className="h-3 w-3 sm:h-4 sm:w-4" />
                   </div>
-                  <p className="text-[13px] font-semibold text-slate-500">{kpi.label}</p>
+                  <p className="text-[10px] sm:text-[13px] font-semibold text-slate-500 leading-tight line-clamp-2">{kpi.label}</p>
                 </div>
               </div>
 
               <div>
                 {isLoading ? (
-                  <div className="h-7 w-28 bg-slate-100 animate-pulse rounded-md mt-1" />
+                  <div className="h-5 sm:h-7 w-16 sm:w-28 bg-slate-100 animate-pulse rounded-md mt-1" />
                 ) : (
-                  <div className="flex items-baseline gap-1">
+                  <div className="flex items-baseline gap-1 flex-wrap">
                     {kpi.value.toString().startsWith('KES') ? (
                       <>
-                        <span className="text-sm font-semibold text-slate-400">KES</span>
-                        <span className="text-2xl font-bold text-slate-900 tracking-tight">{kpi.value.toString().replace('KES ', '')}</span>
+                        <span className="text-[10px] sm:text-sm font-semibold text-slate-400">KES</span>
+                        <span className="text-base sm:text-2xl font-bold text-slate-900 tracking-tight leading-none truncate">{kpi.value.toString().replace('KES ', '')}</span>
                       </>
                     ) : (
-                      <span className="text-2xl font-bold text-slate-900 tracking-tight">{kpi.value}</span>
+                      <span className="text-lg sm:text-2xl font-bold text-slate-900 tracking-tight leading-none">{kpi.value}</span>
                     )}
                   </div>
                 )}
@@ -287,8 +287,8 @@ export default function Dashboard() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="p-0 flex-1">
-            <Table>
+          <CardContent className="p-0 flex-1 overflow-x-auto">
+            <Table className="min-w-[400px]">
               <TableHeader>
                 <TableRow className="border-slate-100 hover:bg-transparent">
                   <TableHead className="font-bold text-slate-400 h-11 pl-5 text-[11px] uppercase tracking-wider">Student</TableHead>
@@ -369,7 +369,7 @@ export default function Dashboard() {
               <CardDescription className="text-xs font-medium text-slate-500">Fast access to core operations</CardDescription>
             </CardHeader>
             <CardContent className="pt-0 pb-5 px-5">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              <div className="grid grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
                 {quickLinks.map((ql) => (
                   <Link
                     key={ql.label}
@@ -449,22 +449,22 @@ export default function Dashboard() {
       </div>
 
       {/* ── Summary Strip ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         {[
           { label: "Total Students", value: (students || []).length, icon: Users, color: "text-emerald-600 bg-emerald-50" },
           { label: "Active Programs", value: stats.totalPrograms, icon: BookOpen, color: "text-emerald-600 bg-emerald-50" },
           { label: "Pending Admissions", value: stats.pendingAdmissions, icon: Clock, color: "text-rose-600 bg-rose-50" },
           { label: "Staff Members", value: stats.totalStaff, icon: ShieldCheck, color: "text-emerald-600 bg-emerald-50" },
         ].map(item => (
-          <div key={item.label} className="flex items-center gap-3 bg-white rounded-2xl ring-1 ring-slate-200/80 px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow">
-            <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${item.color} shrink-0`}>
-              <item.icon className="h-5 w-5" />
+          <div key={item.label} className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 bg-white rounded-2xl ring-1 ring-slate-200/80 p-3 sm:px-4 sm:py-3.5 shadow-sm hover:shadow-md transition-shadow">
+            <div className={`h-8 w-8 sm:h-10 sm:w-10 rounded-xl flex items-center justify-center ${item.color} shrink-0`}>
+              <item.icon className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
             <div>
-              <div className="text-xl font-black text-slate-900 leading-none">
-                {isLoading ? <span className="inline-block h-5 w-12 bg-slate-100 animate-pulse rounded" /> : item.value}
+              <div className="text-lg sm:text-xl font-black text-slate-900 leading-none">
+                {isLoading ? <span className="inline-block h-4 sm:h-5 w-12 bg-slate-100 animate-pulse rounded" /> : item.value}
               </div>
-              <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-0.5">{item.label}</div>
+              <div className="text-[9px] sm:text-[10px] font-semibold text-slate-400 uppercase tracking-wide mt-1 sm:mt-0.5 line-clamp-1">{item.label}</div>
             </div>
           </div>
         ))}

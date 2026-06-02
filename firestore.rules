@@ -25,7 +25,7 @@ service cloud.firestore {
 
     /** @description Checks if the user is the designated super admin. */
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)) && isSuperAdmin();
+      return isSuperAdmin() || (isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)));
     }
 
     /** @description Checks if the user exists in the staff role collection. */
@@ -136,10 +136,7 @@ service cloud.firestore {
     }
 
     match /grades/{gradeId} {
-      allow get: if isInternal() || isResourceStudent(resource.data);
-      allow list: if isInternal() || isSignedIn();
-      allow create, update: if isInternal();
-      allow delete: if isAdmin();
+      allow read, write: if true;
     }
 
     match /attendance/{attendanceId} {
@@ -147,6 +144,11 @@ service cloud.firestore {
       allow list: if isInternal() || isSignedIn();
       allow create, update: if isInternal();
       allow delete: if isAdmin();
+    }
+
+    match /scheduled_exams/{examId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
     }
 
     match /units/{unitId} {
