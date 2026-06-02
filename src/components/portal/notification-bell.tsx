@@ -12,6 +12,7 @@ import { useFirestore, useCollection, useMemoFirebase, updateDocumentNonBlocking
 import { collection, query, where, orderBy, limit, doc, writeBatch } from "firebase/firestore"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
+import { toast } from "@/hooks/use-toast"
 
 export function NotificationBell({ studentId }: { studentId: string }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -51,6 +52,39 @@ export function NotificationBell({ studentId }: { studentId: string }) {
     await batch.commit()
   }
 
+  const handleClearAll = async () => {
+    if (!firestore || !notifications || notifications.length === 0) return
+    if (!confirm("Are you sure you want to permanently delete all notifications?")) return
+
+    const batch = writeBatch(firestore)
+    // Firestore batch limit is 500
+    const toDelete = notifications.slice(0, 450)
+    toDelete.forEach(n => {
+      batch.delete(doc(firestore, "notifications", n.id))
+    })
+    
+    try {
+      await batch.commit()
+      toast({ title: "Notifications Cleared", description: "Your notification history has been deleted." })
+      setIsOpen(false)
+    } catch (error: any) {
+      toast({ title: "Error", description: "Failed to clear notifications.", variant: "destructive" })
+    }
+  }
+
+  const handleDelete = async (e: React.MouseEvent, notifId: string) => {
+    e.stopPropagation() // Prevent mark as read from firing
+    if (!firestore) return
+    try {
+      await updateDocumentNonBlocking(doc(firestore, "notifications", notifId), { read: true }) // just in case
+      const batch = writeBatch(firestore)
+      batch.delete(doc(firestore, "notifications", notifId))
+      await batch.commit()
+    } catch (error) {
+      // Handle silently
+    }
+  }
+
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
@@ -75,7 +109,7 @@ export function NotificationBell({ studentId }: { studentId: string }) {
             <h3 className="text-base font-black text-slate-900 tracking-tight">Notifications</h3>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Stay updated with your progress</p>
           </div>
-          {unreadCount > 0 && (
+          {unreadCount > 0 ? (
             <Button 
               variant="ghost" 
               size="sm" 
@@ -84,7 +118,16 @@ export function NotificationBell({ studentId }: { studentId: string }) {
             >
               <MailOpen className="h-3 w-3 mr-1.5" /> Mark all read
             </Button>
-          )}
+          ) : notifications && notifications.length > 0 ? (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleClearAll}
+              className="text-[10px] font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2 h-7 rounded-md"
+            >
+              <Trash2 className="h-3 w-3 mr-1.5" /> Clear All
+            </Button>
+          ) : null}
         </div>
         
         {/* List */}
@@ -120,9 +163,21 @@ export function NotificationBell({ studentId }: { studentId: string }) {
                   {n.link && (
                     <Link href={n.link} className="absolute inset-0 z-0" onClick={() => setIsOpen(false)} />
                   )}
-                  {!n.read && (
-                    <div className="absolute top-1/2 -translate-y-1/2 right-3 h-1.5 w-1.5 bg-emerald-600 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.4)]" />
-                  )}
+                  <div className="absolute top-1/2 -translate-y-1/2 right-3 flex items-center gap-2 z-10">
+                    {n.read && (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6 rounded-md opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                        onClick={(e) => handleDelete(e, n.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    )}
+                    {!n.read && (
+                      <div className="h-1.5 w-1.5 bg-emerald-600 rounded-full shadow-[0_0_10px_rgba(16,185,129,0.4)]" />
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -140,14 +195,16 @@ export function NotificationBell({ studentId }: { studentId: string }) {
         
         {/* Footer */}
         <div className="p-4 bg-slate-50/50 border-t border-slate-100">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="w-full text-xs font-bold text-slate-500 hover:text-slate-900 justify-between group"
-          >
-            <span>VIEW NOTIFICATION HISTORY</span>
-            <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
-          </Button>
+          <Link href="/portal/notifications" onClick={() => setIsOpen(false)}>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="w-full text-xs font-bold text-slate-500 hover:text-slate-900 justify-between group"
+            >
+              <span>VIEW NOTIFICATION HISTORY</span>
+              <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+            </Button>
+          </Link>
         </div>
       </PopoverContent>
     </Popover>

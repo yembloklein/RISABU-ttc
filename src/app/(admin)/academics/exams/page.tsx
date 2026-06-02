@@ -31,10 +31,11 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-import { Search, Plus, Loader2, BookOpen, User, Trash2, Edit2, ClipboardCheck, GraduationCap, CalendarDays, MapPin, Clock } from "lucide-react"
+import { Search, Plus, Loader2, BookOpen, User, Trash2, Edit2, ClipboardCheck, GraduationCap, CalendarDays, MapPin, Clock, Upload } from "lucide-react"
 
 import { useFirestore, useCollection, useMemoFirebase, useUser, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase"
 import { collection, query, orderBy, doc, serverTimestamp, addDoc, where, writeBatch } from "firebase/firestore"
+import * as XLSX from "xlsx"
 
 import { toast } from "@/hooks/use-toast"
 
@@ -70,6 +71,7 @@ export default function ExaminationsPage() {
   
   const firestore = useFirestore()
   const { user } = useUser()
+  const [isImporting, setIsImporting] = useState(false)
 
   // 1. Fetch Units
   const unitsRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "units") : null, [firestore, user])
@@ -202,6 +204,80 @@ export default function ExaminationsPage() {
     }
   }
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (selectedUnit === "all") {
+      toast({ title: "Select a Unit", description: "Please select a specific unit before importing grades.", variant: "destructive" })
+      e.target.value = ""
+      return
+    }
+
+    const unit = units?.find(u => u.id === selectedUnit)
+    if (!unit || !firestore || !students) return
+
+    setIsImporting(true)
+    try {
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data)
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]]
+      const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet)
+
+      const batch = writeBatch(firestore)
+      let importedCount = 0
+
+      jsonData.forEach((row) => {
+        // Try to match student by admission number (case insensitive)
+        const adm = row['AdmissionNumber'] || row['Admission Number'] || row['Adm']
+        const cat = Number(row['CATMarks'] || row['CAT Marks'] || row['CAT']) || 0
+        const final = Number(row['FinalMarks'] || row['Final Marks'] || row['Final']) || 0
+
+        if (!adm) return
+
+        const student = students.find(s => s.admissionNumber?.toLowerCase() === String(adm).toLowerCase())
+        if (!student) return
+
+        const total = cat + final
+        const gradeInfo = getGradeInfo(total)
+
+        // Check if grade already exists for this unit and student
+        const exists = grades?.some(g => g.studentId === student.id && g.unitId === selectedUnit)
+        if (exists) return // Skip duplicates
+
+        const newGradeRef = doc(collection(firestore, "grades"))
+        batch.set(newGradeRef, {
+          studentId: student.id,
+          studentName: `${student.firstName} ${student.lastName}`,
+          studentAdm: student.admissionNumber || student.id.substring(0, 8),
+          unitId: unit.id,
+          unitName: unit.name,
+          unitCode: unit.code,
+          catMarks: cat,
+          finalMarks: final,
+          totalMarks: total,
+          gradeLetter: gradeInfo.letter,
+          gradeLabel: gradeInfo.label,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
+        })
+        importedCount++
+      })
+
+      if (importedCount > 0) {
+        await batch.commit()
+        toast({ title: "Import Successful", description: `Successfully imported ${importedCount} grades.` })
+      } else {
+        toast({ title: "No Grades Imported", description: "Could not find matching students or grades already exist.", variant: "default" })
+      }
+    } catch (error: any) {
+      toast({ title: "Import Failed", description: error.message, variant: "destructive" })
+    } finally {
+      setIsImporting(false)
+      e.target.value = ""
+    }
+  }
+
   // --- Schedule Handlers ---
   const handleSaveSchedule = async () => {
     if (!firestore) return
@@ -315,12 +391,31 @@ export default function ExaminationsPage() {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <Button 
-              className="h-10 px-4 rounded-lg text-sm font-medium shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white transition-all w-full md:w-auto"
-              onClick={handleOpenAddGradeDialog}
-            >
-              <Plus className="mr-2 h-4 w-4" /> Add Result
-            </Button>
+            <div className="flex gap-2 w-full md:w-auto">
+              <div className="relative">
+                <input 
+                  type="file" 
+                  accept=".xlsx, .xls, .csv" 
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  onChange={handleFileUpload}
+                  disabled={isImporting || selectedUnit === "all"}
+                />
+                <Button 
+                  variant="outline"
+                  className="h-10 px-4 rounded-lg text-sm font-medium shadow-sm border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition-all w-full"
+                  disabled={isImporting || selectedUnit === "all"}
+                >
+                  {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                  Import Excel
+                </Button>
+              </div>
+              <Button 
+                className="h-10 px-4 rounded-lg text-sm font-medium shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white transition-all w-full md:w-auto"
+                onClick={handleOpenAddGradeDialog}
+              >
+                <Plus className="mr-2 h-4 w-4" /> Add Result
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
