@@ -183,7 +183,6 @@ export default function AcademicResourcesPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Notes">Lecture Notes</SelectItem>
-                      <SelectItem value="Assignment">Assignment</SelectItem>
                       <SelectItem value="Reference">Reference Material</SelectItem>
                     </SelectContent>
                   </Select>
