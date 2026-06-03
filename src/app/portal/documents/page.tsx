@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   FileText, Loader2, Download, Receipt, FileCheck2,
-  Briefcase, GraduationCap, ArrowRight, ScrollText, BarChart3
+  Briefcase, GraduationCap, ArrowRight, BarChart3
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import jsPDF from "jspdf"
@@ -16,7 +16,7 @@ import html2canvas from "html2canvas"
 import { PaymentReceipt } from "@/components/documents/payment-receipt"
 import { ExamPass } from "@/components/documents/exam-pass"
 import { InternshipLetter } from "@/components/documents/internship-letter"
-import { AdmissionLetter } from "@/components/documents/admission-letter"
+
 import { FinancialStatement } from "@/components/documents/financial-statement"
 
 export default function DocumentsPage() {
@@ -39,12 +39,6 @@ export default function DocumentsPage() {
   }, [firestore])
   const { data: schoolDocs } = useCollection(schoolDocsQuery)
 
-  // Student-specific uploaded documents (e.g. official admission letter from registrar)
-  const studentDocsQuery = useMemoFirebase(() => {
-    if (!firestore || !student?.id) return null
-    return query(collection(firestore, "student_documents"), where("studentId", "==", student.id))
-  }, [firestore, student])
-  const { data: studentDocs } = useCollection(studentDocsQuery)
 
   // Payments
   const paymentsQuery = useMemoFirebase(() => {
@@ -73,13 +67,13 @@ export default function DocumentsPage() {
   const receiptRef = useRef<HTMLDivElement>(null)
   const examPassRef = useRef<HTMLDivElement>(null)
   const internshipLetterRef = useRef<HTMLDivElement>(null)
-  const admissionLetterRef = useRef<HTMLDivElement>(null)
+
   const financialStatementRef = useRef<HTMLDivElement>(null)
 
   const [isGenerating, setIsGenerating] = useState(false)
   const [isGeneratingExamPass, setIsGeneratingExamPass] = useState(false)
   const [isGeneratingInternship, setIsGeneratingInternship] = useState(false)
-  const [isGeneratingAdmission, setIsGeneratingAdmission] = useState(false)
+
   const [isGeneratingStatement, setIsGeneratingStatement] = useState(false)
 
   // ── Fee stats ────────────────────────────────────────────────────────────────
@@ -162,14 +156,6 @@ export default function DocumentsPage() {
   const internshipTemplate = schoolDocs?.find(d => d.type === "official_internship_letter")?.downloadURL
   const feeStructureTemplate = schoolDocs?.find(d => d.type === "official_fee_structure")?.downloadURL
 
-  // Admission letter URL — same priority order as the dashboard
-  const studentSpecificOfficialLetter = studentDocs?.find(d => d.category === "admission_letter" && d.isOfficial === true)
-  const customAdmissionLetter = studentDocs?.find(d => d.category === "admission_letter")
-  const officialAdmissionLetter = schoolDocs?.find(d => d.type === "official_admission_letter")
-  const admissionLetterUrl =
-    studentSpecificOfficialLetter?.downloadURL ||
-    customAdmissionLetter?.downloadURL ||
-    officialAdmissionLetter?.downloadURL
 
   if (isStudentLoading || isProgramLoading || isPaymentsLoading || isInvoicesLoading) {
     return (
@@ -182,20 +168,6 @@ export default function DocumentsPage() {
 
   // ── On-demand document cards ─────────────────────────────────────────────────
   const onDemandDocs = [
-    {
-      title: "Admission Letter",
-      desc: "Official letter confirming your enrolment at Risabu TTC.",
-      icon: ScrollText,
-      color: "bg-emerald-50 text-emerald-600",
-      btnColor: "text-emerald-600 hover:bg-emerald-50",
-      loading: isGeneratingAdmission,
-      locked: false,
-      action: () => generatePdf(
-        admissionLetterRef,
-        `Admission_Letter_${student?.admissionNumber?.replace(/\//g, "_") || "Student"}.pdf`,
-        setIsGeneratingAdmission
-      ),
-    },
     {
       title: "Examination Pass",
       desc: feeStats.isCleared
@@ -370,14 +342,7 @@ export default function DocumentsPage() {
         {activeReceipt && (
           <PaymentReceipt ref={receiptRef} student={student} payment={activeReceipt} templateImageUrl={paymentReceiptTemplate} />
         )}
-        {student && (
-          <AdmissionLetter
-            ref={admissionLetterRef}
-            student={student}
-            program={program || { name: student.appliedCourse, code: "RTTC-01" }}
-            templateImageUrl={admissionLetterUrl}
-          />
-        )}
+
         {student && (
           <ExamPass ref={examPassRef} student={student} program={{ name: student.appliedCourse, code: "RTTC-01" }} templateImageUrl={feeStructureTemplate || examPassTemplate} />
         )}
