@@ -58,12 +58,28 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
       if (firestore && user.email) {
         try {
-          const q = query(collection(firestore, "students"), where("contactEmail", "==", user.email), limit(1))
-          const snap = await getDocs(q)
-          if (snap.empty) {
+          const emailVariants = [
+            user.email, 
+            user.email.toLowerCase(), 
+            user.email.trim(), 
+            user.email.trim().toLowerCase()
+          ]
+          const uniqueVariants = Array.from(new Set(emailVariants))
+          
+          let studentDoc = null
+          for (const emailVar of uniqueVariants) {
+            const q = query(collection(firestore, "students"), where("contactEmail", "==", emailVar), limit(1))
+            const snap = await getDocs(q)
+            if (!snap.empty) {
+              studentDoc = snap.docs[0]
+              break
+            }
+          }
+
+          if (!studentDoc) {
             router.push("/portal/login")
           } else {
-            setStudentData({ id: snap.docs[0].id, ...snap.docs[0].data() })
+            setStudentData({ id: studentDoc.id, ...studentDoc.data() })
             setIsLoading(false)
           }
         } catch (e) {

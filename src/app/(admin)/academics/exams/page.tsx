@@ -38,6 +38,8 @@ import { collection, query, orderBy, doc, serverTimestamp, addDoc, where, writeB
 import * as XLSX from "xlsx"
 
 import { toast } from "@/hooks/use-toast"
+import { triggerEmail } from "@/lib/send-email"
+import { getExamScheduledEmail } from "@/lib/email-templates"
 
 // Standard Kenyan University Grading
 const getGradeInfo = (total: number) => {
@@ -324,6 +326,14 @@ export default function ExaminationsPage() {
             read: false,
             createdAt: serverTimestamp()
           })
+
+          // Send email notification
+          if (student.contactEmail) {
+            triggerEmail({
+              to: student.contactEmail,
+              ...getExamScheduledEmail(student.firstName, `${unit.code} - ${unit.name} (${examType})`, `${date} at ${time}`)
+            }).catch(e => console.error("Failed to send exam email", e))
+          }
         })
         
         await batch.commit()

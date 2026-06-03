@@ -1,8 +1,7 @@
 "use client"
 
-import { useUser, useFirestore, useStorage, useCollection, useMemoFirebase } from "@/firebase"
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
 import { collection, query, addDoc, deleteDoc, doc, serverTimestamp } from "firebase/firestore"
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage"
 import { useState, useRef, useMemo } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -132,7 +131,6 @@ function formatBytes(bytes: number) {
 export default function SchoolDocumentsPage() {
   const { user } = useUser()
   const firestore = useFirestore()
-  const storage = useStorage()
   const { toast } = useToast()
 
   const schoolDocsQuery = useMemoFirebase(() => {
@@ -171,16 +169,17 @@ export default function SchoolDocumentsPage() {
     try {
       const typeInfo = OFFICIAL_DOC_TYPES.find(t => t.key === activeType)
 
+      // Delete old document(s) of same type in background
       const existingDocs = schoolDocs?.filter((d: any) => d.type === activeType) || []
-      
-      // Run cleanup in the background to avoid delaying the new upload
       existingDocs.forEach((oldDoc: any) => {
         const cleanup = async () => {
           try {
-            if (oldDoc.downloadURL && !oldDoc.downloadURL.includes('firebasestorage')) {
-              await fetch('/api/school_documents/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileUrl: oldDoc.downloadURL }) })
-            } else if (oldDoc.storagePath) {
-              await deleteObject(ref(storage, oldDoc.storagePath))
+            if (oldDoc.publicId) {
+              await fetch('/api/upload/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ publicId: oldDoc.publicId, resourceType: 'raw' }),
+              })
             }
             await deleteDoc(doc(firestore, "school_documents", oldDoc.id))
           } catch (e) {
@@ -190,20 +189,20 @@ export default function SchoolDocumentsPage() {
         cleanup()
       })
 
-      setUploadProgress(40) // Starting upload...
-      const formData = new FormData()
-      formData.append('file', file)
-      formData.append('type', activeType)
+      setUploadProgress(40)
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', file)
+      uploadFormData.append('folder', `school_documents/${activeType}`)
 
-      const response = await fetch('/api/school_documents/upload', {
+      const response = await fetch('/api/upload', {
         method: 'POST',
-        body: formData
+        body: uploadFormData,
       })
-      
+
       if (!response.ok) {
-        throw new Error("Upload failed via local API")
+        throw new Error("Upload failed")
       }
-      
+
       const result = await response.json()
       setUploadProgress(100)
 
@@ -213,7 +212,7 @@ export default function SchoolDocumentsPage() {
         fileName: file.name,
         fileSize: file.size,
         downloadURL: result.fileUrl,
-        storagePath: null,
+        publicId: result.publicId,
         uploadedAt: serverTimestamp(),
         uploadedBy: user?.email,
         active: true,
@@ -233,14 +232,12 @@ export default function SchoolDocumentsPage() {
     if (!deleteTarget || !firestore) return
     setIsDeleting(true)
     try {
-      if (deleteTarget.downloadURL && !deleteTarget.downloadURL.includes('firebasestorage')) {
-        await fetch('/api/school_documents/delete', { 
-          method: 'POST', 
-          headers: { 'Content-Type': 'application/json' }, 
-          body: JSON.stringify({ fileUrl: deleteTarget.downloadURL }) 
-        })
-      } else if (deleteTarget.storagePath) {
-        await deleteObject(ref(storage, deleteTarget.storagePath))
+      if (deleteTarget.publicId) {
+        await fetch('/api/upload/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ publicId: deleteTarget.publicId, resourceType: 'raw' }),
+        }).catch(e => console.warn('Cloudinary delete warning:', e))
       }
       await deleteDoc(doc(firestore, "school_documents", deleteTarget.id))
       toast({ title: "Document Removed", description: "The file has been permanently deleted." })
@@ -298,125 +295,123 @@ export default function SchoolDocumentsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {isLoading
           ? Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} className="h-48 rounded-xl bg-slate-100 animate-pulse" />
-            ))
+            <div key={i} className="h-48 rounded-xl bg-slate-100 animate-pulse" />
+          ))
           : OFFICIAL_DOC_TYPES.map((type) => {
-              const Icon = type.icon
-              const isUploading = uploadingType === type.key
-              const existing = schoolDocs?.find((d: any) => d.type === type.key)
-              const hasFile = !!existing
+            const Icon = type.icon
+            const isUploading = uploadingType === type.key
+            const existing = schoolDocs?.find((d: any) => d.type === type.key)
+            const hasFile = !!existing
 
-              return (
-                <Card
-                  key={type.key}
-                  className={`border shadow-sm rounded-xl overflow-hidden transition-all hover:shadow-md ${
-                    hasFile ? "border-slate-200 bg-white" : "border-dashed border-slate-300 bg-slate-50/50"
+            return (
+              <Card
+                key={type.key}
+                className={`border shadow-sm rounded-xl overflow-hidden transition-all hover:shadow-md ${hasFile ? "border-slate-200 bg-white" : "border-dashed border-slate-300 bg-slate-50/50"
                   }`}
-                >
-                  {/* Card top accent bar */}
-                  <div className={`h-0.5 w-full ${hasFile ? type.accent : "bg-slate-200"}`} />
+              >
+                {/* Card top accent bar */}
+                <div className={`h-0.5 w-full ${hasFile ? type.accent : "bg-slate-200"}`} />
 
-                  <CardContent className="p-4 space-y-3">
-                    {/* Header */}
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${type.bg}`}>
-                          <Icon className={`h-4 w-4 ${type.color}`} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold text-slate-900 leading-tight">{type.label}</p>
-                          <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
-                            <Globe className="h-2.5 w-2.5" /> {type.usage}
-                          </p>
-                        </div>
+                <CardContent className="p-4 space-y-3">
+                  {/* Header */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${type.bg}`}>
+                        <Icon className={`h-4 w-4 ${type.color}`} />
                       </div>
-                      {hasFile
-                        ? <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 border text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0">Live</Badge>
-                        : <Badge className="bg-slate-100 text-slate-500 border-slate-200 border text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0">Not set</Badge>
-                      }
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-900 leading-tight">{type.label}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
+                          <Globe className="h-2.5 w-2.5" /> {type.usage}
+                        </p>
+                      </div>
                     </div>
+                    {hasFile
+                      ? <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 border text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0">Live</Badge>
+                      : <Badge className="bg-slate-100 text-slate-500 border-slate-200 border text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0">Not set</Badge>
+                    }
+                  </div>
 
-                    {/* Description */}
-                    <p className="text-xs text-slate-500 leading-relaxed">{type.description}</p>
+                  {/* Description */}
+                  <p className="text-xs text-slate-500 leading-relaxed">{type.description}</p>
 
-                    {/* File info or empty state */}
-                    {hasFile ? (
-                      <div className={`rounded-lg p-3 border ${type.border} ${type.bg}`}>
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <p className={`text-xs font-bold truncate ${type.color}`}>{existing.fileName}</p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              <span className="text-[10px] text-slate-500">{formatBytes(existing.fileSize)}</span>
-                              {existing.uploadedAt?.toDate && (
-                                <>
-                                  <span className="h-1 w-1 rounded-full bg-slate-300" />
-                                  <span className="text-[10px] text-slate-500">
-                                    {formatDistanceToNow(existing.uploadedAt.toDate(), { addSuffix: true })}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <Button size="icon" variant="ghost" className={`h-7 w-7 ${type.color} hover:${type.bg}`} asChild>
-                              <a href={existing.downloadURL} target="_blank" rel="noopener noreferrer">
-                                <Download className="h-3.5 w-3.5" />
-                              </a>
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="h-7 w-7 text-rose-400 hover:text-rose-600 hover:bg-rose-50"
-                              onClick={() => setDeleteTarget(existing)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
+                  {/* File info or empty state */}
+                  {hasFile ? (
+                    <div className={`rounded-lg p-3 border ${type.border} ${type.bg}`}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-xs font-bold truncate ${type.color}`}>{existing.fileName}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[10px] text-slate-500">{formatBytes(existing.fileSize)}</span>
+                            {existing.uploadedAt?.toDate && (
+                              <>
+                                <span className="h-1 w-1 rounded-full bg-slate-300" />
+                                <span className="text-[10px] text-slate-500">
+                                  {formatDistanceToNow(existing.uploadedAt.toDate(), { addSuffix: true })}
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="h-14 rounded-lg border border-dashed border-slate-200 flex items-center justify-center bg-white/60">
-                        <div className="flex items-center gap-2 text-slate-400">
-                          <FolderOpen className="h-4 w-4" />
-                          <span className="text-xs">No file uploaded</span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button size="icon" variant="ghost" className={`h-7 w-7 ${type.color} hover:${type.bg}`} asChild>
+                            <a href={existing.downloadURL} target="_blank" rel="noopener noreferrer">
+                              <Download className="h-3.5 w-3.5" />
+                            </a>
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-rose-400 hover:text-rose-600 hover:bg-rose-50"
+                            onClick={() => setDeleteTarget(existing)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       </div>
-                    )}
+                    </div>
+                  ) : (
+                    <div className="h-14 rounded-lg border border-dashed border-slate-200 flex items-center justify-center bg-white/60">
+                      <div className="flex items-center gap-2 text-slate-400">
+                        <FolderOpen className="h-4 w-4" />
+                        <span className="text-xs">No file uploaded</span>
+                      </div>
+                    </div>
+                  )}
 
-                    {/* Upload button or progress */}
-                    {isUploading ? (
-                      <div className="space-y-1.5">
-                        <Progress value={uploadProgress} className="h-1.5" />
-                        <div className="flex items-center justify-between">
-                          <p className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
-                            <Loader2 className="h-3 w-3 animate-spin" /> Uploading...
-                          </p>
-                          <p className="text-[10px] font-bold text-slate-700">{uploadProgress}%</p>
-                        </div>
+                  {/* Upload button or progress */}
+                  {isUploading ? (
+                    <div className="space-y-1.5">
+                      <Progress value={uploadProgress} className="h-1.5" />
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Uploading...
+                        </p>
+                        <p className="text-[10px] font-bold text-slate-700">{uploadProgress}%</p>
                       </div>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant={hasFile ? "outline" : "default"}
-                        className={`w-full h-8 text-xs font-semibold gap-1.5 ${
-                          hasFile
-                            ? "border-slate-200 text-slate-600 hover:bg-slate-50"
-                            : "bg-emerald-600 hover:bg-emerald-700 text-white"
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant={hasFile ? "outline" : "default"}
+                      className={`w-full h-8 text-xs font-semibold gap-1.5 ${hasFile
+                          ? "border-slate-200 text-slate-600 hover:bg-slate-50"
+                          : "bg-emerald-600 hover:bg-emerald-700 text-white"
                         }`}
-                        onClick={() => triggerUpload(type.key)}
-                        disabled={!!uploadingType}
-                      >
-                        {hasFile ? (
-                          <><RefreshCw className="h-3.5 w-3.5" /> Replace File</>
-                        ) : (
-                          <><FileUp className="h-3.5 w-3.5" /> Upload File</>
-                        )}
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-              )
-            })
+                      onClick={() => triggerUpload(type.key)}
+                      disabled={!!uploadingType}
+                    >
+                      {hasFile ? (
+                        <><RefreshCw className="h-3.5 w-3.5" /> Replace File</>
+                      ) : (
+                        <><FileUp className="h-3.5 w-3.5" /> Upload File</>
+                      )}
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })
         }
       </div>
 

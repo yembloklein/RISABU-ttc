@@ -1,7 +1,7 @@
 "use client"
 
-import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
-import { collection, query, where, limit } from "firebase/firestore"
+import { useUser, useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking } from "@/firebase"
+import { collection, query, where, limit, serverTimestamp } from "firebase/firestore"
 import { useMemo, useRef, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import {
@@ -9,12 +9,15 @@ import {
   CheckCircle2, AlertCircle, Smartphone, Info, X, Eye
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { formatDistanceToNow } from "date-fns"
 import { FinancialStatement } from "@/components/documents/financial-statement"
 import { PaymentReceipt } from "@/components/documents/payment-receipt"
 import jsPDF from "jspdf"
 import html2canvas from "html2canvas"
 import { useToast } from "@/hooks/use-toast"
+import { PaystackButton } from "react-paystack"
 
 export default function FinancePage() {
   const { user } = useUser()
@@ -82,6 +85,7 @@ export default function FinancePage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [activeReceipt, setActiveReceipt] = useState<any>(null)
   const [showReceiptModal, setShowReceiptModal] = useState(false)
+  const [paymentAmount, setPaymentAmount] = useState<string>('')
 
   const downloadStatement = async () => {
     if (!statementRef.current) return
@@ -123,6 +127,23 @@ export default function FinancePage() {
       setIsGenerating(false)
     }
   }
+
+  const handlePaystackSuccessAction = (reference: any, paidAmount: number) => {
+    if (!firestore || !user || !student) return;
+    addDocumentNonBlocking(collection(firestore, "payments"), {
+      type: "Fee",
+      studentId: student.id,
+      amount: paidAmount,
+      paymentMethod: "Paystack (Online)",
+      transactionReference: reference.reference || `PAYSTACK-${Date.now().toString().slice(-6)}`,
+      paymentDate: new Date().toISOString(),
+      recordedByUserId: user.uid,
+      recordedByUserFirebaseUid: user.uid,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    toast({ title: "Payment Successful", description: "Your fee balance has been updated." });
+  };
 
   if (isStudentLoading) {
     return (
@@ -337,6 +358,42 @@ export default function FinancePage() {
               </p>
             </CardContent>
           </Card>
+
+          {!isCleared && (
+            <Card className="border shadow-sm rounded-xl overflow-hidden border-emerald-200 bg-emerald-50/30">
+              <CardContent className="p-4 space-y-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Pay Here</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Pay Online Via M-pesa or card</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="pay-amount" className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Amount to Pay (KES)</Label>
+                  <Input
+                    id="pay-amount"
+                    type="number"
+                    placeholder={`e.g. ${feeStats.balance}`}
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value)}
+                    className="h-10 bg-white border-emerald-200 focus-visible:ring-emerald-500 font-bold"
+                  />
+                </div>
+                <PaystackButton
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 rounded-xl shadow-md transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  text={`Pay KES ${(paymentAmount ? Number(paymentAmount) : feeStats.balance).toLocaleString()}`}
+                  email={user?.email || 'student@risabu.edu'}
+                  amount={(paymentAmount ? Number(paymentAmount) : feeStats.balance) * 100}
+                  publicKey={process.env.NEXT_PUBLIC_PAYSTACK_KEY || 'pk_test_1e21b8bbfccfbf2f8a8ad4fbd9d7496cc0a78a60'}
+                  currency="KES"
+                  reference={(new Date()).getTime().toString()}
+                  onSuccess={(ref) => {
+                    handlePaystackSuccessAction(ref, paymentAmount ? Number(paymentAmount) : feeStats.balance);
+                    setPaymentAmount('');
+                  }}
+                  onClose={() => console.log('Payment modal closed')}
+                />
+              </CardContent>
+            </Card>
+          )}
 
           <div className="flex items-start gap-2 px-1">
             <Info className="h-3.5 w-3.5 text-blue-400 shrink-0 mt-0.5" />

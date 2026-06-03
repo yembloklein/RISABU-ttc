@@ -448,7 +448,7 @@ export default function StudentsPage() {
                 <h2 className="text-lg font-semibold text-slate-600 uppercase tracking-widest mt-1">Official Student Record</h2>
               </div>
             </header>
-            
+
             <main className="space-y-10">
               <section className="grid grid-cols-2 gap-8">
                 <div>
@@ -460,7 +460,7 @@ export default function StudentsPage() {
                     <p><span className="font-semibold text-slate-500 w-32 inline-block">Address:</span> {activeStudent.address || 'N/A'}</p>
                   </div>
                 </div>
-                
+
                 <div>
                   <h3 className="text-sm font-bold uppercase tracking-wider border-b pb-2 mb-4 text-emerald-700">Academic Information</h3>
                   <div className="space-y-3 text-sm">
@@ -516,64 +516,109 @@ export default function StudentsPage() {
               </div>
             </div>
           ) : (
-            <div className="w-[11in] h-[8.5in] border-[12px] border-primary p-1 bg-white relative">
-              <div className="w-full h-full border-[2px] border-primary p-12 flex flex-col items-center justify-between text-center relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-700/5 -mr-32 -mt-32 rounded-full"></div>
-                <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-700/5 -ml-32 -mb-32 rounded-full"></div>
+            <div className="w-[11in] h-[8.5in] p-2 bg-[#f8fcfb] relative mx-auto shadow-2xl overflow-hidden print:shadow-none print:m-0 border border-slate-200">
+              {/* Ornate Border Setup */}
+              <div className="w-full h-full border-[10px] border-emerald-800 p-1.5 relative">
+                <div className="w-full h-full border-[2px] border-emerald-700/60 p-10 flex flex-col items-center justify-between text-center relative bg-white">
 
-                <header className="space-y-6 w-full">
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="bg-white p-3 rounded-2xl shadow-xl border-4 border-slate-100 overflow-hidden">
-                      <Logo size={80} />
-                    </div>
-                    <div className="space-y-1">
-                      <h1 className="text-5xl font-black text-emerald-700 uppercase tracking-tighter">Risabu Technical</h1>
-                      <h2 className="text-2xl font-bold text-slate-600 uppercase tracking-[0.3em]">Training College</h2>
-                    </div>
-                  </div>
-                </header>
-
-                <main className="space-y-10 flex-1 flex flex-col justify-center w-full max-w-4xl">
-                  <div className="space-y-3">
-                    <span className="text-2xl font-serif italic text-emerald-700/70">This is to certify that</span>
-                    <div className="relative inline-block w-full">
-                      <h3 className="text-7xl font-black text-slate-900 py-6 tracking-tight relative z-10">
-                        {activeStudent.firstName} {activeStudent.lastName}
-                      </h3>
-                    </div>
+                  {/* Subtle Background Elements */}
+                  <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
+                    <Logo size={500} />
                   </div>
 
-                  <div className="space-y-6">
-                    <span className="text-xl font-medium text-slate-500 uppercase tracking-widest">has successfully fulfilled the prescribed requirements for the award of</span>
-                    <div className="bg-emerald-700/5 py-8 px-16 rounded-3xl border-2 border-emerald-100 inline-block shadow-inner">
-                      <h4 className="text-4xl font-black text-emerald-700 uppercase tracking-tight">
-                        {activeStudent.appliedCourse || "Professional Certification"}
-                      </h4>
-                    </div>
-                  </div>
-                </main>
+                  {/* Corner Ornaments */}
+                  <div className="absolute top-2 left-2 w-16 h-16 border-t-[3px] border-l-[3px] border-emerald-800 rounded-tl-xl"></div>
+                  <div className="absolute top-2 right-2 w-16 h-16 border-t-[3px] border-r-[3px] border-emerald-800 rounded-tr-xl"></div>
+                  <div className="absolute bottom-2 left-2 w-16 h-16 border-b-[3px] border-l-[3px] border-emerald-800 rounded-bl-xl"></div>
+                  <div className="absolute bottom-2 right-2 w-16 h-16 border-b-[3px] border-r-[3px] border-emerald-800 rounded-br-xl"></div>
 
-                <footer className="w-full flex justify-around items-end pt-12">
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="w-56 border-b-4 border-emerald-100 h-16 flex items-end justify-center pb-2 italic text-slate-400">
-                      <span className="font-mono text-[10px] opacity-40 uppercase tracking-[0.2em]">{activeStudent.admissionNumber || activeStudent.id}</span>
-                    </div>
-                    <span className="text-sm font-black text-emerald-700 uppercase tracking-[0.2em]">Registrar</span>
-                  </div>
-
-                  <div className="relative group">
-                    <div className="w-40 h-40 border-[6px] border-emerald-100 rounded-full flex items-center justify-center bg-emerald-700/[0.02]">
-                      <div className="w-32 h-32 border-2 border-dashed border-emerald-700/30 rounded-full flex items-center justify-center">
-                        <FileBadge className="h-20 w-20 text-emerald-700/40" />
+                  {/* Header */}
+                  <header className="space-y-6 w-full relative z-10 mt-4">
+                    <div className="flex flex-col items-center gap-5">
+                      <div className="bg-white p-3 rounded-full shadow-lg border border-slate-100">
+                        <Logo size={75} />
+                      </div>
+                      <div className="space-y-1">
+                        <h1 className="text-4xl font-black text-emerald-900 uppercase tracking-widest" style={{ fontFamily: 'Georgia, serif' }}>Risabu Technical</h1>
+                        <h2 className="text-xl font-bold text-slate-600 uppercase tracking-[0.4em] mt-1">Training College</h2>
                       </div>
                     </div>
-                  </div>
+                  </header>
 
-                  <div className="flex flex-col items-center gap-3">
-                    <div className="w-56 border-b-4 border-emerald-100 h-16"></div>
-                    <span className="text-sm font-black text-emerald-700 uppercase tracking-[0.2em]">Principal</span>
+                  {/* Main Body */}
+                  <main className="space-y-8 flex-1 flex flex-col justify-center w-full max-w-4xl relative z-10 mt-6">
+                    <div className="space-y-4">
+                      <span className="text-3xl font-serif italic text-slate-600" style={{ fontFamily: 'Georgia, serif' }}>This is to certify that</span>
+                      <div className="relative inline-block w-full px-8 py-2">
+                        <h3 className="text-6xl font-bold text-slate-900 py-2 border-b border-emerald-200 inline-block px-12" style={{ fontFamily: 'Georgia, serif' }}>
+                          {activeStudent.firstName} {activeStudent.lastName}
+                        </h3>
+                      </div>
+                    </div>
+
+                    <div className="space-y-5">
+                      <span className="text-lg font-medium text-slate-600 uppercase tracking-widest block max-w-2xl mx-auto leading-relaxed">
+                        having successfully completed the prescribed course of study and satisfied the examiners, is hereby awarded the
+                      </span>
+                      <div className="pt-4">
+                        <h4 className="text-4xl font-black text-emerald-800 uppercase tracking-tight px-12 py-4 bg-emerald-50/50 inline-block border-y-2 border-emerald-100 shadow-sm" style={{ fontFamily: 'Georgia, serif' }}>
+                          {activeStudent.appliedCourse || "Professional Certification"}
+                        </h4>
+                      </div>
+                    </div>
+                  </main>
+
+                  {/* Footer / Signatures */}
+                  <footer className="w-full flex justify-between items-end px-16 pb-8 relative z-10">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-64 h-16 flex items-end justify-center pb-2">
+                        <span className="font-mono text-sm text-slate-800 border-b border-slate-300 w-full text-center pb-1">
+                          {new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        </span>
+                      </div>
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Date of Issue</span>
+                    </div>
+
+                    <div className="relative transform translate-y-4">
+                      <div className="w-36 h-36 border-[4px] border-emerald-800/20 rounded-full flex items-center justify-center bg-white shadow-inner relative z-20">
+                        <div className="w-28 h-28 border-[2px] border-dashed border-emerald-700 rounded-full flex flex-col items-center justify-center">
+                          <Logo size={40} className="opacity-80 mb-1" />
+                          <span className="text-[6px] font-bold text-emerald-800 uppercase tracking-widest">Official Seal</span>
+                        </div>
+                      </div>
+                      {/* Ribbon effect */}
+                      <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-16 h-24 bg-emerald-700 z-10" style={{ clipPath: 'polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%)' }}></div>
+                    </div>
+
+                    <div className="flex flex-col items-center gap-2 relative">
+                      <div className="w-64 h-16 border-b border-slate-300 flex justify-center items-end relative">
+                        <img
+                          src="/signature.png"
+                          alt="Principal Signature"
+                          className="absolute bottom-2 h-20 object-contain opacity-90 mix-blend-multiply"
+                        />
+                      </div>
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-1">Principal Signature</span>
+                    </div>
+                  </footer>
+
+                  {/* Serial Number & QR Code */}
+                  <div className="absolute bottom-6 left-8 flex items-end gap-4 z-20">
+                    <div className="w-24 h-24 p-1.5 bg-white border-2 border-slate-200 shadow-sm rounded-md flex-shrink-0">
+                      <img
+                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=1&data=${encodeURIComponent(`https://risabuttc.co.ke/verify/${activeStudent.admissionNumber?.replace(/\//g, '') || activeStudent.id.substring(0, 8)}`)}`}
+                        alt="Verification QR Code"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div className="pb-2 text-left">
+                      <span className="font-mono text-xs text-slate-700 uppercase tracking-[0.2em] block mb-1 font-bold">
+                        S/N: {activeStudent.admissionNumber?.replace(/\//g, '') || activeStudent.id.substring(0, 8)}
+                      </span>
+                      <span className="text-[7px] text-slate-400 uppercase tracking-widest font-bold">Scan to Verify Authenticity</span>
+                    </div>
                   </div>
-                </footer>
+                </div>
               </div>
             </div>
           )}
@@ -790,8 +835,8 @@ export default function StudentsPage() {
                     </TableCell>
                     <TableCell className="py-3">
                       <Badge variant="outline" className={`border-0 font-medium px-2.5 py-0.5 rounded-full text-xs ${(student.status || "Active") === "Active" ? "bg-emerald-50 text-emerald-700" :
-                          (student.status || "Active") === "On Leave" ? "bg-orange-50 text-orange-700" :
-                            (student.status || "Active") === "Graduated" ? "bg-slate-100 text-slate-700" : "bg-rose-50 text-rose-700"
+                        (student.status || "Active") === "On Leave" ? "bg-orange-50 text-orange-700" :
+                          (student.status || "Active") === "Graduated" ? "bg-slate-100 text-slate-700" : "bg-rose-50 text-rose-700"
                         }`}>
                         {student.status || "Active"}
                       </Badge>
@@ -819,8 +864,8 @@ export default function StudentsPage() {
                                   <SheetTitle className="text-xl font-bold text-slate-900">{activeStudent?.firstName} {activeStudent?.lastName}</SheetTitle>
                                   <SheetDescription className="font-mono text-xs font-bold text-emerald-600 mt-0.5">ADM: {activeStudent?.admissionNumber || activeStudent?.id}</SheetDescription>
                                   <Badge variant="outline" className={`mt-2 border-0 font-semibold text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md ${(activeStudent?.status || "Active") === "Active" ? "bg-emerald-50 text-emerald-700" :
-                                      (activeStudent?.status || "Active") === "On Leave" ? "bg-orange-50 text-orange-700" :
-                                        (activeStudent?.status || "Active") === "Graduated" ? "bg-slate-100 text-slate-700" : "bg-rose-50 text-rose-700"
+                                    (activeStudent?.status || "Active") === "On Leave" ? "bg-orange-50 text-orange-700" :
+                                      (activeStudent?.status || "Active") === "Graduated" ? "bg-slate-100 text-slate-700" : "bg-rose-50 text-rose-700"
                                     }`}>{activeStudent?.status || "Active"}</Badge>
                                 </div>
                               </div>

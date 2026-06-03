@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useUser, useFirestore, useCollection, useMemoFirebase, useStorage } from "@/firebase"
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
 import { collection, query, where, limit, addDoc, serverTimestamp, getDocs } from "firebase/firestore"
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+
 import { Card, CardContent } from "@/components/ui/card"
 import {
   BookOpen, FileText, Download, GraduationCap, Clock, Loader2,
@@ -80,7 +80,6 @@ function ResourceDialog({
 export default function AcademicsPage() {
   const { user } = useUser()
   const firestore = useFirestore()
-  const storage = useStorage()
   const { toast } = useToast()
   const router = useRouter()
 
@@ -157,17 +156,28 @@ export default function AcademicsPage() {
   }
 
   const handleSubmitAssignment = async () => {
-    if (!selectedFile || !targetUnit || !student?.id || !storage || !user) {
+    if (!selectedFile || !targetUnit || !student?.id || !user) {
       toast({ title: "Error", description: "Please select a file to upload.", variant: "destructive" })
       return
     }
     setIsSubmitting(true)
     try {
-      const fileName = `${Date.now()}_${selectedFile.name}`
-      const storagePath = `submissions/${student.id}/${fileName}`
-      const storageRef = ref(storage, storagePath)
-      const uploadResult = await uploadBytes(storageRef, selectedFile)
-      const downloadUrl = await getDownloadURL(uploadResult.ref)
+      // Upload to Cloudinary via API route
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', selectedFile)
+      uploadFormData.append('folder', 'submissions')
+
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: uploadFormData,
+      })
+
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || 'Upload failed')
+      }
+
+      const result = await response.json()
 
       await addDoc(collection(firestore!, "submissions"), {
         studentId: student.id,
@@ -178,8 +188,8 @@ export default function AcademicsPage() {
         unitCode: targetUnit.unitCode,
         unitName: targetUnit.unitName,
         fileName: selectedFile.name,
-        fileUrl: downloadUrl,
-        storagePath,
+        fileUrl: result.fileUrl,
+        publicId: result.publicId,
         status: "Pending",
         submittedAt: serverTimestamp(),
       })
@@ -297,9 +307,8 @@ export default function AcademicsPage() {
                             <p className="text-xs font-mono text-slate-400 mt-0.5">{reg.unitCode}</p>
                           </div>
                         </div>
-                        <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                          reg.status === 'Registered' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
-                        }`}>
+                        <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${reg.status === 'Registered' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                          }`}>
                           {reg.status || "Registered"}
                         </span>
                       </div>
@@ -317,9 +326,8 @@ export default function AcademicsPage() {
 
                       {/* Submission status */}
                       {submission && (
-                        <div className={`rounded-lg px-3 py-2 mb-3 flex items-center gap-2 ${
-                          isGraded ? 'bg-emerald-50 border border-emerald-100' : 'bg-amber-50 border border-amber-100'
-                        }`}>
+                        <div className={`rounded-lg px-3 py-2 mb-3 flex items-center gap-2 ${isGraded ? 'bg-emerald-50 border border-emerald-100' : 'bg-amber-50 border border-amber-100'
+                          }`}>
                           {isGraded
                             ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
                             : <AlertCircle className="h-3.5 w-3.5 text-amber-600 shrink-0" />
@@ -473,13 +481,12 @@ export default function AcademicsPage() {
                       rel="noopener noreferrer"
                       className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors group"
                     >
-                      <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
-                        res.type === 'Assignment' ? 'bg-amber-50 text-amber-600' :
-                        res.type === 'Video' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'
-                      }`}>
+                      <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${res.type === 'Assignment' ? 'bg-amber-50 text-amber-600' :
+                          res.type === 'Video' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'
+                        }`}>
                         {res.type === 'Assignment' ? <FileSpreadsheet className="h-4 w-4" /> :
-                         res.type === 'Video' ? <PlayCircle className="h-4 w-4" /> :
-                         <FileText className="h-4 w-4" />}
+                          res.type === 'Video' ? <PlayCircle className="h-4 w-4" /> :
+                            <FileText className="h-4 w-4" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-slate-900 truncate leading-tight">{res.title}</p>

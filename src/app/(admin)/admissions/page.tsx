@@ -52,6 +52,8 @@ import {
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, doc, serverTimestamp } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
+import { triggerEmail } from "@/lib/send-email"
+import { getAdmissionEmail, getEnrollmentEmail } from "@/lib/email-templates"
 
 export default function AdmissionsPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -229,9 +231,12 @@ export default function AdmissionsPage() {
     }
   };
 
-  const handleStatusUpdate = (studentId: string, status: string) => {
+  const handleStatusUpdate = async (studentId: string, status: string) => {
     if (!firestore || !user) return;
     const docRef = doc(firestore, "students", studentId);
+    
+    const student = (students || []).find(s => s.id === studentId);
+    if (!student) return;
 
     const updateData: any = {
       admissionStatus: status,
@@ -239,8 +244,7 @@ export default function AdmissionsPage() {
     };
 
     if (status === "Enrolled") {
-      const student = (students || []).find(s => s.id === studentId);
-      if (student && !student.admissionNumber) {
+      if (!student.admissionNumber) {
         const admNo = generateAdmissionNumber();
         updateData.admissionNumber = admNo;
         updateData.status = "Active";
@@ -249,9 +253,33 @@ export default function AdmissionsPage() {
           title: "Enrollment Finalized \uD83C\uDF89",
           description: `Scholar officially enrolled with Admission Number: ${admNo}`
         });
+
+        if (student.contactEmail) {
+          try {
+            await triggerEmail({
+              to: student.contactEmail,
+              ...getEnrollmentEmail(student.firstName, admNo)
+            });
+            toast({ title: "Email Sent", description: "Enrollment email sent to student." });
+          } catch (error) {
+            console.error("Failed to send enrollment email:", error);
+          }
+        }
       }
     } else if (status === "Admitted") {
       toast({ title: "Admission Offered", description: `An admission letter has logically been issued to the applicant.` });
+      
+      if (student.contactEmail) {
+        try {
+          await triggerEmail({
+            to: student.contactEmail,
+            ...getAdmissionEmail(student.firstName)
+          });
+          toast({ title: "Email Sent", description: "Admission offer email sent to student." });
+        } catch (error) {
+          console.error("Failed to send admission email:", error);
+        }
+      }
     } else {
       toast({ title: "Status Updated", description: `Student application marked as ${status}.` });
     }

@@ -25,9 +25,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { BookOpen, FileText, Upload, Trash2, Loader2, Download, Search, Plus, FileSpreadsheet } from "lucide-react"
-import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, useUser, useStorage } from "@/firebase"
+import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, doc, serverTimestamp } from "firebase/firestore"
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage"
 import { toast } from "@/hooks/use-toast"
 
 export default function AcademicResourcesPage() {
@@ -36,7 +35,7 @@ export default function AcademicResourcesPage() {
   const [isUploading, setIsUploading] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [progress, setProgress] = useState(0)
-  
+
   const [formData, setFormData] = useState({
     title: "",
     type: "Notes",
@@ -44,17 +43,16 @@ export default function AcademicResourcesPage() {
   })
 
   const firestore = useFirestore()
-  const storage = useStorage()
   const { user } = useUser()
 
   const resourcesRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "academic_resources") : null, [firestore, user])
   const coursesRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "programs") : null, [firestore, user])
-  
+
   const { data: resources, isLoading: loadingResources } = useCollection(resourcesRef)
   const { data: courses } = useCollection(coursesRef)
 
   const filteredResources = useMemo(() => {
-    return (resources || []).filter(r => 
+    return (resources || []).filter(r =>
       r.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.courseName.toLowerCase().includes(searchTerm.toLowerCase())
     )
@@ -67,41 +65,47 @@ export default function AcademicResourcesPage() {
   }
 
   const handleUpload = async () => {
-    if (!file || !formData.title || !formData.courseName || !resourcesRef || !storage) {
+    if (!file || !formData.title || !formData.courseName || !resourcesRef) {
       toast({ title: "Missing Fields", description: "Please fill all fields and select a file.", variant: "destructive" })
       return
     }
 
     setIsUploading(true)
-    setProgress(0)
+    setProgress(10)
     try {
-      const storagePath = `academic_resources/${formData.courseName}/${Date.now()}_${file.name}`
-      const storageRef = ref(storage, storagePath)
-      const uploadTask = uploadBytesResumable(storageRef, file)
+      // Upload to Cloudinary via our API route
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', file)
+      uploadFormData.append('folder', 'academic_resources')
 
-      await new Promise<void>((resolve, reject) => {
-        uploadTask.on("state_changed", 
-          (snap) => setProgress(Math.round((snap.bytesTransferred / snap.totalBytes) * 100)),
-          (err) => reject(err),
-          () => resolve()
-        )
+      setProgress(40)
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: uploadFormData,
       })
 
-      const downloadURL = await getDownloadURL(uploadTask.snapshot.ref)
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || 'Upload failed')
+      }
+
+      const result = await response.json()
+      setProgress(90)
 
       await addDocumentNonBlocking(resourcesRef, {
         title: formData.title,
         type: formData.type,
         courseName: formData.courseName,
         fileName: file.name,
-        fileUrl: downloadURL,
-        storagePath: storagePath,
+        fileUrl: result.fileUrl,
+        publicId: result.publicId,
         uploadedBy: user?.email || "Admin",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })
 
-      toast({ title: "Success", description: "Resource uploaded securely to Firebase Storage." })
+      setProgress(100)
+      toast({ title: "Success", description: "Resource uploaded successfully." })
       setIsDialogOpen(false)
       setFile(null)
       setProgress(0)
@@ -118,13 +122,18 @@ export default function AcademicResourcesPage() {
     if (!confirm("Are you sure you want to delete this resource?") || !firestore) return
 
     try {
-      if (resource.storagePath && storage) {
-        await deleteObject(ref(storage, resource.storagePath)).catch(e => console.error("Error deleting from storage:", e));
+      // Delete from Cloudinary if publicId exists
+      if (resource.publicId) {
+        await fetch('/api/upload/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ publicId: resource.publicId, resourceType: 'raw' }),
+        }).catch(e => console.warn('Cloudinary delete warning:', e))
       }
-      
+
       const docRef = doc(firestore, "academic_resources", resource.id)
       deleteDocumentNonBlocking(docRef)
-      
+
       toast({ title: "Deleted", description: "Resource has been removed." })
     } catch (error: any) {
       toast({ title: "Error", description: "Failed to delete resource.", variant: "destructive" })
@@ -153,14 +162,14 @@ export default function AcademicResourcesPage() {
                 Add assignments or notes to a specific course.
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="py-4 space-y-5">
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-slate-700">Title</Label>
-                <Input 
-                  placeholder="e.g. Introduction to Typography" 
+                <Input
+                  placeholder="e.g. Introduction to Typography"
                   value={formData.title}
-                  onChange={(e) => setFormData({...formData, title: e.target.value})}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   className="h-10 border-slate-200 focus-visible:ring-emerald-500 rounded-lg"
                 />
               </div>
@@ -168,7 +177,7 @@ export default function AcademicResourcesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-slate-700">Resource Type</Label>
-                  <Select value={formData.type} onValueChange={(v) => setFormData({...formData, type: v})}>
+                  <Select value={formData.type} onValueChange={(v) => setFormData({ ...formData, type: v })}>
                     <SelectTrigger className="h-10 border-slate-200 focus:ring-emerald-500 rounded-lg">
                       <SelectValue />
                     </SelectTrigger>
@@ -181,7 +190,7 @@ export default function AcademicResourcesPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-slate-700">Target Course</Label>
-                  <Select value={formData.courseName} onValueChange={(v) => setFormData({...formData, courseName: v})}>
+                  <Select value={formData.courseName} onValueChange={(v) => setFormData({ ...formData, courseName: v })}>
                     <SelectTrigger className="h-10 border-slate-200 focus:ring-emerald-500 rounded-lg">
                       <SelectValue placeholder="Select Course" />
                     </SelectTrigger>
@@ -197,8 +206,8 @@ export default function AcademicResourcesPage() {
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-slate-700">Select File</Label>
                 <div className="relative">
-                  <input 
-                    type="file" 
+                  <input
+                    type="file"
                     onChange={handleFileChange}
                     className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                   />
@@ -214,8 +223,8 @@ export default function AcademicResourcesPage() {
             </div>
 
             <DialogFooter className="bg-slate-50 p-4 -mx-6 -mb-6 border-t border-slate-100 mt-2">
-              <Button 
-                onClick={handleUpload} 
+              <Button
+                onClick={handleUpload}
                 className="w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg shadow-sm"
                 disabled={isUploading}
               >
@@ -229,8 +238,8 @@ export default function AcademicResourcesPage() {
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-        <Input 
-          placeholder="Search by title or course..." 
+        <Input
+          placeholder="Search by title or course..."
           className="pl-9 h-10 rounded-lg bg-white border-slate-200 shadow-sm text-sm focus-visible:ring-emerald-500"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -276,11 +285,10 @@ export default function AcademicResourcesPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="py-3">
-                      <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md ${
-                        res.type === 'Assignment' ? 'bg-amber-50 text-amber-700' : 
-                        res.type === 'Reference' ? 'bg-indigo-50 text-indigo-700' :
-                        'bg-blue-50 text-blue-700'
-                      }`}>
+                      <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md ${res.type === 'Assignment' ? 'bg-amber-50 text-amber-700' :
+                          res.type === 'Reference' ? 'bg-indigo-50 text-indigo-700' :
+                            'bg-blue-50 text-blue-700'
+                        }`}>
                         {res.type}
                       </span>
                     </TableCell>

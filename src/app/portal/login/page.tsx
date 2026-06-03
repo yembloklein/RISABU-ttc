@@ -39,18 +39,43 @@ function StudentLoginForm() {
       }
       
       try {
+        // Query multiple exact-match variations (case sensitivity in Firestore)
+        const emailVariants = [
+          user.email, 
+          user.email.toLowerCase(), 
+          user.email.trim(), 
+          user.email.trim().toLowerCase()
+        ]
+        const uniqueVariants = Array.from(new Set(emailVariants))
+        
         // 2. Check Staff
-        const staffQuery = query(collection(firestore, "users"), where("email", "==", user.email.toLowerCase()), limit(1))
-        const staffSnap = await getDocs(staffQuery)
-        if (!staffSnap.empty) {
+        let isStaff = false
+        for (const emailVar of uniqueVariants) {
+          const staffQuery = query(collection(firestore, "users"), where("email", "==", emailVar), limit(1))
+          const staffSnap = await getDocs(staffQuery)
+          if (!staffSnap.empty) {
+            isStaff = true
+            break
+          }
+        }
+        
+        if (isStaff) {
           router.push("/")
           return
         }
         
         // 3. Check Student
-        const studentQuery = query(collection(firestore, "students"), where("contactEmail", "==", user.email.toLowerCase()), limit(1))
-        const studentSnap = await getDocs(studentQuery)
-        if (!studentSnap.empty) {
+        let isStudent = false
+        for (const emailVar of uniqueVariants) {
+          const studentQuery = query(collection(firestore, "students"), where("contactEmail", "==", emailVar), limit(1))
+          const studentSnap = await getDocs(studentQuery)
+          if (!studentSnap.empty) {
+            isStudent = true
+            break
+          }
+        }
+
+        if (isStudent) {
           router.push("/portal/dashboard")
         }
       } catch (e) {
@@ -99,19 +124,32 @@ function StudentLoginForm() {
         } catch (signInErr: any) {
           // If login fails, check if this is a valid student attempting first-time login
           if (signInErr.code === "auth/user-not-found" || signInErr.code === "auth/invalid-credential") {
-            const studentByEmailQuery = query(
-              collection(firestore, "students"),
-              where("contactEmail", "==", email.toLowerCase()),
-              limit(1)
-            )
-            const emailSnapshot = await getDocs(studentByEmailQuery)
+            const emailVariants = [
+              email, 
+              email.toLowerCase(), 
+              email.trim(), 
+              email.trim().toLowerCase()
+            ]
+            const uniqueVariants = Array.from(new Set(emailVariants))
+            
+            let studentData = null
+            for (const emailVar of uniqueVariants) {
+              const studentByEmailQuery = query(
+                collection(firestore, "students"),
+                where("contactEmail", "==", emailVar),
+                limit(1)
+              )
+              const emailSnapshot = await getDocs(studentByEmailQuery)
+              if (!emailSnapshot.empty) {
+                studentData = emailSnapshot.docs[0].data()
+                break
+              }
+            }
 
-            if (emailSnapshot.empty) {
+            if (!studentData) {
               // Not a registered student email
               throw new Error("This email is not registered in our student records.")
             }
-
-            const studentData = emailSnapshot.docs[0].data()
             if (studentData.admissionNumber === password) {
               // Reg No matches! If they don't have an account, create it.
               // If they DO have an account but used Reg No, signIn would have failed if they changed password.
@@ -141,9 +179,25 @@ function StudentLoginForm() {
         return
       }
       try {
-        const staffQuery = query(collection(firestore, "users"), where("email", "==", email.toLowerCase()), limit(1))
-        const staffSnap = await getDocs(staffQuery)
-        if (!staffSnap.empty) {
+        const emailVariants = [
+          email, 
+          email.toLowerCase(), 
+          email.trim(), 
+          email.trim().toLowerCase()
+        ]
+        const uniqueVariants = Array.from(new Set(emailVariants))
+        
+        let isStaff = false
+        for (const emailVar of uniqueVariants) {
+          const staffQuery = query(collection(firestore, "users"), where("email", "==", emailVar), limit(1))
+          const staffSnap = await getDocs(staffQuery)
+          if (!staffSnap.empty) {
+            isStaff = true
+            break
+          }
+        }
+        
+        if (isStaff) {
           router.push("/")
           return
         }

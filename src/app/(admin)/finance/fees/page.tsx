@@ -46,6 +46,8 @@ import { collection, serverTimestamp } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
 import * as XLSX from 'xlsx'
 import { Logo } from "@/components/ui/logo"
+import { triggerEmail } from "@/lib/send-email"
+import { getFeeReminderEmail } from "@/lib/email-templates"
 
 export default function FeesPage() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -271,6 +273,23 @@ export default function FeesPage() {
       if (e.target) e.target.value = '';
     }
   };
+
+  const handleSendReminder = async (student: any, balance: number) => {
+    if (!student.contactEmail) {
+      toast({ title: "No Email", description: "This student does not have an email on file.", variant: "destructive" })
+      return
+    }
+    try {
+      await triggerEmail({
+        to: student.contactEmail,
+        ...getFeeReminderEmail(student.firstName, balance)
+      })
+      toast({ title: "Reminder Sent", description: `Fee reminder sent to ${student.firstName}.` })
+    } catch (error) {
+      console.error(error)
+      toast({ title: "Error", description: "Failed to send reminder email.", variant: "destructive" })
+    }
+  }
 
   const isLoading = loadingPayments || loadingStudents || loadingPrograms
 
@@ -728,17 +747,27 @@ export default function FeesPage() {
 
                         {/* Action */}
                         {!isCleared && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="w-full h-8 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50 mt-1"
-                            onClick={() => {
-                              setFormData({ studentId: student.id, amount: fee.balance.toString(), method: 'Cash', reference: '', phoneNumber: '' })
-                              setIsDialogOpen(true)
-                            }}
-                          >
-                            <Plus className="h-3 w-3 mr-1.5" /> Record Payment
-                          </Button>
+                          <div className="flex gap-2 mt-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 h-8 text-xs text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                              onClick={() => {
+                                setFormData({ studentId: student.id, amount: fee.balance.toString(), method: 'Cash', reference: '', phoneNumber: '' })
+                                setIsDialogOpen(true)
+                              }}
+                            >
+                              <Plus className="h-3 w-3 mr-1.5" /> Record
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 h-8 text-xs text-rose-700 border-rose-200 hover:bg-rose-50"
+                              onClick={() => handleSendReminder(student, fee.balance)}
+                            >
+                              <AlertCircle className="h-3 w-3 mr-1.5" /> Remind
+                            </Button>
+                          </div>
                         )}
                       </div>
                     )
