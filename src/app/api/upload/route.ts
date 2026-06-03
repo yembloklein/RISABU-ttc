@@ -38,9 +38,3 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Increase body size limit to 50MB for large files
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
