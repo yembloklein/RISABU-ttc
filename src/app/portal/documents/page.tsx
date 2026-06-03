@@ -39,6 +39,13 @@ export default function DocumentsPage() {
   }, [firestore])
   const { data: schoolDocs } = useCollection(schoolDocsQuery)
 
+  // Student-specific uploaded documents (e.g. official admission letter from registrar)
+  const studentDocsQuery = useMemoFirebase(() => {
+    if (!firestore || !student?.id) return null
+    return query(collection(firestore, "student_documents"), where("studentId", "==", student.id))
+  }, [firestore, student])
+  const { data: studentDocs } = useCollection(studentDocsQuery)
+
   // Payments
   const paymentsQuery = useMemoFirebase(() => {
     if (!firestore || !student?.id) return null
@@ -154,6 +161,15 @@ export default function DocumentsPage() {
   const examPassTemplate = schoolDocs?.find(d => d.type === "official_exam_pass")?.downloadURL
   const internshipTemplate = schoolDocs?.find(d => d.type === "official_internship_letter")?.downloadURL
   const feeStructureTemplate = schoolDocs?.find(d => d.type === "official_fee_structure")?.downloadURL
+
+  // Admission letter URL — same priority order as the dashboard
+  const studentSpecificOfficialLetter = studentDocs?.find(d => d.category === "admission_letter" && d.isOfficial === true)
+  const customAdmissionLetter = studentDocs?.find(d => d.category === "admission_letter")
+  const officialAdmissionLetter = schoolDocs?.find(d => d.type === "official_admission_letter")
+  const admissionLetterUrl =
+    studentSpecificOfficialLetter?.downloadURL ||
+    customAdmissionLetter?.downloadURL ||
+    officialAdmissionLetter?.downloadURL
 
   if (isStudentLoading || isProgramLoading || isPaymentsLoading || isInvoicesLoading) {
     return (
@@ -355,7 +371,12 @@ export default function DocumentsPage() {
           <PaymentReceipt ref={receiptRef} student={student} payment={activeReceipt} templateImageUrl={paymentReceiptTemplate} />
         )}
         {student && (
-          <AdmissionLetter ref={admissionLetterRef} student={student} program={program || { name: student.appliedCourse, code: "RTTC-01" }} />
+          <AdmissionLetter
+            ref={admissionLetterRef}
+            student={student}
+            program={program || { name: student.appliedCourse, code: "RTTC-01" }}
+            templateImageUrl={admissionLetterUrl}
+          />
         )}
         {student && (
           <ExamPass ref={examPassRef} student={student} program={{ name: student.appliedCourse, code: "RTTC-01" }} templateImageUrl={feeStructureTemplate || examPassTemplate} />
