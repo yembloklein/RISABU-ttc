@@ -151,6 +151,11 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    match /assignments/{assignmentId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
     match /units/{unitId} {
       allow get, list: if isSignedIn();
       allow create, update, delete: if isAdmin();

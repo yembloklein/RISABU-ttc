@@ -11,6 +11,7 @@ import {
   User,
   CalendarCheck,
   ClipboardList,
+  BarChart3,
   MessageSquare,
   FileText
 } from "lucide-react"
@@ -44,8 +45,13 @@ const portalMenuItems = [
     url: "/portal/academics",
   },
   {
-    title: "Grades",
+    title: "Assignments",
     icon: ClipboardList,
+    url: "/portal/assignments",
+  },
+  {
+    title: "Grades",
+    icon: BarChart3,
     url: "/portal/grades",
   },
   {

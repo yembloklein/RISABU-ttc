@@ -20,6 +20,8 @@ export async function POST(request: NextRequest) {
     const result = await cloudinary.uploader.upload(base64, {
       folder: `ttc/${folder}`,
       resource_type: 'auto', // handles PDFs, images, videos, docs
+      type: 'upload',        // public delivery — prevents 401 on download
+      access_mode: 'public', // explicitly mark as publicly accessible
       use_filename: true,
       unique_filename: true,
     });

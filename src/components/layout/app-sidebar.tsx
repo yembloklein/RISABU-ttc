@@ -19,7 +19,7 @@ import {
   Settings
 } from "lucide-react"
 import { Logo } from "@/components/ui/logo"
-import { ClipboardCheck } from "lucide-react"
+import { ClipboardCheck, ClipboardList } from "lucide-react"
 
 
 
@@ -89,6 +89,11 @@ const menuItems = [
         title: "Academic Resources",
         icon: FileText,
         url: "/academics/resources",
+      },
+      {
+        title: "Assignments",
+        icon: ClipboardList,
+        url: "/academics/assignments",
       },
       {
         title: "Manage Units",

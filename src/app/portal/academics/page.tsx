@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import {
   BookOpen, FileText, Download, GraduationCap, Clock, Loader2,
   FileSpreadsheet, CheckCircle2, PlusCircle, UploadCloud, FileUp,
-  Send, AlertCircle, Video, BookMarked, ExternalLink, PlayCircle, FileSearch
+  Send, AlertCircle, Video, BookMarked, PlayCircle, FileSearch
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
@@ -16,6 +16,15 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger
 } from "@/components/ui/dialog"
 import { useRouter } from "next/navigation"
+
+// ── Cloudinary download URL helper ──────────────────────────────────────────────
+// Injects fl_attachment so the browser downloads the file instead of trying
+// to open it inline (which causes the chrome-error://chromewebdata/ CORS block).
+function getDownloadUrl(url: string): string {
+  if (!url || !url.includes('res.cloudinary.com')) return url
+  // Works for both /image/upload/ and /raw/upload/ paths
+  return url.replace(/\/upload\//, '/upload/fl_attachment/')
+}
 
 // ── Resource Viewer Dialog ────────────────────────────────────────────────────
 function ResourceDialog({
@@ -54,9 +63,10 @@ function ResourceDialog({
             resources.map((res) => (
               <a
                 key={res.id}
-                href={res.fileUrl}
+                href={getDownloadUrl(res.fileUrl)}
                 target="_blank"
                 rel="noopener noreferrer"
+                download
                 className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50 transition-all group"
               >
                 <div className="h-9 w-9 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0 text-emerald-600">
@@ -66,7 +76,7 @@ function ResourceDialog({
                   <p className="text-sm font-semibold text-slate-900 truncate">{res.title}</p>
                   <p className="text-xs text-slate-400 truncate">{res.fileName || res.type}</p>
                 </div>
-                <ExternalLink className="h-3.5 w-3.5 text-slate-300 group-hover:text-emerald-500 shrink-0 transition-colors" />
+                <Download className="h-3.5 w-3.5 text-slate-300 group-hover:text-emerald-500 shrink-0 transition-colors" />
               </a>
             ))
           )}
@@ -476,9 +486,10 @@ export default function AcademicsPage() {
                   {(resources || []).map((res) => (
                     <a
                       key={res.id}
-                      href={res.fileUrl}
+                      href={getDownloadUrl(res.fileUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
+                      download
                       className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors group"
                     >
                       <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${res.type === 'Assignment' ? 'bg-amber-50 text-amber-600' :
