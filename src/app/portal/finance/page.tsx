@@ -308,31 +308,33 @@ export default function FinancePage() {
 
         {/* Sidebar: payment info */}
         <div className="space-y-4">
-          {/* Bank details card */}
+          {/* Payment Details card */}
           <Card className="border border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-100">
               <h2 className="text-sm font-semibold text-slate-800">Payment Details</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Use any method below to make a payment</p>
             </div>
-            <CardContent className="p-4 space-y-4">
-              <div className="flex items-start gap-3">
-                <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                  <Landmark className="h-4 w-4 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-700">NATIONAL BANK OF KENYA</p>
-                  <p className="text-xs font-mono text-slate-900 mt-0.5">PAYBILL NO:625625</p>
-                  <p className="text-xs font-semibold text-slate-700">ACCOUNT NO:2015623652</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5 uppercase tracking-wide">Nairobi</p>
-                </div>
-              </div>
-              <div className="border-t border-slate-100 pt-3 flex items-start gap-3">
-                <div className="h-8 w-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+            <CardContent className="p-0 divide-y divide-slate-100">
+              {/* M-Pesa */}
+              <div className="flex items-center gap-3 px-4 py-3.5">
+                <div className="h-9 w-9 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
                   <Smartphone className="h-4 w-4 text-emerald-600" />
                 </div>
-                <div>
-                  <p className="text-xs font-semibold text-emerald-700">M-Pesa Till No.</p>
-                  <p className="text-lg font-bold text-slate-900">522522</p>
-                  <p className="text-[10px] text-slate-400">Account: {student?.admissionNumber || "Your ADM No."}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">M-Pesa Paybill</p>
+                  <p className="text-sm font-bold text-slate-900 mt-0.5">Paybill: <span className="font-mono">625625</span></p>
+                  <p className="text-xs text-slate-400 mt-0.5">Account: <span className="font-mono font-semibold text-slate-600">{student?.admissionNumber || "Your ADM No."}</span></p>
+                </div>
+              </div>
+              {/* Bank */}
+              <div className="flex items-center gap-3 px-4 py-3.5">
+                <div className="h-9 w-9 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                  <Landmark className="h-4 w-4 text-blue-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">National Bank of Kenya</p>
+                  <p className="text-sm font-bold text-slate-900 mt-0.5">A/C: <span className="font-mono">2015623652</span></p>
+                  <p className="text-xs text-slate-400 mt-0.5">Branch: Nairobi</p>
                 </div>
               </div>
             </CardContent>
@@ -359,26 +361,39 @@ export default function FinancePage() {
             </CardContent>
           </Card>
 
+          {/* Pay Here — online payment */}
           {!isCleared && (
-            <Card className="border shadow-sm rounded-xl overflow-hidden border-emerald-200 bg-emerald-50/30">
-              <CardContent className="p-4 space-y-3">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">Pay Here</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">Pay Online Via M-pesa or card</p>
+            <Card className="border border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100">
+                <h2 className="text-sm font-semibold text-slate-800">Pay Online</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Via M-Pesa or card through Paystack</p>
+              </div>
+              <CardContent className="p-4 space-y-4">
+                {/* Outstanding balance pill */}
+                <div className="flex items-center justify-between rounded-lg bg-slate-50 border border-slate-100 px-3 py-2.5">
+                  <span className="text-xs text-slate-500 font-medium">Outstanding Balance</span>
+                  <span className="text-sm font-bold text-rose-600">KES {feeStats.balance.toLocaleString()}</span>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="pay-amount" className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Amount to Pay (KES)</Label>
-                  <Input
-                    id="pay-amount"
-                    type="number"
-                    placeholder={`e.g. ${feeStats.balance}`}
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    className="h-10 bg-white border-emerald-200 focus-visible:ring-emerald-500 font-bold"
-                  />
+
+                {/* Amount input */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="pay-amount" className="text-xs font-semibold text-slate-600">Amount to Pay</Label>
+                  <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-transparent bg-white">
+                    <span className="px-3 py-2.5 text-xs font-bold text-slate-400 border-r border-slate-200 bg-slate-50 shrink-0">KES</span>
+                    <Input
+                      id="pay-amount"
+                      type="number"
+                      placeholder={String(feeStats.balance)}
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      className="border-0 focus-visible:ring-0 h-10 font-semibold text-slate-900 text-sm rounded-none"
+                    />
+                  </div>
                 </div>
+
+                {/* Pay button */}
                 <PaystackButton
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-10 rounded-xl shadow-md transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold h-10 rounded-lg transition-colors text-sm"
                   text={`Pay KES ${(paymentAmount ? Number(paymentAmount) : feeStats.balance).toLocaleString()}`}
                   email={user?.email || 'student@risabu.edu'}
                   amount={(paymentAmount ? Number(paymentAmount) : feeStats.balance) * 100}
@@ -389,7 +404,7 @@ export default function FinancePage() {
                     handlePaystackSuccessAction(ref, paymentAmount ? Number(paymentAmount) : feeStats.balance);
                     setPaymentAmount('');
                   }}
-                  onClose={() => console.log('Payment modal closed')}
+                  onClose={() => {}}
                 />
               </CardContent>
             </Card>
