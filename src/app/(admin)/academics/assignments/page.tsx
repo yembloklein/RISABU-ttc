@@ -17,7 +17,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import {
   ClipboardList, Plus, Search, Trash2, Loader2, CalendarDays,
-  BookOpen, AlertCircle, CheckCircle2, Clock
+  BookOpen, AlertCircle, CheckCircle2, Clock, Paperclip, X, Download
 } from "lucide-react"
 import { useFirestore, useCollection, useMemoFirebase, useUser } from "@/firebase"
 import { collection, doc, addDoc, serverTimestamp, deleteDoc } from "firebase/firestore"
@@ -27,6 +27,8 @@ export default function AdminAssignmentsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false)
 
   const [form, setForm] = useState({
     title: "",
@@ -80,6 +82,25 @@ export default function AdminAssignmentsPage() {
     setIsSaving(true)
     try {
       const unit = (units || []).find(u => u.id === form.unitId)
+
+      // Upload attachment to Cloudinary if provided
+      let attachmentUrl = ""
+      let attachmentName = ""
+      let attachmentPublicId = ""
+      if (attachmentFile) {
+        setIsUploadingAttachment(true)
+        const fd = new FormData()
+        fd.append("file", attachmentFile)
+        fd.append("folder", "assignments")
+        const res = await fetch("/api/upload", { method: "POST", body: fd })
+        if (!res.ok) { const e = await res.json(); throw new Error(e.error || "Attachment upload failed") }
+        const result = await res.json()
+        attachmentUrl = result.fileUrl
+        attachmentName = attachmentFile.name
+        attachmentPublicId = result.publicId
+        setIsUploadingAttachment(false)
+      }
+
       await addDoc(assignmentsRef, {
         title: form.title,
         instructions: form.instructions,
@@ -93,11 +114,14 @@ export default function AdminAssignmentsPage() {
         status: "Active",
         createdBy: user?.email || "Admin",
         createdAt: serverTimestamp(),
+        ...(attachmentUrl && { attachmentUrl, attachmentName, attachmentPublicId }),
       })
       toast({ title: "Assignment Created", description: `"${form.title}" is now visible to students.` })
       setIsDialogOpen(false)
+      setAttachmentFile(null)
       setForm({ title: "", instructions: "", unitId: "", courseName: "", dueDate: "", maxFileSizeMb: "10", allowedTypes: "PDF, DOCX, ZIP" })
     } catch (e: any) {
+      setIsUploadingAttachment(false)
       toast({ title: "Error", description: e.message, variant: "destructive" })
     } finally {
       setIsSaving(false)
@@ -226,16 +250,46 @@ export default function AdminAssignmentsPage() {
                   className="h-10 border-slate-200 rounded-lg focus-visible:ring-emerald-500"
                 />
               </div>
+
+              {/* Assignment Attachment */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Assignment File <span className="text-slate-400 font-normal">(optional — students will be able to download this)</span></Label>
+                <div className="relative">
+                  {attachmentFile ? (
+                    <div className="flex items-center gap-2 h-10 px-3 rounded-lg border border-emerald-300 bg-emerald-50">
+                      <Paperclip className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                      <span className="text-xs font-medium text-emerald-800 flex-1 truncate">{attachmentFile.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setAttachmentFile(null)}
+                        className="shrink-0 text-emerald-500 hover:text-rose-500 transition-colors"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex items-center gap-2 h-10 px-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 hover:border-emerald-400 hover:bg-emerald-50/50 cursor-pointer transition-all">
+                      <input
+                        type="file"
+                        className="hidden"
+                        onChange={e => setAttachmentFile(e.target.files?.[0] || null)}
+                      />
+                      <Paperclip className="h-3.5 w-3.5 text-slate-400" />
+                      <span className="text-xs text-slate-500">Attach file (PDF, DOCX, ZIP, etc.)</span>
+                    </label>
+                  )}
+                </div>
+              </div>
             </div>
 
             <DialogFooter className="bg-slate-50 p-4 -mx-6 -mb-6 border-t border-slate-100 mt-2">
               <Button
                 onClick={handleSave}
-                disabled={isSaving}
+                disabled={isSaving || isUploadingAttachment}
                 className="w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg shadow-sm"
               >
-                {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
-                {isSaving ? "Creating..." : "Publish Assignment"}
+                {(isSaving || isUploadingAttachment) ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                {isUploadingAttachment ? "Uploading file..." : isSaving ? "Creating..." : "Publish Assignment"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -284,6 +338,17 @@ export default function AdminAssignmentsPage() {
                         <div>
                           <p className="font-semibold text-sm text-slate-900">{a.title}</p>
                           <p className="text-[10px] text-slate-400">{a.allowedTypes} · max {a.maxFileSizeMb}MB</p>
+                          {a.attachmentUrl && (
+                            <a
+                              href={a.attachmentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[10px] text-emerald-600 font-semibold hover:underline mt-0.5"
+                            >
+                              <Paperclip className="h-2.5 w-2.5" />
+                              {a.attachmentName || "Attachment"}
+                            </a>
+                          )}
                         </div>
                       </div>
                     </TableCell>

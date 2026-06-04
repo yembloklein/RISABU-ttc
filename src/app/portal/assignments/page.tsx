@@ -8,7 +8,7 @@ import {
 import {
   ClipboardList, Upload, FileUp, Loader2, CheckCircle2, AlertCircle,
   Clock, CalendarDays, BookOpen, FileText, Lock, ChevronDown, ChevronUp,
-  Send, TriangleAlert
+  Send, TriangleAlert, Download, Paperclip
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
@@ -133,10 +133,24 @@ function AssignmentCard({
             </div>
           </div>
 
+          {/* Download Assignment — only when admin attached a file */}
+          {assignment.attachmentUrl && (
+            <a
+              href={assignment.attachmentUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              download
+              className="mt-3 w-full flex items-center justify-center gap-2 h-9 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-700 text-xs font-semibold transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Download Assignment File
+            </a>
+          )}
+
           {/* Submit button — full width row on mobile */}
           {!isSubmitted && !isPast && (
             <button
-              className="mt-3 w-full flex items-center justify-center gap-2 h-9 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold transition-colors"
+              className="mt-2 w-full flex items-center justify-center gap-2 h-9 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold transition-colors"
               onClick={() => onSubmit(assignment)}
             >
               <Upload className="h-3.5 w-3.5" />
@@ -181,6 +195,18 @@ function AssignmentCard({
               <span className="text-[10px] text-slate-400 font-medium">
                 📦 Max {assignment.maxFileSizeMb}MB
               </span>
+              {assignment.attachmentUrl && (
+                <a
+                  href={assignment.attachmentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                  className="inline-flex items-center gap-1 text-[10px] text-emerald-600 font-bold hover:underline"
+                >
+                  <Paperclip className="h-2.5 w-2.5" />
+                  {assignment.attachmentName || "Assignment File"}
+                </a>
+              )}
             </div>
           </div>
         )}
