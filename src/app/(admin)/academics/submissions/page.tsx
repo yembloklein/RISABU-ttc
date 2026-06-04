@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,137 +22,259 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
 
-import { Search, Download, CheckCircle, Clock, Loader2, FileText, User, GraduationCap, Filter, Trash2, BookOpen } from "lucide-react"
+import {
+  Search, CheckCircle, Loader2, FileText, User,
+  Trash2, BookOpen, GraduationCap, Hash, MessageSquare,
+  ExternalLink, ClipboardCheck
+} from "lucide-react"
 
 import { ref, deleteObject } from "firebase/storage"
-import { useFirestore, useCollection, useMemoFirebase, useUser, useStorage, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase"
+import {
+  useFirestore, useCollection, useMemoFirebase,
+  useUser, useStorage, updateDocumentNonBlocking, deleteDocumentNonBlocking
+} from "@/firebase"
 
 import { collection, query, orderBy, doc, serverTimestamp, addDoc } from "firebase/firestore"
-
 import { toast } from "@/hooks/use-toast"
 
 export default function SubmissionsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedUnit, setSelectedUnit] = useState("all")
   const [feedbackNote, setFeedbackNote] = useState("")
-  const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false)
+  const [marks, setMarks] = useState("")
+  const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false)
   const [activeSub, setActiveSub] = useState<any>(null)
-  
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
   const firestore = useFirestore()
   const storage = useStorage()
   const { user } = useUser()
 
-  // 1. Fetch Submissions
-  const subsRef = useMemoFirebase(() => (firestore && user) ? query(collection(firestore, "submissions"), orderBy("submittedAt", "desc")) : null, [firestore, user])
+  const subsRef = useMemoFirebase(
+    () => (firestore && user) ? query(collection(firestore, "submissions"), orderBy("submittedAt", "desc")) : null,
+    [firestore, user]
+  )
   const { data: submissions, isLoading: loadingSubs } = useCollection(subsRef)
 
-  // 2. Fetch Units for filter
-  const unitsRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "units") : null, [firestore, user])
+  const unitsRef = useMemoFirebase(
+    () => (firestore && user) ? collection(firestore, "units") : null,
+    [firestore, user]
+  )
   const { data: units } = useCollection(unitsRef)
 
-  // 3. Filtering Logic
   const filteredSubs = useMemo(() => {
     return (submissions || []).filter(sub => {
-      const matchesSearch = 
+      const matchesSearch =
         sub.studentName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         sub.unitName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         sub.unitCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         sub.studentEmail?.toLowerCase().includes(searchTerm.toLowerCase())
-      
       const matchesUnit = selectedUnit === "all" || sub.unitId === selectedUnit
-
       return matchesSearch && matchesUnit
     })
   }, [submissions, searchTerm, selectedUnit])
 
-  const handleUpdateStatus = async (submission: any, newStatus: string, feedback: string = "") => {
-    if (!firestore) return
+  const openGradeDialog = (sub: any) => {
+    setActiveSub(sub)
+    setFeedbackNote(sub.feedback || "")
+    setMarks(sub.marks !== undefined ? String(sub.marks) : "")
+    setIsGradeDialogOpen(true)
+  }
+
+  const handleGrade = async () => {
+    if (!firestore || !activeSub) return
+    const parsedMarks = marks.trim() !== "" ? Number(marks) : null
+    if (parsedMarks !== null && (isNaN(parsedMarks) || parsedMarks < 0 || parsedMarks > 100)) {
+      toast({ title: "Invalid marks", description: "Enter a number between 0 and 100.", variant: "destructive" })
+      return
+    }
+    setIsSubmitting(true)
     try {
-      // 1. Update Submission status
-      const docRef = doc(firestore, "submissions", submission.id)
-      await updateDocumentNonBlocking(docRef, { 
-        status: newStatus,
-        feedback: feedback,
-        gradedAt: serverTimestamp()
+      const docRef = doc(firestore, "submissions", activeSub.id)
+      await updateDocumentNonBlocking(docRef, {
+        status: "Graded",
+        feedback: feedbackNote.trim(),
+        ...(parsedMarks !== null && { marks: parsedMarks }),
+        gradedAt: serverTimestamp(),
       })
 
-      // 2. Create Notification for the student
       await addDoc(collection(firestore, "notifications"), {
-        studentId: submission.studentId,
+        studentId: activeSub.studentId,
         title: "Assignment Graded",
-        message: `Your submission for ${submission.unitName} has been marked as ${newStatus}. ${feedback ? "Feedback provided." : ""}`,
+        message: `Your submission for ${activeSub.unitName} has been graded${parsedMarks !== null ? ` — ${parsedMarks}/100` : ""}.${feedbackNote.trim() ? " Feedback provided." : ""}`,
         type: "Academic",
-        link: "/portal/academics",
+        link: "/portal/assignments",
         read: false,
         createdAt: serverTimestamp(),
       })
 
-      toast({ title: "Status Updated", description: `Submission marked as ${newStatus} and student notified.` })
-      setIsFeedbackDialogOpen(false)
+      toast({ title: "Graded!", description: `${activeSub.studentName}'s submission has been marked and student notified.` })
+      setIsGradeDialogOpen(false)
+      setActiveSub(null)
       setFeedbackNote("")
+      setMarks("")
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" })
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
   const handleDeleteSubmission = async (submission: any) => {
-    if (!firestore || !storage || !confirm("Are you sure you want to permanently delete this submission and its file?")) return
-    
+    if (!firestore || !storage || !confirm("Permanently delete this submission and its file?")) return
     try {
-      // 1. Delete file from Storage if path exists
       if (submission.storagePath) {
         const fileRef = ref(storage, submission.storagePath)
         await deleteObject(fileRef)
-      } else if (submission.fileUrl && !submission.fileUrl.includes('firebasestorage')) {
-        // Fallback for old local files (optional cleanup)
-        await fetch('/api/assignments/delete', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+      } else if (submission.fileUrl && !submission.fileUrl.includes("firebasestorage")) {
+        await fetch("/api/assignments/delete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ fileUrl: submission.fileUrl }),
         })
       }
-
-      // 2. Delete from Firestore
       const docRef = doc(firestore, "submissions", submission.id)
       deleteDocumentNonBlocking(docRef)
-      
-      toast({ title: "Deleted", description: "Submission and file have been removed from the cloud." })
+      toast({ title: "Deleted", description: "Submission removed." })
     } catch (error: any) {
       toast({ title: "Delete Failed", description: error.message, variant: "destructive" })
     }
   }
 
+  // Stats
+  const totalCount = (submissions || []).length
+  const pendingCount = (submissions || []).filter(s => s.status !== "Graded").length
+  const gradedCount = (submissions || []).filter(s => s.status === "Graded").length
+
   return (
     <div className="space-y-6 pb-10 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+
+      {/* ── Grade Dialog ──────────────────────────────────────────────────── */}
+      <Dialog open={isGradeDialogOpen} onOpenChange={open => {
+        if (!open) { setIsGradeDialogOpen(false); setActiveSub(null) }
+      }}>
+        <DialogContent className="w-[calc(100vw-2rem)] max-w-sm rounded-2xl p-0 gap-0 overflow-hidden border border-slate-200 shadow-xl">
+          <DialogHeader className="px-5 pt-5 pb-4 border-b border-slate-100">
+            <DialogTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <ClipboardCheck className="h-4 w-4 text-emerald-600" />
+              Grade Submission
+            </DialogTitle>
+            {activeSub && (
+              <div className="mt-2 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2.5 space-y-0.5">
+                <p className="text-xs font-semibold text-slate-800">{activeSub.studentName}</p>
+                <p className="text-[11px] text-slate-500">{activeSub.assignmentTitle || activeSub.unitName}</p>
+                <a
+                  href={activeSub.fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:underline font-medium mt-1"
+                >
+                  <ExternalLink className="h-2.5 w-2.5" />
+                  View submitted file
+                </a>
+              </div>
+            )}
+          </DialogHeader>
+
+          <div className="px-5 py-4 space-y-4">
+            {/* Marks */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <Hash className="h-3 w-3 text-slate-400" />
+                Marks <span className="text-slate-400 font-normal">(out of 100)</span>
+              </Label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                placeholder="e.g. 78"
+                value={marks}
+                onChange={e => setMarks(e.target.value)}
+                className="h-10 rounded-lg border-slate-200 focus-visible:ring-emerald-500 text-sm font-mono"
+              />
+            </div>
+
+            {/* Comments */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                <MessageSquare className="h-3 w-3 text-slate-400" />
+                Feedback <span className="text-slate-400 font-normal">(optional)</span>
+              </Label>
+              <Textarea
+                placeholder="e.g. Good structure. Work on referencing next time."
+                value={feedbackNote}
+                onChange={e => setFeedbackNote(e.target.value)}
+                className="min-h-[90px] rounded-lg border-slate-200 focus-visible:ring-emerald-500 text-sm resize-none"
+              />
+            </div>
+          </div>
+
+          <div className="px-5 pb-5 flex gap-2">
+            <Button
+              variant="outline"
+              className="flex-1 h-10 rounded-xl border-slate-200 text-slate-600 text-sm"
+              onClick={() => setIsGradeDialogOpen(false)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="flex-1 h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-sm"
+              onClick={handleGrade}
+              disabled={isSubmitting}
+            >
+              {isSubmitting
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <><CheckCircle className="h-4 w-4 mr-1.5" /> Confirm Grade</>
+              }
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Page Header ──────────────────────────────────────────────────── */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold text-emerald-600 uppercase tracking-widest mb-1">Academic Submissions</p>
+          <p className="text-xs font-semibold text-emerald-600 uppercase tracking-widest mb-1">Academic Management</p>
           <h1 className="text-2xl font-bold text-slate-900">Student Submissions</h1>
           <p className="text-sm text-slate-500 mt-0.5">Review, grade, and manage student assignment uploads.</p>
         </div>
+        <div className="flex items-center gap-3">
+          <div className="text-center">
+            <p className="text-xs text-slate-400 font-medium">Total</p>
+            <p className="text-xl font-bold text-slate-900">{totalCount}</p>
+          </div>
+          <div className="h-8 w-px bg-slate-200" />
+          <div className="text-center">
+            <p className="text-xs text-amber-500 font-medium">Pending</p>
+            <p className="text-xl font-bold text-amber-600">{pendingCount}</p>
+          </div>
+          <div className="h-8 w-px bg-slate-200" />
+          <div className="text-center">
+            <p className="text-xs text-emerald-600 font-medium">Graded</p>
+            <p className="text-xl font-bold text-emerald-600">{gradedCount}</p>
+          </div>
+        </div>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-3 bg-slate-50/50 p-1.5 rounded-xl border border-slate-200">
+      {/* ── Filters ──────────────────────────────────────────────────────── */}
+      <div className="flex flex-col md:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input 
-            placeholder="Search student, unit or email..." 
+          <Input
+            placeholder="Search student, unit or email..."
             className="pl-9 h-10 rounded-lg bg-white border-slate-200 shadow-sm text-sm focus-visible:ring-emerald-500"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="w-full md:w-64">
+        <div className="w-full md:w-60">
           <Select value={selectedUnit} onValueChange={setSelectedUnit}>
             <SelectTrigger className="h-10 rounded-lg bg-white border-slate-200 shadow-sm text-sm">
               <div className="flex items-center gap-2">
@@ -163,130 +285,123 @@ export default function SubmissionsPage() {
             <SelectContent>
               <SelectItem value="all">All Units</SelectItem>
               {(units || []).map(u => (
-                <SelectItem key={u.id} value={u.id}>{u.code} - {u.name}</SelectItem>
+                <SelectItem key={u.id} value={u.id}>{u.code} – {u.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
       </div>
 
+      {/* ── Table ────────────────────────────────────────────────────────── */}
       <Card className="border border-slate-200 shadow-sm overflow-hidden rounded-xl bg-white">
         <CardContent className="p-0">
           <Table>
             <TableHeader className="bg-slate-50/50">
               <TableRow className="border-slate-100 hover:bg-transparent">
                 <TableHead className="font-semibold text-slate-500 h-10 text-xs pl-5">Student</TableHead>
-                <TableHead className="font-semibold text-slate-500 h-10 text-xs">Unit</TableHead>
-                <TableHead className="font-semibold text-slate-500 h-10 text-xs">Assignment File</TableHead>
-                <TableHead className="font-semibold text-slate-500 h-10 text-xs text-center w-[120px]">Status</TableHead>
-                <TableHead className="font-semibold text-slate-500 h-10 text-xs text-right pr-5 w-[140px]">Action</TableHead>
+                <TableHead className="font-semibold text-slate-500 h-10 text-xs">Assignment</TableHead>
+                <TableHead className="font-semibold text-slate-500 h-10 text-xs">File</TableHead>
+                <TableHead className="font-semibold text-slate-500 h-10 text-xs text-center w-[100px]">Status</TableHead>
+                <TableHead className="font-semibold text-slate-500 h-10 text-xs text-center w-[80px]">Marks</TableHead>
+                <TableHead className="w-[120px]" />
               </TableRow>
             </TableHeader>
             <TableBody>
               {loadingSubs ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-64 text-center">
+                  <TableCell colSpan={6} className="h-64 text-center">
                     <Loader2 className="h-8 w-8 animate-spin mx-auto text-emerald-600" />
                   </TableCell>
                 </TableRow>
               ) : filteredSubs.length > 0 ? (
-                filteredSubs.map((sub) => (
+                filteredSubs.map(sub => (
                   <TableRow key={sub.id} className="hover:bg-slate-50/80 transition-colors border-slate-100">
+                    {/* Student */}
                     <TableCell className="py-3 pl-5">
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
                           <User className="h-4 w-4" />
                         </div>
-                        <div className="flex flex-col">
-                          <span className="font-semibold text-slate-900 text-sm">{sub.studentName}</span>
-                          <span className="text-[10px] font-medium text-slate-500">{sub.studentEmail}</span>
+                        <div>
+                          <p className="font-semibold text-slate-900 text-sm leading-tight">{sub.studentName}</p>
+                          <p className="text-[10px] text-slate-500 mt-0.5">{sub.studentEmail}</p>
                         </div>
                       </div>
                     </TableCell>
+
+                    {/* Assignment / Unit */}
                     <TableCell className="py-3">
-                      <div className="flex flex-col">
-                        <span className="text-xs font-semibold text-slate-800">{sub.unitName}</span>
-                        <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-tighter mt-0.5">{sub.unitCode}</span>
-                      </div>
+                      <p className="text-xs font-semibold text-slate-800 leading-tight">{sub.assignmentTitle || sub.unitName}</p>
+                      <p className="text-[10px] font-mono text-slate-400 uppercase mt-0.5">{sub.unitCode}</p>
                     </TableCell>
+
+                    {/* File link */}
                     <TableCell className="py-3">
-                      <a 
-                        href={sub.fileUrl} 
-                        target="_blank" 
+                      <a
+                        href={sub.fileUrl}
+                        target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-2 py-1 rounded-md transition-colors group"
+                        className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-700 px-2 py-1 rounded-md hover:bg-blue-50 transition-colors"
                       >
-                        <FileText className="h-4 w-4 shrink-0" />
-                        <span className="text-xs font-medium underline underline-offset-4 decoration-blue-200 group-hover:decoration-blue-400 line-clamp-1 max-w-[150px]">
+                        <FileText className="h-3.5 w-3.5 shrink-0" />
+                        <span className="text-xs font-medium underline underline-offset-4 decoration-blue-200 line-clamp-1 max-w-[130px]">
                           {sub.fileName}
                         </span>
                       </a>
                     </TableCell>
+
+                    {/* Status */}
                     <TableCell className="py-3 text-center">
-                      <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md ${
-                        sub.status === 'Graded' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                        sub.status === "Graded"
+                          ? "bg-emerald-50 text-emerald-700"
+                          : "bg-amber-50 text-amber-700"
                       }`}>
-                        {sub.status || 'Pending'}
+                        {sub.status || "Pending"}
                       </span>
                     </TableCell>
-                    <TableCell className="py-3 text-right pr-5">
-                      <div className="flex items-center justify-end gap-1">
-                        {sub.status !== 'Graded' && (
-                          <Dialog open={isFeedbackDialogOpen && activeSub?.id === sub.id} onOpenChange={(open) => {
-                            setIsFeedbackDialogOpen(open)
-                            if (open) setActiveSub(sub)
-                          }}>
-                            <DialogTrigger asChild>
-                              <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="h-7 rounded-md text-[10px] font-semibold border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 transition-colors"
-                              >
-                                <CheckCircle className="h-3 w-3 mr-1.5" /> Grade
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-[425px] border border-slate-200 shadow-lg rounded-xl">
-                              <DialogHeader>
-                                <DialogTitle className="text-lg font-bold text-slate-900">Provide Feedback</DialogTitle>
-                                <DialogDescription className="text-sm text-slate-500 mt-1">
-                                  Add an optional note for <strong>{sub.studentName}</strong> regarding their submission for {sub.unitName}.
-                                </DialogDescription>
-                              </DialogHeader>
-                              <div className="py-4 space-y-2">
-                                <Label className="text-xs font-medium text-slate-700">Instructor Note (Optional)</Label>
-                                <Textarea 
-                                  placeholder="e.g. Great work on the typography! Next time, focus more on..." 
-                                  value={feedbackNote}
-                                  onChange={(e) => setFeedbackNote(e.target.value)}
-                                  className="min-h-[120px] rounded-lg border-slate-200 focus-visible:ring-emerald-500"
-                                />
-                              </div>
-                              <DialogFooter className="bg-slate-50 p-4 -mx-6 -mb-6 border-t border-slate-100 mt-2">
-                                <Button 
-                                  className="w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg shadow-sm"
-                                  onClick={() => handleUpdateStatus(sub, 'Graded', feedbackNote)}
-                                >
-                                  Finalize & Mark Graded
-                                </Button>
-                              </DialogFooter>
-                            </DialogContent>
-                          </Dialog>
-                        )}
 
-                        <Button variant="ghost" size="icon" className="h-7 w-7 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleDeleteSubmission(sub)}>
+                    {/* Marks */}
+                    <TableCell className="py-3 text-center">
+                      {sub.marks !== undefined && sub.marks !== null ? (
+                        <span className="text-sm font-bold text-slate-700">
+                          {sub.marks}<span className="text-[10px] text-slate-400 font-normal">/100</span>
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-300">—</span>
+                      )}
+                    </TableCell>
+
+                    {/* Actions */}
+                    <TableCell className="py-3 pr-4">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 rounded-md text-[10px] font-semibold border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                          onClick={() => openGradeDialog(sub)}
+                        >
+                          <GraduationCap className="h-3 w-3 mr-1" />
+                          {sub.status === "Graded" ? "Re-grade" : "Grade"}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                          onClick={() => handleDeleteSubmission(sub)}
+                        >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </TableCell>
-
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-48 text-center text-slate-400 text-sm italic">
+                  <TableCell colSpan={6} className="h-48 text-center">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <FileText className="h-8 w-8 text-slate-200" />
-                      <p>No submissions found matching your search.</p>
+                      <p className="text-sm text-slate-400">No submissions found.</p>
                     </div>
                   </TableCell>
                 </TableRow>
