@@ -6,7 +6,8 @@ import { collection, query, where, limit, addDoc, serverTimestamp, getDocs } fro
 import { Card, CardContent } from "@/components/ui/card"
 import {
   BookOpen, FileText, Download, GraduationCap, Clock,
-  Loader2, CheckCircle2, PlusCircle, PlayCircle, BookMarked
+  Loader2, CheckCircle2, PlusCircle, PlayCircle, BookMarked,
+  User, BarChart3, Sparkles
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
@@ -161,44 +162,106 @@ export default function AcademicsPage() {
 
           {/* Registered Units */}
           <div>
-            <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-              My Registered Units
-            </h2>
-            <div className="space-y-2">
-              {(registrations || []).length > 0 ? (
-                (registrations || []).map((reg: any) => (
-                  <div key={reg.id} className="bg-white border border-slate-200 rounded-xl p-4 hover:shadow-sm transition-all">
-                    <div className="flex items-center justify-between gap-3 mb-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
-                          <BookOpen className="h-5 w-5 text-emerald-600" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="font-semibold text-slate-900 text-sm leading-tight truncate">{reg.unitName}</p>
-                          <p className="text-xs font-mono text-slate-400 mt-0.5">{reg.unitCode}</p>
-                        </div>
-                      </div>
-                      <span className="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
-                        {reg.status || "Registered"}
-                      </span>
-                    </div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                My Registered Units
+              </h2>
+              <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-0.5 rounded-full">
+                {(registrations || []).length} unit{(registrations || []).length !== 1 ? 's' : ''}
+              </span>
+            </div>
 
-                    {/* Progress bar */}
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs font-medium text-slate-500">
-                        <span>Progress</span>
-                        <span className="text-emerald-600">{reg.progress || 0}%</span>
-                      </div>
-                      <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                        <div
-                          className="h-full bg-emerald-500 rounded-full transition-all"
-                          style={{ width: `${reg.progress || 0}%` }}
-                        />
+            <div className="space-y-3">
+              {(registrations || []).length > 0 ? (
+                (registrations || []).map((reg: any, index: number) => {
+                  const progress = reg.progress || 0
+                  const isComplete = progress >= 100
+                  return (
+                    <div
+                      key={reg.id}
+                      className={`relative rounded-xl border p-4 transition-all ${
+                        isComplete
+                          ? 'border-emerald-200 bg-gradient-to-br from-emerald-50/60 to-white'
+                          : 'border-slate-200 bg-white hover:border-emerald-200 hover:shadow-sm'
+                      }`}
+                    >
+                      {/* Top row */}
+                      <div className="flex items-start gap-3">
+                        {/* Index badge */}
+                        <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 font-bold text-sm ${
+                          isComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                        }`}>
+                          {isComplete
+                            ? <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                            : <span>{index + 1}</span>}
+                        </div>
+
+                        {/* Unit info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="font-bold text-slate-900 text-sm leading-snug">{reg.unitName}</p>
+                              <div className="flex flex-wrap items-center gap-2 mt-1">
+                                <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
+                                  {reg.unitCode}
+                                </span>
+                                {reg.instructor && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 font-medium">
+                                    <User className="h-2.5 w-2.5" />
+                                    {reg.instructor}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {/* Status badge */}
+                            <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              isComplete
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : progress > 0
+                                ? 'bg-blue-50 text-blue-700'
+                                : 'bg-slate-100 text-slate-500'
+                            }`}>
+                              {isComplete ? '✓ Complete' : reg.status || 'Registered'}
+                            </span>
+                          </div>
+
+                          {/* Progress section */}
+                          <div className="mt-3 space-y-1.5">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5">
+                                <BarChart3 className="h-3 w-3 text-slate-400" />
+                                <span className="text-[11px] text-slate-500 font-medium">Progress</span>
+                              </div>
+                              <span className={`text-[11px] font-bold ${
+                                isComplete ? 'text-emerald-600' : progress >= 50 ? 'text-blue-600' : 'text-slate-500'
+                              }`}>
+                                {progress}%
+                              </span>
+                            </div>
+                            {/* Progress bar with milestones */}
+                            <div className="relative h-2 rounded-full bg-slate-100 overflow-hidden">
+                              <div
+                                className={`absolute left-0 top-0 h-full rounded-full transition-all duration-500 ${
+                                  isComplete ? 'bg-emerald-500' : progress >= 75 ? 'bg-blue-500' : progress >= 50 ? 'bg-indigo-400' : 'bg-slate-400'
+                                }`}
+                                style={{ width: `${progress}%` }}
+                              />
+                            </div>
+                            {/* Milestone markers */}
+                            <div className="flex justify-between mt-0.5">
+                              {[25, 50, 75, 100].map(m => (
+                                <span key={m} className={`text-[9px] font-semibold ${
+                                  progress >= m ? 'text-emerald-500' : 'text-slate-300'
+                                }`}>{m}%</span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
               ) : (
                 <div className="py-14 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50/50">
                   <BookOpen className="h-8 w-8 text-slate-300 mx-auto mb-3" />
@@ -212,33 +275,37 @@ export default function AcademicsPage() {
           {/* Available Units */}
           {availableUnits.length > 0 && (
             <div>
-              <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                <PlusCircle className="h-4 w-4 text-blue-500" />
-                Available to Register
-              </h2>
-              <div className="space-y-2">
-                {availableUnits.map((unit: any) => (
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                  <PlusCircle className="h-4 w-4 text-blue-500" />
+                  Available to Register
+                </h2>
+                <span className="text-xs text-slate-400 font-medium">{availableUnits.length} unit{availableUnits.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="rounded-xl border border-slate-200 overflow-hidden bg-white divide-y divide-slate-100">
+                {availableUnits.map((unit: any, i: number) => (
                   <div
                     key={unit.id}
-                    className="bg-white border border-slate-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4 hover:border-emerald-200 hover:shadow-sm transition-all"
+                    className="px-4 py-3 flex items-center justify-between gap-4 hover:bg-slate-50 transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                        <BookOpen className="h-4 w-4 text-slate-500" />
+                      <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0 text-xs font-bold text-blue-500">
+                        {i + 1}
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-semibold text-slate-900 truncate">{unit.name}</p>
-                        <p className="text-xs text-slate-400 font-mono">
+                        <p className="text-[10px] font-mono text-slate-400 mt-0.5">
                           {unit.code}{unit.instructor ? ` · ${unit.instructor}` : ""}
                         </p>
                       </div>
                     </div>
                     <Button
                       size="sm"
-                      className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-xs shrink-0"
+                      variant="outline"
+                      className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300 h-8 text-xs shrink-0 gap-1.5"
                       onClick={() => handleRegisterUnit(unit)}
                     >
-                      <PlusCircle className="h-3 w-3 mr-1.5" /> Register
+                      <PlusCircle className="h-3 w-3" /> Register
                     </Button>
                   </div>
                 ))}
