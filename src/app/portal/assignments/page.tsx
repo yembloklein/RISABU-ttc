@@ -86,7 +86,7 @@ function AssignmentCard({
   return (
     <Card className={`border rounded-xl overflow-hidden transition-all ${cardBorder}`}>
       <CardContent className="p-0">
-        <div className="p-3 sm:p-4">
+        <div className="p-3 sm:p-4 md:p-5">
 
           {/* Top row: icon + title + status badge */}
           <div className="flex items-start gap-3">
@@ -99,8 +99,8 @@ function AssignmentCard({
 
             <div className="flex-1 min-w-0">
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <h3 className="text-sm font-bold text-slate-900 leading-tight">{assignment.title}</h3>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-bold text-slate-900 leading-tight line-clamp-2">{assignment.title}</h3>
                   <div className="flex flex-wrap items-center gap-1.5 mt-1">
                     <StatusBadge isGraded={isGraded} isSubmitted={isSubmitted} isPast={isPast} />
                     {assignment.dueDate && !isPast && <Countdown dueDate={assignment.dueDate} />}
@@ -109,10 +109,10 @@ function AssignmentCard({
                 {/* Expand toggle */}
                 {assignment.instructions && (
                   <button
-                    className="shrink-0 h-7 w-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                    className="shrink-0 h-8 w-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors touch-manipulation"
                     onClick={() => setExpanded(!expanded)}
                   >
-                    {expanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                    {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </button>
                 )}
               </div>
@@ -133,29 +133,33 @@ function AssignmentCard({
             </div>
           </div>
 
-          {/* Download Assignment — only when admin attached a file */}
-          {assignment.attachmentUrl && (
-            <a
-              href={assignment.attachmentUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              download
-              className="mt-3 w-full flex items-center justify-center gap-2 h-9 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-700 text-xs font-semibold transition-colors"
-            >
-              <Download className="h-3.5 w-3.5" />
-              Download Assignment File
-            </a>
-          )}
-
-          {/* Submit button — full width row on mobile */}
-          {!isSubmitted && !isPast && (
-            <button
-              className="mt-2 w-full flex items-center justify-center gap-2 h-9 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold transition-colors"
-              onClick={() => onSubmit(assignment)}
-            >
-              <Upload className="h-3.5 w-3.5" />
-              Submit Assignment
-            </button>
+          {/* Action buttons — stacked on mobile, side by side on sm+ */}
+          {(assignment.attachmentUrl || (!isSubmitted && !isPast)) && (
+            <div className={`mt-3 flex flex-col sm:flex-row gap-2 ${
+              assignment.attachmentUrl && !isSubmitted && !isPast ? "sm:gap-2" : ""
+            }`}>
+              {assignment.attachmentUrl && (
+                <a
+                  href={assignment.attachmentUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                  className="flex-1 flex items-center justify-center gap-2 h-10 sm:h-9 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-700 text-xs font-semibold transition-colors touch-manipulation"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Download File
+                </a>
+              )}
+              {!isSubmitted && !isPast && (
+                <button
+                  className="flex-1 flex items-center justify-center gap-2 h-10 sm:h-9 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold transition-colors touch-manipulation"
+                  onClick={() => onSubmit(assignment)}
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  Submit Assignment
+                </button>
+              )}
+            </div>
           )}
 
           {/* Submitted file info */}
@@ -235,6 +239,8 @@ export default function StudentAssignmentsPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+  const [showOverdueWarning, setShowOverdueWarning] = useState(false)
+  const [overdueVisible, setOverdueVisible] = useState(false)
 
   useEffect(() => {
     async function fetchStudent() {
@@ -284,6 +290,17 @@ export default function StudentAssignmentsPage() {
     ).length
     return { total, submitted, graded, pending: total - submitted, overdue }
   }, [assignments, submissions])
+
+  // Auto-dismiss overdue warning after 6 seconds
+  useEffect(() => {
+    if (stats.overdue > 0) {
+      setShowOverdueWarning(true)
+      setOverdueVisible(true)
+      const fadeTimer = setTimeout(() => setOverdueVisible(false), 5500)
+      const hideTimer = setTimeout(() => setShowOverdueWarning(false), 6200)
+      return () => { clearTimeout(fadeTimer); clearTimeout(hideTimer) }
+    }
+  }, [stats.overdue])
 
   const openSubmitDialog = (assignment: any) => {
     setActiveAssignment(assignment)
@@ -357,25 +374,25 @@ export default function StudentAssignmentsPage() {
 
       {/* ── Submit Dialog ─────────────────────────────────────────────────────── */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-[calc(100vw-2rem)] max-w-md rounded-2xl p-0 gap-0 overflow-hidden">
-          <DialogHeader className="px-5 pt-5 pb-4 border-b border-slate-100">
-            <DialogTitle className="text-base font-bold">Submit Assignment</DialogTitle>
-            <DialogDescription className="text-xs text-slate-500 mt-0.5">
-              {activeAssignment?.title}
-              {" · "}
+        <DialogContent className="w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] max-w-md rounded-2xl p-0 gap-0 overflow-hidden">
+          <DialogHeader className="px-4 sm:px-5 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-slate-100">
+            <DialogTitle className="text-sm sm:text-base font-bold pr-6">Submit Assignment</DialogTitle>
+            <DialogDescription className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+              <span className="font-medium text-slate-700">{activeAssignment?.title}</span>
+              <br />
               <span className="font-mono">{activeAssignment?.allowedTypes}</span>
               {" · max "}
               <span className="font-semibold">{activeAssignment?.maxFileSizeMb}MB</span>
             </DialogDescription>
           </DialogHeader>
 
-          <div className="px-5 py-4 space-y-3">
+          <div className="px-4 sm:px-5 py-4 space-y-3">
             {/* Drop zone */}
             <div
               onDrop={handleFileDrop}
               onDragOver={e => { e.preventDefault(); setDragOver(true) }}
               onDragLeave={() => setDragOver(false)}
-              className={`relative py-8 flex flex-col items-center justify-center border-2 border-dashed rounded-xl transition-all cursor-pointer group ${
+              className={`relative py-7 sm:py-9 flex flex-col items-center justify-center border-2 border-dashed rounded-xl transition-all cursor-pointer group ${
                 dragOver ? "border-emerald-400 bg-emerald-50"
                 : selectedFile ? "border-emerald-300 bg-emerald-50/50"
                 : "border-slate-200 bg-slate-50 hover:border-emerald-300 hover:bg-emerald-50/30"
@@ -383,28 +400,31 @@ export default function StudentAssignmentsPage() {
             >
               <input
                 type="file"
-                className="absolute inset-0 opacity-0 cursor-pointer"
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                 onChange={e => setSelectedFile(e.target.files?.[0] || null)}
               />
               {selectedFile ? (
                 <>
-                  <div className="h-11 w-11 rounded-xl bg-emerald-100 flex items-center justify-center mb-2">
-                    <FileText className="h-5 w-5 text-emerald-600" />
+                  <div className="h-12 w-12 rounded-xl bg-emerald-100 flex items-center justify-center mb-2">
+                    <FileText className="h-6 w-6 text-emerald-600" />
                   </div>
-                  <p className="text-sm font-semibold text-slate-800 px-4 text-center leading-snug max-w-[240px] truncate">
+                  <p className="text-sm font-semibold text-slate-800 px-4 text-center leading-snug w-full max-w-[260px] truncate">
                     {selectedFile.name}
                   </p>
                   <p className="text-xs text-slate-400 mt-1">
-                    {(selectedFile.size / 1024 / 1024).toFixed(2)} MB · tap to change
+                    {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                    <span className="hidden sm:inline"> · tap to change</span>
                   </p>
+                  <span className="mt-2 text-[10px] text-emerald-600 font-semibold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full sm:hidden">Tap to change</span>
                 </>
               ) : (
                 <>
-                  <div className="h-11 w-11 rounded-xl bg-slate-100 flex items-center justify-center mb-2 group-hover:bg-emerald-100 transition-colors">
-                    <FileUp className="h-5 w-5 text-slate-400 group-hover:text-emerald-600 transition-colors" />
+                  <div className="h-12 w-12 rounded-xl bg-slate-100 flex items-center justify-center mb-2 group-hover:bg-emerald-100 transition-colors">
+                    <FileUp className="h-6 w-6 text-slate-400 group-hover:text-emerald-600 transition-colors" />
                   </div>
                   <p className="text-sm font-semibold text-slate-600">Tap to choose file</p>
                   <p className="text-xs text-slate-400 mt-0.5">{activeAssignment?.allowedTypes}</p>
+                  <p className="text-[10px] text-slate-300 mt-1 hidden sm:block">or drag and drop</p>
                 </>
               )}
             </div>
@@ -413,7 +433,7 @@ export default function StudentAssignmentsPage() {
             {activeAssignment?.dueDate && (() => {
               const diff = new Date(activeAssignment.dueDate).getTime() - Date.now()
               return diff > 0 && diff < 3600000 ? (
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-100">
+                <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-100">
                   <TriangleAlert className="h-3.5 w-3.5 text-amber-600 shrink-0" />
                   <p className="text-xs text-amber-700 font-medium">Less than 1 hour remaining!</p>
                 </div>
@@ -421,9 +441,9 @@ export default function StudentAssignmentsPage() {
             })()}
           </div>
 
-          <div className="px-5 pb-5">
+          <div className="px-4 sm:px-5 pb-4 sm:pb-5">
             <Button
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-11 rounded-xl font-semibold"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white h-12 sm:h-11 rounded-xl font-semibold text-sm touch-manipulation"
               onClick={handleSubmit}
               disabled={isSubmitting || !selectedFile}
             >
@@ -437,15 +457,20 @@ export default function StudentAssignmentsPage() {
       </Dialog>
 
       {/* ── Page Header ───────────────────────────────────────────────────────── */}
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2 text-slate-900">
-          <ClipboardList className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
-          Assignments
-        </h1>
-        <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-          {student?.appliedCourse ? `${student.appliedCourse} · ` : ""}
-          {stats.pending} pending · {stats.submitted} submitted · {stats.graded} graded
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2 text-slate-900">
+            <ClipboardList className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600 shrink-0" />
+            Assignments
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5 leading-relaxed">
+            {student?.appliedCourse ? (
+              <span className="font-medium text-slate-600">{student.appliedCourse}</span>
+            ) : null}
+            {student?.appliedCourse ? " · " : ""}
+            {stats.pending} pending · {stats.submitted} submitted · {stats.graded} graded
+          </p>
+        </div>
       </div>
 
       {/* ── Stats Grid ────────────────────────────────────────────────────────── */}
@@ -457,22 +482,25 @@ export default function StudentAssignmentsPage() {
           { label: "Graded", value: stats.graded, color: "text-emerald-600", bg: "bg-emerald-50", icon: CheckCircle2 },
         ].map((s, i) => (
           <Card key={i} className="border border-slate-200 shadow-sm rounded-xl bg-white">
-            <CardContent className="p-3 flex items-center gap-2.5">
-              <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${s.bg} ${s.color}`}>
-                <s.icon className="h-3.5 w-3.5" />
+            <CardContent className="p-3 sm:p-4 flex items-center gap-2.5">
+              <div className={`h-9 w-9 sm:h-10 sm:w-10 rounded-lg flex items-center justify-center shrink-0 ${s.bg} ${s.color}`}>
+                <s.icon className="h-4 w-4" />
               </div>
               <div>
-                <p className="text-[10px] text-slate-500 font-medium leading-none">{s.label}</p>
-                <p className="text-lg font-bold text-slate-900 leading-tight mt-0.5">{s.value}</p>
+                <p className="text-[10px] sm:text-xs text-slate-500 font-medium leading-none">{s.label}</p>
+                <p className="text-xl sm:text-2xl font-bold text-slate-900 leading-tight mt-0.5">{s.value}</p>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* ── Overdue Warning ───────────────────────────────────────────────────── */}
-      {stats.overdue > 0 && (
-        <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl bg-rose-50 border border-rose-200">
+      {/* ── Overdue Warning — auto-dismisses after 6s ────────────────────────── */}
+      {showOverdueWarning && (
+        <div
+          className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl bg-rose-50 border border-rose-200 transition-all duration-700"
+          style={{ opacity: overdueVisible ? 1 : 0, transform: overdueVisible ? 'translateY(0)' : 'translateY(-6px)' }}
+        >
           <AlertCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
           <p className="text-xs sm:text-sm text-rose-700 font-medium leading-snug">
             <strong>{stats.overdue}</strong> assignment{stats.overdue > 1 ? "s" : ""} missed — deadline passed without submission.
@@ -482,13 +510,13 @@ export default function StudentAssignmentsPage() {
 
       {/* ── Assignment List ───────────────────────────────────────────────────── */}
       {sortedAssignments.length === 0 ? (
-        <div className="py-16 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
-          <ClipboardList className="h-9 w-9 text-slate-300 mx-auto mb-3" />
+        <div className="py-16 sm:py-20 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
+          <ClipboardList className="h-10 w-10 text-slate-300 mx-auto mb-3" />
           <p className="text-sm font-semibold text-slate-500">No assignments yet.</p>
           <p className="text-xs text-slate-400 mt-1">Check back after your instructors post work.</p>
         </div>
       ) : (
-        <div className="space-y-2.5">
+        <div className="space-y-2 sm:space-y-2.5">
           {sortedAssignments.map(a => (
             <AssignmentCard
               key={a.id}

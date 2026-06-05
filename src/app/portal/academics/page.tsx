@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase"
 import { collection, query, where, limit, addDoc, serverTimestamp, getDocs } from "firebase/firestore"
 import { Card, CardContent } from "@/components/ui/card"
@@ -58,9 +58,21 @@ export default function AcademicsPage() {
 
   const resourcesQuery = useMemoFirebase(() => {
     if (!firestore || !student?.appliedCourse) return null
-    return query(collection(firestore, "academic_resources"), where("courseName", "==", student.appliedCourse))
+    // Fetch all resources — filter client-side to support cross-course visibleTo array
+    return collection(firestore, "academic_resources")
   }, [firestore, student])
-  const { data: resources, isLoading: isResourcesLoading } = useCollection(resourcesQuery)
+  const { data: allResources, isLoading: isResourcesLoading } = useCollection(resourcesQuery)
+
+  // Filter resources: show if student's course matches courseName OR is in visibleTo array
+  const resources = useMemo(() => {
+    if (!allResources || !student?.appliedCourse) return []
+    return allResources.filter((r: any) => {
+      if (r.visibleTo && Array.isArray(r.visibleTo)) {
+        return r.visibleTo.includes(student.appliedCourse)
+      }
+      return r.courseName === student.appliedCourse
+    })
+  }, [allResources, student])
 
   const registrationsQuery = useMemoFirebase(() => {
     if (!firestore || !student?.id) return null

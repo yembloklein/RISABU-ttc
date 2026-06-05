@@ -24,7 +24,7 @@ import {
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { BookOpen, FileText, Upload, Trash2, Loader2, Download, Search, Plus, FileSpreadsheet } from "lucide-react"
+import { BookOpen, FileText, Upload, Trash2, Loader2, Download, Search, Plus, FileSpreadsheet, CheckSquare, Square } from "lucide-react"
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, doc, serverTimestamp } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
@@ -40,6 +40,7 @@ export default function AcademicResourcesPage() {
     title: "",
     type: "Notes",
     courseName: "",
+    visibleTo: [] as string[],
   })
 
   const firestore = useFirestore()
@@ -96,6 +97,7 @@ export default function AcademicResourcesPage() {
         title: formData.title,
         type: formData.type,
         courseName: formData.courseName,
+        visibleTo: formData.visibleTo.length > 0 ? formData.visibleTo : [formData.courseName],
         fileName: file.name,
         fileUrl: result.fileUrl,
         publicId: result.publicId,
@@ -109,7 +111,7 @@ export default function AcademicResourcesPage() {
       setIsDialogOpen(false)
       setFile(null)
       setProgress(0)
-      setFormData({ title: "", type: "Notes", courseName: "" })
+      setFormData({ title: "", type: "Notes", courseName: "", visibleTo: [] })
     } catch (error: any) {
       console.error("Upload error:", error)
       toast({ title: "Upload Failed", description: error.message, variant: "destructive" })
@@ -188,8 +190,14 @@ export default function AcademicResourcesPage() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-medium text-slate-700">Target Course</Label>
-                  <Select value={formData.courseName} onValueChange={(v) => setFormData({ ...formData, courseName: v })}>
+                  <Label className="text-xs font-medium text-slate-700">Primary Course</Label>
+                  <Select value={formData.courseName} onValueChange={(v) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      courseName: v,
+                      visibleTo: prev.visibleTo.includes(v) ? prev.visibleTo : [v, ...prev.visibleTo]
+                    }))
+                  }}>
                     <SelectTrigger className="h-10 border-slate-200 focus:ring-emerald-500 rounded-lg">
                       <SelectValue placeholder="Select Course" />
                     </SelectTrigger>
@@ -201,6 +209,44 @@ export default function AcademicResourcesPage() {
                   </Select>
                 </div>
               </div>
+
+              {/* Multi-course visibility */}
+              {formData.courseName && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-700 flex items-center gap-1.5">
+                    <BookOpen className="h-3 w-3" /> Also Visible To
+                    <span className="text-slate-400 font-normal">(optional — for cross-course access)</span>
+                  </Label>
+                  <div className="border border-slate-200 rounded-lg p-3 space-y-2 max-h-36 overflow-y-auto bg-slate-50/50">
+                    {(courses || []).filter(c => c.name !== formData.courseName).map(c => {
+                      const checked = formData.visibleTo.includes(c.name)
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => setFormData(prev => ({
+                            ...prev,
+                            visibleTo: checked
+                              ? prev.visibleTo.filter(n => n !== c.name)
+                              : [...prev.visibleTo, c.name]
+                          }))}
+                          className="w-full flex items-center gap-2.5 text-left px-2 py-1.5 rounded-md hover:bg-white transition-colors"
+                        >
+                          {checked
+                            ? <CheckSquare className="h-4 w-4 text-emerald-600 shrink-0" />
+                            : <Square className="h-4 w-4 text-slate-300 shrink-0" />}
+                          <span className={`text-xs font-medium ${checked ? 'text-emerald-700' : 'text-slate-600'}`}>{c.name}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                  {formData.visibleTo.filter(n => n !== formData.courseName).length > 0 && (
+                    <p className="text-[10px] text-emerald-600 font-medium">
+                      ✓ Visible to {formData.visibleTo.length} course(s)
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-slate-700">Select File</Label>

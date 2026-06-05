@@ -31,7 +31,7 @@ import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-import { Search, Plus, Loader2, BookOpen, User, Trash2, Edit2, ClipboardCheck, GraduationCap, CalendarDays, MapPin, Clock, Upload } from "lucide-react"
+import { Search, Plus, Loader2, BookOpen, User, Trash2, Edit2, ClipboardCheck, GraduationCap, CalendarDays, MapPin, Clock, Upload, CheckSquare, Square } from "lucide-react"
 
 import { useFirestore, useCollection, useMemoFirebase, useUser, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase"
 import { collection, query, orderBy, doc, serverTimestamp, addDoc, where, writeBatch } from "firebase/firestore"
@@ -68,7 +68,8 @@ export default function ExaminationsPage() {
     examType: "CAT",
     date: "",
     time: "",
-    venue: ""
+    venue: "",
+    additionalCourses: [] as string[],
   })
   
   const firestore = useFirestore()
@@ -280,10 +281,9 @@ export default function ExaminationsPage() {
     }
   }
 
-  // --- Schedule Handlers ---
   const handleSaveSchedule = async () => {
     if (!firestore) return
-    const { unitId, examType, date, time, venue } = scheduleFormData
+    const { unitId, examType, date, time, venue, additionalCourses } = scheduleFormData
 
     if (!unitId || !date || !time || !venue) {
       toast({ title: "Missing Fields", description: "Please fill in all scheduling details.", variant: "destructive" })
@@ -292,6 +292,9 @@ export default function ExaminationsPage() {
 
     const unit = units?.find(u => u.id === unitId)
     if (!unit) return
+
+    // Fetch the programs collection to get courses for additional course notification
+    const allCourses = additionalCourses
 
     try {
       // 1. Create the Schedule Document
@@ -303,19 +306,26 @@ export default function ExaminationsPage() {
         date,
         time,
         venue,
+        additionalCourses,
         createdAt: serverTimestamp()
       })
 
-      // 2. Notify Students (Batch write notifications to all students)
-      // Ideally, we filter by students enrolled in this unit, but since we don't have strict enrollment querying active, we will broadcast a portal notification to all active students or simulate it.
-      // For this implementation, we will send to all students in the portal to ensure they see it.
+      // 2. Notify Students — include students from additional courses
       if (students && students.length > 0) {
         const batch = writeBatch(firestore)
-        
-        // Firestore batches can handle up to 500 writes. We slice to 400 to be safe.
-        const studentsToNotify = students.slice(0, 400)
-        
-        studentsToNotify.forEach(student => {
+        const studentsToNotify = students
+          .filter(s =>
+            // notify students whose course matches the unit's course OR is in additionalCourses
+            (unit.courseName && s.appliedCourse === unit.courseName) ||
+            additionalCourses.includes(s.appliedCourse) ||
+            additionalCourses.length === 0 // fallback: notify all if no additional courses set
+          )
+          .slice(0, 400)
+
+        // If no course filter was possible, fall back to all students
+        const finalList = studentsToNotify.length > 0 ? studentsToNotify : students.slice(0, 400)
+
+        finalList.forEach(student => {
           const newNotifRef = doc(collection(firestore, "notifications"))
           batch.set(newNotifRef, {
             studentId: student.id,
@@ -327,7 +337,6 @@ export default function ExaminationsPage() {
             createdAt: serverTimestamp()
           })
 
-          // Send email notification
           if (student.contactEmail) {
             triggerEmail({
               to: student.contactEmail,
@@ -335,13 +344,13 @@ export default function ExaminationsPage() {
             }).catch(e => console.error("Failed to send exam email", e))
           }
         })
-        
+
         await batch.commit()
       }
 
       toast({ title: "Exam Scheduled", description: `The ${examType} has been scheduled and students have been notified via their portals.` })
       setIsScheduleDialogOpen(false)
-      setScheduleFormData({ unitId: "", examType: "CAT", date: "", time: "", venue: "" })
+      setScheduleFormData({ unitId: "", examType: "CAT", date: "", time: "", venue: "", additionalCourses: [] })
     } catch (error: any) {
       toast({ title: "Error Scheduling", description: error.message, variant: "destructive" })
     }
@@ -767,6 +776,52 @@ export default function ExaminationsPage() {
                 placeholder="e.g. Main Hall"
                 className="h-10 border-slate-200 focus-visible:ring-emerald-500 rounded-lg text-sm"
               />
+            </div>
+
+            {/* Additional courses — cross-course visibility */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-medium text-slate-700 flex items-center gap-1.5">
+                <BookOpen className="h-3 w-3" /> Also Notify Students From
+                <span className="text-slate-400 font-normal text-[10px]">(cross-course access)</span>
+              </Label>
+              <div className="border border-slate-200 rounded-lg p-2.5 space-y-1.5 max-h-32 overflow-y-auto bg-slate-50/50">
+                {(units || [])
+                  .filter(u => u.id !== scheduleFormData.unitId)
+                  .reduce((acc: string[], u) => {
+                    if (u.courseName && !acc.includes(u.courseName)) acc.push(u.courseName)
+                    return acc
+                  }, [])
+                  .map(courseName => {
+                    const checked = scheduleFormData.additionalCourses.includes(courseName)
+                    return (
+                      <button
+                        key={courseName}
+                        type="button"
+                        onClick={() => setScheduleFormData(prev => ({
+                          ...prev,
+                          additionalCourses: checked
+                            ? prev.additionalCourses.filter(c => c !== courseName)
+                            : [...prev.additionalCourses, courseName]
+                        }))}
+                        className="w-full flex items-center gap-2 text-left px-2 py-1 rounded-md hover:bg-white transition-colors"
+                      >
+                        {checked
+                          ? <CheckSquare className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                          : <Square className="h-3.5 w-3.5 text-slate-300 shrink-0" />}
+                        <span className={`text-xs font-medium ${checked ? 'text-emerald-700' : 'text-slate-600'}`}>{courseName}</span>
+                      </button>
+                    )
+                  })
+                }
+                {(units || []).length === 0 && (
+                  <p className="text-xs text-slate-400 text-center py-2">No other courses found</p>
+                )}
+              </div>
+              {scheduleFormData.additionalCourses.length > 0 && (
+                <p className="text-[10px] text-emerald-600 font-medium">
+                  ✓ Will also notify {scheduleFormData.additionalCourses.join(", ")} students
+                </p>
+              )}
             </div>
 
           </div>
