@@ -134,33 +134,34 @@ function AssignmentCard({
           </div>
 
           {/* Action buttons — stacked on mobile, side by side on sm+ */}
-          {(assignment.attachmentUrl || (!isSubmitted && !isPast)) && (
-            <div className={`mt-3 flex flex-col sm:flex-row gap-2 ${
-              assignment.attachmentUrl && !isSubmitted && !isPast ? "sm:gap-2" : ""
-            }`}>
-              {assignment.attachmentUrl && (
-                <a
-                  href={assignment.attachmentUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  download
-                  className="flex-1 flex items-center justify-center gap-2 h-10 sm:h-9 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-700 text-xs font-semibold transition-colors touch-manipulation"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  Download File
-                </a>
-              )}
-              {!isSubmitted && !isPast && (
-                <button
-                  className="flex-1 flex items-center justify-center gap-2 h-10 sm:h-9 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold transition-colors touch-manipulation"
-                  onClick={() => onSubmit(assignment)}
-                >
-                  <Upload className="h-3.5 w-3.5" />
-                  Submit Assignment
-                </button>
-              )}
-            </div>
-          )}
+          {(assignment.attachmentUrl || (!isSubmitted && !isPast)) && (() => {
+            const hasBoth = !!assignment.attachmentUrl && !isSubmitted && !isPast
+            return (
+              <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                {assignment.attachmentUrl && (
+                  <a
+                    href={assignment.attachmentUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    download
+                    className={`${hasBoth ? 'flex-1' : 'w-full sm:w-auto sm:px-4'} flex items-center justify-center gap-2 h-10 sm:h-9 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 text-emerald-700 text-xs font-semibold transition-colors touch-manipulation`}
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    Download File
+                  </a>
+                )}
+                {!isSubmitted && !isPast && (
+                  <button
+                    className="flex-1 flex items-center justify-center gap-2 h-10 sm:h-9 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold transition-colors touch-manipulation"
+                    onClick={() => onSubmit(assignment)}
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    Submit Assignment
+                  </button>
+                )}
+              </div>
+            )
+          })()}
 
           {/* Submitted file info */}
           {isSubmitted && (
