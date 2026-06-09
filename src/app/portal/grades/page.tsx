@@ -8,12 +8,14 @@ import { TrendingUp, Loader2, Info, ClipboardList, Award, Star } from "lucide-re
 
 const GRADE_CONFIG: Record<string, { points: number; label: string; color: string; bg: string; bar: string }> = {
   "A":  { points: 4.0, label: "Distinction", color: "text-emerald-700", bg: "bg-emerald-50", bar: "bg-emerald-500" },
-  "B+": { points: 3.5, label: "Credit",      color: "text-blue-700",   bg: "bg-blue-50",   bar: "bg-blue-500" },
+  "A-": { points: 3.7, label: "Distinction", color: "text-emerald-600", bg: "bg-emerald-50", bar: "bg-emerald-400" },
+  "B+": { points: 3.3, label: "Credit",      color: "text-blue-700",   bg: "bg-blue-50",   bar: "bg-blue-500" },
   "B":  { points: 3.0, label: "Credit",      color: "text-blue-600",   bg: "bg-blue-50",   bar: "bg-blue-400" },
-  "C+": { points: 2.5, label: "Pass",        color: "text-amber-700",  bg: "bg-amber-50",  bar: "bg-amber-400" },
+  "B-": { points: 2.7, label: "Credit",      color: "text-blue-500",   bg: "bg-blue-50",   bar: "bg-blue-300" },
+  "C+": { points: 2.3, label: "Pass",        color: "text-amber-700",  bg: "bg-amber-50",  bar: "bg-amber-500" },
   "C":  { points: 2.0, label: "Pass",        color: "text-amber-600",  bg: "bg-amber-50",  bar: "bg-amber-400" },
-  "D":  { points: 1.0, label: "Borderline",  color: "text-orange-700", bg: "bg-orange-50", bar: "bg-orange-400" },
-  "F":  { points: 0.0, label: "Fail",        color: "text-rose-700",   bg: "bg-rose-50",   bar: "bg-rose-500" },
+  "C-": { points: 1.7, label: "Pass",        color: "text-amber-500",  bg: "bg-amber-50",  bar: "bg-amber-300" },
+  "D":  { points: 1.0, label: "Fail",        color: "text-rose-700",   bg: "bg-rose-50",   bar: "bg-rose-500" },
 }
 
 function getGradeConfig(grade: string) {
@@ -22,8 +24,8 @@ function getGradeConfig(grade: string) {
 
 function getGpaStatus(gpa: number) {
   if (gpa >= 3.7) return { label: "Distinction", color: "text-emerald-600", bg: "bg-emerald-50" }
-  if (gpa >= 3.0) return { label: "Credit", color: "text-blue-600", bg: "bg-blue-50" }
-  if (gpa >= 2.0) return { label: "Pass", color: "text-amber-600", bg: "bg-amber-50" }
+  if (gpa >= 2.7) return { label: "Credit",      color: "text-blue-600",    bg: "bg-blue-50" }
+  if (gpa >= 1.7) return { label: "Pass",        color: "text-amber-600",   bg: "bg-amber-50" }
   return { label: "At Risk", color: "text-rose-600", bg: "bg-rose-50" }
 }
 
@@ -46,14 +48,14 @@ export default function GradesPage() {
 
   const gpa = useMemo(() => {
     if (!grades || grades.length === 0) return 0
-    const total = grades.reduce((acc, g) => acc + (getGradeConfig(g.grade || "F").points), 0)
+    const total = grades.reduce((acc, g) => acc + (getGradeConfig(g.gradeLetter || "D").points), 0)
     return parseFloat((total / grades.length).toFixed(2))
   }, [grades])
 
   const gradeDistribution = useMemo(() => {
     const dist: Record<string, number> = {}
     ;(grades || []).forEach(g => {
-      const gr = g.grade || "F"
+      const gr = g.gradeLetter || "D"
       dist[gr] = (dist[gr] || 0) + 1
     })
     return dist
@@ -96,8 +98,8 @@ export default function GradesPage() {
             <p className={`text-xs font-semibold mt-0.5 ${gpaStatus.color}`}>{gpaStatus.label}</p>
             {/* GPA bar — out of 4.0 */}
             <div className="mt-2 h-1.5 rounded-full bg-slate-100 overflow-hidden">
-              <div className={`h-full rounded-full ${gpaStatus.bg.replace('bg-', 'bg-').replace('-50','')}`}
-                style={{ width: `${(gpa / 4.0) * 100}%`, background: gpa >= 3.7 ? '#10b981' : gpa >= 3.0 ? '#3b82f6' : gpa >= 2.0 ? '#f59e0b' : '#ef4444' }}
+              <div className={`h-full rounded-full`}
+                style={{ width: `${(gpa / 4.0) * 100}%`, background: gpa >= 3.7 ? '#10b981' : gpa >= 2.7 ? '#3b82f6' : gpa >= 1.7 ? '#f59e0b' : '#ef4444' }}
               />
             </div>
           </CardContent>
@@ -122,14 +124,14 @@ export default function GradesPage() {
             <p className="text-xs text-slate-400 font-medium">Best Grade</p>
             {(() => {
               const best = (grades || []).reduce((b, g) => {
-                const pts = getGradeConfig(g.grade || 'F').points
-                return pts > (getGradeConfig(b?.grade || 'F').points) ? g : b
+                const pts = getGradeConfig(g.gradeLetter || 'D').points
+                return pts > (getGradeConfig(b?.gradeLetter || 'D').points) ? g : b
               }, null as any)
-              const cfg = best ? getGradeConfig(best.grade) : null
+              const cfg = best ? getGradeConfig(best.gradeLetter) : null
               return cfg ? (
                 <>
-                  <p className={`text-3xl font-bold mt-0.5 ${cfg.color}`}>{best.grade}</p>
-                  <p className="text-xs text-slate-400 mt-0.5 truncate">{best.name || best.unitName || '—'}</p>
+                  <p className={`text-3xl font-bold mt-0.5 ${cfg.color}`}>{best.gradeLetter}</p>
+                  <p className="text-xs text-slate-400 mt-0.5 truncate">{best.unitName || '—'}</p>
                 </>
               ) : <p className="text-xl font-bold text-slate-300 mt-0.5">—</p>
             })()}
@@ -144,7 +146,7 @@ export default function GradesPage() {
             <p className="text-xs text-slate-400 font-medium">Academic Status</p>
             <p className={`text-base font-bold mt-1 ${gpaStatus.color}`}>{gpaStatus.label}</p>
             <p className="text-xs text-slate-400 mt-0.5">
-              {gpa >= 2.0 ? "Good standing" : "Needs improvement"}
+              {gpa >= 1.7 ? "Good standing" : "Needs improvement"}
             </p>
           </CardContent>
         </Card>
@@ -161,21 +163,20 @@ export default function GradesPage() {
             {total > 0 ? (
               <div className="divide-y divide-slate-100">
                 {(grades || []).map((res, i) => {
-                  const cfg = getGradeConfig(res.grade || "F")
-                  const total = (Number(res.cat) || 0) + (Number(res.exam) || 0)
-                  const maxScore = 100
-                  const pct = Math.min(100, Math.round((total / maxScore) * 100))
+                  const cfg = getGradeConfig(res.gradeLetter || "D")
+                  const scoreTotal = res.totalMarks ?? ((Number(res.catMarks) || 0) + (Number(res.finalMarks) || 0))
+                  const pct = Math.min(100, Math.round((scoreTotal / 100) * 100))
                   return (
                     <div key={res.id || i} className="px-4 py-4 hover:bg-slate-50 transition-colors">
                       <div className="flex items-start justify-between gap-3 mb-2">
                         <div className="flex items-center gap-3 min-w-0">
                           <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 font-bold text-sm ${cfg.bg} ${cfg.color}`}>
-                            {res.grade || "?"}
+                            {res.gradeLetter || "?"}
                           </div>
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold text-slate-900 truncate">{res.name || res.unitName || "—"}</p>
+                            <p className="text-sm font-semibold text-slate-900 truncate">{res.unitName || "—"}</p>
                             <div className="flex items-center gap-2 mt-0.5">
-                              <span className="text-[10px] font-mono text-slate-400">{res.code || res.unitCode || "—"}</span>
+                              <span className="text-[10px] font-mono text-slate-400">{res.unitCode || "—"}</span>
                               {res.semester && (
                                 <>
                                   <span className="h-1 w-1 rounded-full bg-slate-300" />
@@ -189,12 +190,12 @@ export default function GradesPage() {
                           <div>
                             <p className="text-xs text-slate-400">CAT&nbsp;&nbsp;Exam</p>
                             <p className="text-sm font-bold text-slate-700">
-                              {res.cat ?? "—"}&nbsp;&nbsp;{res.exam ?? "—"}
+                              {res.catMarks ?? "—"}&nbsp;&nbsp;{res.finalMarks ?? "—"}
                             </p>
                           </div>
                           <div className={`min-w-[52px] text-center px-2 py-1 rounded-lg ${cfg.bg}`}>
                             <p className="text-[9px] font-medium text-slate-400">Total</p>
-                            <p className={`text-sm font-bold ${cfg.color}`}>{total}/100</p>
+                            <p className={`text-sm font-bold ${cfg.color}`}>{scoreTotal}/100</p>
                           </div>
                         </div>
                       </div>

@@ -41,13 +41,17 @@ import { toast } from "@/hooks/use-toast"
 import { triggerEmail } from "@/lib/send-email"
 import { getExamScheduledEmail } from "@/lib/email-templates"
 
-// Standard Kenyan University Grading
+// Standard Grading Scale
 const getGradeInfo = (total: number) => {
-  if (total >= 70) return { letter: "A", label: "Distinction", color: "bg-emerald-50 text-emerald-700" }
-  if (total >= 60) return { letter: "B", label: "Credit", color: "bg-blue-50 text-blue-700" }
-  if (total >= 50) return { letter: "C", label: "Pass", color: "bg-indigo-50 text-indigo-700" }
-  if (total >= 40) return { letter: "D", label: "Pass", color: "bg-amber-50 text-amber-700" }
-  return { letter: "E", label: "Fail", color: "bg-rose-50 text-rose-700" }
+  if (total >= 80) return { letter: "A",  label: "Distinction", color: "bg-emerald-50 text-emerald-700" }
+  if (total >= 75) return { letter: "A-", label: "Distinction", color: "bg-emerald-50 text-emerald-600" }
+  if (total >= 70) return { letter: "B+", label: "Credit",      color: "bg-blue-50 text-blue-700" }
+  if (total >= 65) return { letter: "B",  label: "Credit",      color: "bg-blue-50 text-blue-600" }
+  if (total >= 60) return { letter: "B-", label: "Credit",      color: "bg-blue-50 text-blue-500" }
+  if (total >= 55) return { letter: "C+", label: "Pass",        color: "bg-amber-50 text-amber-700" }
+  if (total >= 50) return { letter: "C",  label: "Pass",        color: "bg-amber-50 text-amber-600" }
+  if (total >= 45) return { letter: "C-", label: "Pass",        color: "bg-amber-50 text-amber-500" }
+  return { letter: "D",  label: "Fail",        color: "bg-rose-50 text-rose-700" }
 }
 
 export default function ExaminationsPage() {
@@ -143,8 +147,8 @@ export default function ExaminationsPage() {
     const cat = Number(gradeFormData.catMarks) || 0
     const final = Number(gradeFormData.finalMarks) || 0
 
-    if (cat < 0 || cat > 30) {
-      toast({ title: "Invalid CAT Marks", description: "CAT marks must be between 0 and 30.", variant: "destructive" })
+    if (gradeFormData.catMarks !== "" && (cat < 0 || cat > 30)) {
+      toast({ title: "Invalid CAT Marks", description: "CAT marks must be between 0 and 30 (leave blank to default to 0).", variant: "destructive" })
       return
     }
     if (final < 0 || final > 70) {
@@ -440,7 +444,7 @@ export default function ExaminationsPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <div className="col-span-1 md:col-span-4 flex items-center gap-2 bg-blue-50 text-blue-800 text-xs font-semibold px-4 py-2 rounded-lg border border-blue-100">
               <ClipboardCheck className="h-4 w-4 shrink-0" />
-              <span>Standard Grading Rule Active: CATs (30%) + Final Examination (70%).</span>
+              <span>Grading Scale: A ≥80 · A- 75–79 · B+ 70–74 · B 65–69 · B- 60–64 · C+ 55–59 · C 50–54 · C- 45–49 · D &lt;45 &nbsp;|&nbsp; CAT (30%) + Final Exam (70%)</span>
             </div>
           </div>
 
@@ -649,14 +653,17 @@ export default function ExaminationsPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-xs font-medium text-slate-700">CAT Marks (Out of 30)</Label>
+                <Label className="text-xs font-medium text-slate-700">
+                  CAT Marks (Out of 30)
+                  <span className="ml-1.5 text-[10px] font-normal text-slate-400 italic">Optional</span>
+                </Label>
                 <Input 
                   type="number"
                   min="0" max="30"
                   value={gradeFormData.catMarks}
                   onChange={(e) => setGradeFormData({...gradeFormData, catMarks: e.target.value})}
                   className="h-10 border-slate-200 focus-visible:ring-emerald-500 rounded-lg text-lg font-mono font-semibold"
-                  placeholder="0 - 30"
+                  placeholder="Leave blank for 0"
                 />
               </div>
               <div className="space-y-2">
