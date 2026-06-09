@@ -96,20 +96,19 @@ export default function ManageUnitsPage() {
       return
     }
 
-    const data = {
+    const updateData = {
       ...formData,
-      progress: editingUnitId ? undefined : 0, 
       updatedAt: serverTimestamp(),
     }
 
     try {
       if (editingUnitId) {
         const docRef = doc(firestore!, "units", editingUnitId)
-        await updateDocumentNonBlocking(docRef, data)
+        await updateDocumentNonBlocking(docRef, updateData)
         toast({ title: "Updated", description: "Unit updated successfully." })
       } else {
         await addDocumentNonBlocking(unitsRef, {
-          ...data,
+          ...updateData,
           progress: 0,
           createdAt: serverTimestamp(),
         })
