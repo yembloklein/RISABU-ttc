@@ -28,7 +28,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Slider } from "@/components/ui/slider"
 import { BookOpen, Plus, Search, Edit2, Trash2, Loader2, User, Hash, Filter, Download, Printer, Users, GraduationCap, Activity, CheckCircle2, BarChart3, Save } from "lucide-react"
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from "@/firebase"
-import { collection, doc, serverTimestamp, query, orderBy, where, updateDoc } from "firebase/firestore"
+import { collection, doc, serverTimestamp, query, orderBy, updateDoc } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
 
 export default function ManageUnitsPage() {
@@ -51,11 +51,9 @@ export default function ManageUnitsPage() {
   const [selectedCourse, setSelectedCourse] = useState("all")
   const [selectedUnit, setSelectedUnit] = useState("all")
 
-  // Progress State
-  const [progressUnitId, setProgressUnitId] = useState("all")
-  const [progressSearch, setProgressSearch] = useState("")
-  const [progressDraft, setProgressDraft] = useState<Record<string, number>>({})
-  const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
+  // Progress State — unit-centric (one value per unit, pushes to all enrolled students)
+  const [unitProgressDraft, setUnitProgressDraft] = useState<Record<string, number>>({})
+  const [savingUnitIds, setSavingUnitIds] = useState<Set<string>>(new Set())
 
   const firestore = useFirestore()
   const { user } = useUser()
@@ -134,84 +132,68 @@ export default function ManageUnitsPage() {
     toast({ title: "Deleted", description: "Unit removed from catalog." })
   }
 
-  // --- PROGRESS LOGIC ---
-  const progressFilteredRegs = useMemo(() => {
-    return (registrations || []).filter(reg => {
-      const matchesUnit = progressUnitId === "all" || reg.unitId === progressUnitId
-      const name = (reg.studentName || "").toLowerCase()
-      const email = (reg.studentEmail || "").toLowerCase()
-      const code = (reg.unitCode || "").toLowerCase()
-      const unitName = (reg.unitName || "").toLowerCase()
-      const search = progressSearch.toLowerCase()
-      const matchesSearch = !search || name.includes(search) || email.includes(search) || code.includes(search) || unitName.includes(search)
-      return matchesUnit && matchesSearch
+  // --- PROGRESS LOGIC (unit-centric) ---
+  // Build a map: unitId -> list of registration docs
+  const regsByUnit = useMemo(() => {
+    const map: Record<string, any[]> = {}
+    ;(registrations || []).forEach(r => {
+      if (!map[r.unitId]) map[r.unitId] = []
+      map[r.unitId].push(r)
     })
-  }, [registrations, progressUnitId, progressSearch])
+    return map
+  }, [registrations])
 
-  // Initialise draft when regs load
+  // Initialise draft from the first registration's progress for each unit
   useEffect(() => {
-    if (!registrations) return
-    setProgressDraft(prev => {
+    if (!units) return
+    setUnitProgressDraft(prev => {
       const next = { ...prev }
-      registrations.forEach(r => {
-        if (!(r.id in next)) next[r.id] = r.progress ?? 0
+      units.forEach(u => {
+        if (!(u.id in next)) {
+          const regs = regsByUnit[u.id] || []
+          // Use the existing progress value (all students in a unit share the same value)
+          next[u.id] = regs.length > 0 ? (regs[0].progress ?? 0) : 0
+        }
       })
       return next
     })
-  }, [registrations])
+  }, [units, regsByUnit])
 
-  const handleSaveProgress = async (reg: any) => {
+  // Save progress for ALL students in a unit at once
+  const handleSaveUnitProgress = async (unit: any) => {
     if (!firestore) return
-    const newProgress = progressDraft[reg.id] ?? reg.progress ?? 0
-    setSavingIds(prev => new Set(prev).add(reg.id))
-    try {
-      const regDoc = doc(firestore, "unit_registrations", reg.id)
-      await updateDoc(regDoc, {
-        progress: newProgress,
-        status: newProgress >= 100 ? "Completed" : newProgress > 0 ? "In Progress" : "Registered",
-        updatedAt: serverTimestamp(),
-      })
-      toast({ title: "Progress Updated", description: `${reg.studentName} → ${newProgress}%` })
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" })
-    } finally {
-      setSavingIds(prev => { const s = new Set(prev); s.delete(reg.id); return s })
+    const newProgress = unitProgressDraft[unit.id] ?? 0
+    const regsForUnit = regsByUnit[unit.id] || []
+    if (regsForUnit.length === 0) {
+      toast({ title: "No students", description: "No students are registered for this unit.", variant: "destructive" })
+      return
     }
-  }
-
-  const handleSaveAllProgress = async () => {
-    if (!firestore || progressFilteredRegs.length === 0) return
-    const ids = new Set(progressFilteredRegs.map(r => r.id))
-    setSavingIds(ids)
+    setSavingUnitIds(prev => new Set(prev).add(unit.id))
     try {
-      await Promise.all(
-        progressFilteredRegs.map(reg => {
-          const newProgress = progressDraft[reg.id] ?? reg.progress ?? 0
-          const regDoc = doc(firestore, "unit_registrations", reg.id)
-          return updateDoc(regDoc, {
-            progress: newProgress,
-            status: newProgress >= 100 ? "Completed" : newProgress > 0 ? "In Progress" : "Registered",
-            updatedAt: serverTimestamp(),
-          })
+      await Promise.all(regsForUnit.map(reg =>
+        updateDoc(doc(firestore, "unit_registrations", reg.id), {
+          progress: newProgress,
+          status: newProgress >= 100 ? "Completed" : newProgress > 0 ? "In Progress" : "Registered",
+          updatedAt: serverTimestamp(),
         })
-      )
-      toast({ title: "All Progress Saved", description: `${progressFilteredRegs.length} record(s) updated.` })
+      ))
+      toast({ title: "Progress Updated", description: `${unit.name} → ${newProgress}% (${regsForUnit.length} student${regsForUnit.length !== 1 ? 's' : ''} updated)` })
     } catch (e: any) {
       toast({ title: "Error", description: e.message, variant: "destructive" })
     } finally {
-      setSavingIds(new Set())
+      setSavingUnitIds(prev => { const s = new Set(prev); s.delete(unit.id); return s })
     }
   }
 
-  const progressStats = useMemo(() => {
-    const regs = progressFilteredRegs
-    if (regs.length === 0) return { avg: 0, complete: 0, inProgress: 0, notStarted: 0 }
-    const avg = Math.round(regs.reduce((s, r) => s + (progressDraft[r.id] ?? r.progress ?? 0), 0) / regs.length)
-    const complete = regs.filter(r => (progressDraft[r.id] ?? r.progress ?? 0) >= 100).length
-    const inProgress = regs.filter(r => { const p = progressDraft[r.id] ?? r.progress ?? 0; return p > 0 && p < 100 }).length
-    const notStarted = regs.filter(r => (progressDraft[r.id] ?? r.progress ?? 0) === 0).length
+  const unitProgressStats = useMemo(() => {
+    const us = units || []
+    if (us.length === 0) return { avg: 0, complete: 0, inProgress: 0, notStarted: 0 }
+    const avg = Math.round(us.reduce((s, u) => s + (unitProgressDraft[u.id] ?? 0), 0) / us.length)
+    const complete = us.filter(u => (unitProgressDraft[u.id] ?? 0) >= 100).length
+    const inProgress = us.filter(u => { const p = unitProgressDraft[u.id] ?? 0; return p > 0 && p < 100 }).length
+    const notStarted = us.filter(u => (unitProgressDraft[u.id] ?? 0) === 0).length
     return { avg, complete, inProgress, notStarted }
-  }, [progressFilteredRegs, progressDraft])
+  }, [units, unitProgressDraft])
 
   // --- REGISTRATIONS LOGIC ---
   const studentMap = useMemo(() => {
@@ -664,10 +646,10 @@ export default function ManageUnitsPage() {
           {/* Stats row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: "Avg Progress", value: `${progressStats.avg}%`, icon: BarChart3, color: "text-blue-600", bg: "bg-blue-50" },
-              { label: "Completed",   value: progressStats.complete,   icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50" },
-              { label: "In Progress", value: progressStats.inProgress, icon: Activity,     color: "text-amber-600",  bg: "bg-amber-50"  },
-              { label: "Not Started", value: progressStats.notStarted, icon: Users,        color: "text-slate-500",  bg: "bg-slate-100" },
+              { label: "Avg Progress",   value: `${unitProgressStats.avg}%`,      icon: BarChart3,   color: "text-blue-600",    bg: "bg-blue-50"    },
+              { label: "Units Complete", value: unitProgressStats.complete,        icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50" },
+              { label: "In Progress",    value: unitProgressStats.inProgress,      icon: Activity,    color: "text-amber-600",   bg: "bg-amber-50"   },
+              { label: "Not Started",    value: unitProgressStats.notStarted,      icon: Users,       color: "text-slate-500",   bg: "bg-slate-100"  },
             ].map((s, i) => (
               <Card key={i} className="border border-slate-200 shadow-sm rounded-xl bg-white">
                 <CardContent className="p-4 flex items-center gap-3">
@@ -683,157 +665,111 @@ export default function ManageUnitsPage() {
             ))}
           </div>
 
-          {/* Filters */}
-          <div className="flex flex-col md:flex-row gap-3 bg-slate-50/50 p-1.5 rounded-xl border border-slate-200">
-            <div className="w-full md:w-72">
-              <Select value={progressUnitId} onValueChange={(v) => { setProgressUnitId(v); setProgressDraft({}) }}>
-                <SelectTrigger className="h-10 rounded-lg bg-white border-slate-200 shadow-sm text-sm">
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="h-3.5 w-3.5 text-slate-400" />
-                    <SelectValue placeholder="Filter by Unit" />
-                  </div>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Units</SelectItem>
-                  {(units || []).map(u => (
-                    <SelectItem key={u.id} value={u.id}>{u.code} — {u.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Search student name or email..."
-                className="pl-9 h-10 rounded-lg bg-white border-slate-200 shadow-sm text-sm focus-visible:ring-emerald-500"
-                value={progressSearch}
-                onChange={e => setProgressSearch(e.target.value)}
-              />
-            </div>
-            {progressFilteredRegs.length > 0 && (
-              <Button
-                onClick={handleSaveAllProgress}
-                disabled={savingIds.size > 0}
-                className="h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg shadow-sm px-5 shrink-0"
-              >
-                {savingIds.size > 0
-                  ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  : <Save className="h-4 w-4 mr-2" />}
-                Save All
-              </Button>
-            )}
+          {/* Info banner */}
+          <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+            <Activity className="h-4 w-4 text-blue-500 mt-0.5 shrink-0" />
+            <p className="text-xs text-blue-700 leading-relaxed">
+              Progress is set <strong>per unit</strong> — all students registered for that unit receive the same update simultaneously. Changes reflect instantly in the Student Portal.
+            </p>
           </div>
 
-          {/* Table */}
-          <Card className="border border-slate-200 shadow-sm overflow-hidden rounded-xl bg-white">
-            <CardContent className="p-0">
-              {loadingRegs ? (
-                <div className="flex items-center justify-center py-20">
-                  <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
-                </div>
-              ) : progressFilteredRegs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20">
-                  <Activity className="h-8 w-8 text-slate-200 mb-3" />
-                  <p className="text-sm text-slate-400">No registrations found.</p>
-                  <p className="text-xs text-slate-300 mt-1">Select a unit or adjust your search.</p>
-                </div>
-              ) : (
+          {/* Units table */}
+          {loadingUnits || loadingRegs ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+            </div>
+          ) : (units || []).length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <BookOpen className="h-8 w-8 text-slate-200 mb-3" />
+              <p className="text-sm text-slate-400">No units found. Add units in the Unit Catalog tab first.</p>
+            </div>
+          ) : (
+            <Card className="border border-slate-200 shadow-sm overflow-hidden rounded-xl bg-white">
+              <CardContent className="p-0">
                 <Table>
                   <TableHeader className="bg-slate-50/50">
                     <TableRow className="border-slate-100 hover:bg-transparent">
-                      <TableHead className="font-semibold text-slate-500 h-10 text-xs pl-5">Student</TableHead>
-                      <TableHead className="font-semibold text-slate-500 h-10 text-xs">Unit</TableHead>
-                      <TableHead className="font-semibold text-slate-500 h-10 text-xs w-[260px]">Progress</TableHead>
-                      <TableHead className="font-semibold text-slate-500 h-10 text-xs text-center w-[80px]">%</TableHead>
+                      <TableHead className="font-semibold text-slate-500 h-10 text-xs pl-5">Unit</TableHead>
+                      <TableHead className="font-semibold text-slate-500 h-10 text-xs">Course</TableHead>
+                      <TableHead className="font-semibold text-slate-500 h-10 text-xs text-center w-[90px]">Students</TableHead>
+                      <TableHead className="font-semibold text-slate-500 h-10 text-xs w-[280px]">Progress (all students)</TableHead>
+                      <TableHead className="font-semibold text-slate-500 h-10 text-xs text-center w-[70px]">%</TableHead>
                       <TableHead className="font-semibold text-slate-500 h-10 text-xs text-center w-[90px]">Status</TableHead>
                       <TableHead className="font-semibold text-slate-500 h-10 text-xs text-right pr-5 w-[80px]">Save</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {progressFilteredRegs.map(reg => {
-                      const current = progressDraft[reg.id] ?? reg.progress ?? 0
-                      const isSaving = savingIds.has(reg.id)
+                    {(units || []).map(unit => {
+                      const current = unitProgressDraft[unit.id] ?? 0
+                      const isSaving = savingUnitIds.has(unit.id)
+                      const enrolled = (regsByUnit[unit.id] || []).length
                       const isComplete = current >= 100
                       const isInProgress = current > 0 && current < 100
                       return (
-                        <TableRow key={reg.id} className="hover:bg-slate-50/80 transition-colors border-slate-100">
-                          {/* Student */}
-                          <TableCell className="py-3 pl-5">
-                            <div className="flex items-center gap-2.5">
-                              <div className="h-8 w-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-700 font-bold text-xs shrink-0">
-                                {(reg.studentName || "?")[0].toUpperCase()}
+                        <TableRow key={unit.id} className="hover:bg-slate-50/80 transition-colors border-slate-100">
+                          <TableCell className="py-4 pl-5">
+                            <div className="flex items-center gap-3">
+                              <div className="h-9 w-9 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
+                                <BookOpen className="h-4 w-4 text-emerald-600" />
                               </div>
                               <div>
-                                <p className="text-sm font-semibold text-slate-900">{reg.studentName || "—"}</p>
-                                <p className="text-[10px] text-slate-400">{reg.studentEmail || "—"}</p>
+                                <p className="text-sm font-semibold text-slate-900">{unit.name}</p>
+                                <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{unit.code}</span>
                               </div>
                             </div>
                           </TableCell>
-
-                          {/* Unit */}
-                          <TableCell className="py-3">
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-xs font-semibold text-slate-800">{reg.unitName}</span>
-                              <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded w-fit">{reg.unitCode}</span>
+                          <TableCell className="py-4">
+                            <Badge variant="secondary" className="bg-slate-100 text-slate-600 border-0 text-[11px] font-medium">
+                              {unit.courseName}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-4 text-center">
+                            <div className="flex flex-col items-center">
+                              <span className="text-base font-bold text-slate-800">{enrolled}</span>
+                              <span className="text-[10px] text-slate-400">enrolled</span>
                             </div>
                           </TableCell>
-
-                          {/* Slider */}
-                          <TableCell className="py-3">
-                            <div className="flex items-center gap-3">
-                              <Slider
-                                value={[current]}
-                                min={0}
-                                max={100}
-                                step={5}
-                                onValueChange={([v]) => setProgressDraft(p => ({ ...p, [reg.id]: v }))}
-                                className="flex-1"
-                              />
-                            </div>
+                          <TableCell className="py-4">
+                            <Slider
+                              value={[current]}
+                              min={0} max={100} step={5}
+                              onValueChange={([v]) => setUnitProgressDraft(p => ({ ...p, [unit.id]: v }))}
+                              className="w-full"
+                            />
                             <div className="flex justify-between text-[9px] text-slate-300 mt-1 px-0.5">
                               {[0, 25, 50, 75, 100].map(m => (
                                 <span key={m} className={current >= m ? "text-emerald-400 font-semibold" : ""}>{m}%</span>
                               ))}
                             </div>
                           </TableCell>
-
-                          {/* Numeric input */}
-                          <TableCell className="py-3 text-center">
+                          <TableCell className="py-4 text-center">
                             <input
-                              type="number"
-                              min={0}
-                              max={100}
-                              value={current}
+                              type="number" min={0} max={100} value={current}
                               onChange={e => {
                                 const v = Math.min(100, Math.max(0, Number(e.target.value)))
-                                setProgressDraft(p => ({ ...p, [reg.id]: v }))
+                                setUnitProgressDraft(p => ({ ...p, [unit.id]: v }))
                               }}
                               className="w-14 h-8 text-center text-sm font-bold border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-slate-800"
                             />
                           </TableCell>
-
-                          {/* Status badge */}
-                          <TableCell className="py-3 text-center">
+                          <TableCell className="py-4 text-center">
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              isComplete   ? "bg-emerald-100 text-emerald-700" :
+                              isComplete ? "bg-emerald-100 text-emerald-700" :
                               isInProgress ? "bg-amber-100 text-amber-700" :
-                                             "bg-slate-100 text-slate-500"
+                              "bg-slate-100 text-slate-500"
                             }`}>
                               {isComplete ? "Complete" : isInProgress ? "In Progress" : "Not Started"}
                             </span>
                           </TableCell>
-
-                          {/* Save button */}
-                          <TableCell className="py-3 text-right pr-5">
+                          <TableCell className="py-4 text-right pr-5">
                             <Button
                               size="sm"
-                              onClick={() => handleSaveProgress(reg)}
-                              disabled={isSaving}
-                              className="h-7 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg"
+                              onClick={() => handleSaveUnitProgress(unit)}
+                              disabled={isSaving || enrolled === 0}
+                              title={enrolled === 0 ? "No students enrolled" : `Update ${enrolled} student(s)`}
+                              className="h-7 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg disabled:opacity-40"
                             >
-                              {isSaving
-                                ? <Loader2 className="h-3 w-3 animate-spin" />
-                                : <Save className="h-3 w-3" />}
+                              {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -841,16 +777,12 @@ export default function ManageUnitsPage() {
                     })}
                   </TableBody>
                 </Table>
-              )}
-            </CardContent>
-          </Card>
-
-          <p className="text-[11px] text-slate-400 text-center">
-            Progress changes are reflected instantly in the Student Portal under <span className="font-semibold">Academics → My Registered Units</span>.
-          </p>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
+
       </Tabs>
     </div>
   )
 }
-
