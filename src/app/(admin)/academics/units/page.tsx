@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -25,9 +25,10 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { BookOpen, Plus, Search, Edit2, Trash2, Loader2, Code, User, Hash, Filter, Download, Printer, Users, GraduationCap } from "lucide-react"
+import { Slider } from "@/components/ui/slider"
+import { BookOpen, Plus, Search, Edit2, Trash2, Loader2, User, Hash, Filter, Download, Printer, Users, GraduationCap, Activity, CheckCircle2, BarChart3, Save } from "lucide-react"
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from "@/firebase"
-import { collection, doc, serverTimestamp, query, orderBy, limit } from "firebase/firestore"
+import { collection, doc, serverTimestamp, query, orderBy, where, updateDoc } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
 
 export default function ManageUnitsPage() {
@@ -49,6 +50,12 @@ export default function ManageUnitsPage() {
   const [regSearchTerm, setRegSearchTerm] = useState("")
   const [selectedCourse, setSelectedCourse] = useState("all")
   const [selectedUnit, setSelectedUnit] = useState("all")
+
+  // Progress State
+  const [progressUnitId, setProgressUnitId] = useState("all")
+  const [progressSearch, setProgressSearch] = useState("")
+  const [progressDraft, setProgressDraft] = useState<Record<string, number>>({})
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
 
   const firestore = useFirestore()
   const { user } = useUser()
@@ -126,6 +133,85 @@ export default function ManageUnitsPage() {
     deleteDocumentNonBlocking(docRef)
     toast({ title: "Deleted", description: "Unit removed from catalog." })
   }
+
+  // --- PROGRESS LOGIC ---
+  const progressFilteredRegs = useMemo(() => {
+    return (registrations || []).filter(reg => {
+      const matchesUnit = progressUnitId === "all" || reg.unitId === progressUnitId
+      const name = (reg.studentName || "").toLowerCase()
+      const email = (reg.studentEmail || "").toLowerCase()
+      const code = (reg.unitCode || "").toLowerCase()
+      const unitName = (reg.unitName || "").toLowerCase()
+      const search = progressSearch.toLowerCase()
+      const matchesSearch = !search || name.includes(search) || email.includes(search) || code.includes(search) || unitName.includes(search)
+      return matchesUnit && matchesSearch
+    })
+  }, [registrations, progressUnitId, progressSearch])
+
+  // Initialise draft when regs load
+  useEffect(() => {
+    if (!registrations) return
+    setProgressDraft(prev => {
+      const next = { ...prev }
+      registrations.forEach(r => {
+        if (!(r.id in next)) next[r.id] = r.progress ?? 0
+      })
+      return next
+    })
+  }, [registrations])
+
+  const handleSaveProgress = async (reg: any) => {
+    if (!firestore) return
+    const newProgress = progressDraft[reg.id] ?? reg.progress ?? 0
+    setSavingIds(prev => new Set(prev).add(reg.id))
+    try {
+      const regDoc = doc(firestore, "unit_registrations", reg.id)
+      await updateDoc(regDoc, {
+        progress: newProgress,
+        status: newProgress >= 100 ? "Completed" : newProgress > 0 ? "In Progress" : "Registered",
+        updatedAt: serverTimestamp(),
+      })
+      toast({ title: "Progress Updated", description: `${reg.studentName} → ${newProgress}%` })
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" })
+    } finally {
+      setSavingIds(prev => { const s = new Set(prev); s.delete(reg.id); return s })
+    }
+  }
+
+  const handleSaveAllProgress = async () => {
+    if (!firestore || progressFilteredRegs.length === 0) return
+    const ids = new Set(progressFilteredRegs.map(r => r.id))
+    setSavingIds(ids)
+    try {
+      await Promise.all(
+        progressFilteredRegs.map(reg => {
+          const newProgress = progressDraft[reg.id] ?? reg.progress ?? 0
+          const regDoc = doc(firestore, "unit_registrations", reg.id)
+          return updateDoc(regDoc, {
+            progress: newProgress,
+            status: newProgress >= 100 ? "Completed" : newProgress > 0 ? "In Progress" : "Registered",
+            updatedAt: serverTimestamp(),
+          })
+        })
+      )
+      toast({ title: "All Progress Saved", description: `${progressFilteredRegs.length} record(s) updated.` })
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" })
+    } finally {
+      setSavingIds(new Set())
+    }
+  }
+
+  const progressStats = useMemo(() => {
+    const regs = progressFilteredRegs
+    if (regs.length === 0) return { avg: 0, complete: 0, inProgress: 0, notStarted: 0 }
+    const avg = Math.round(regs.reduce((s, r) => s + (progressDraft[r.id] ?? r.progress ?? 0), 0) / regs.length)
+    const complete = regs.filter(r => (progressDraft[r.id] ?? r.progress ?? 0) >= 100).length
+    const inProgress = regs.filter(r => { const p = progressDraft[r.id] ?? r.progress ?? 0; return p > 0 && p < 100 }).length
+    const notStarted = regs.filter(r => (progressDraft[r.id] ?? r.progress ?? 0) === 0).length
+    return { avg, complete, inProgress, notStarted }
+  }, [progressFilteredRegs, progressDraft])
 
   // --- REGISTRATIONS LOGIC ---
   const studentMap = useMemo(() => {
@@ -313,6 +399,7 @@ export default function ManageUnitsPage() {
         <TabsList className="bg-slate-100 p-1 rounded-lg h-auto min-h-10 mb-6 inline-flex flex-wrap print:hidden">
           <TabsTrigger value="catalog" className="rounded-md px-6 text-sm font-medium h-full data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-emerald-700 text-slate-500">Unit Catalog</TabsTrigger>
           <TabsTrigger value="registrations" className="rounded-md px-6 text-sm font-medium h-full data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-emerald-700 text-slate-500">Registrations</TabsTrigger>
+          <TabsTrigger value="progress" className="rounded-md px-6 text-sm font-medium h-full data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-emerald-700 text-slate-500">Student Progress</TabsTrigger>
         </TabsList>
 
         <TabsContent value="catalog" className="space-y-4 m-0 border-0 p-0 focus-visible:ring-0">
@@ -570,7 +657,200 @@ export default function ManageUnitsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {/* ── PROGRESS TAB ────────────────────────────────────── */}
+        <TabsContent value="progress" className="space-y-5 m-0 border-0 p-0 focus-visible:ring-0">
+
+          {/* Stats row */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {[
+              { label: "Avg Progress", value: `${progressStats.avg}%`, icon: BarChart3, color: "text-blue-600", bg: "bg-blue-50" },
+              { label: "Completed",   value: progressStats.complete,   icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50" },
+              { label: "In Progress", value: progressStats.inProgress, icon: Activity,     color: "text-amber-600",  bg: "bg-amber-50"  },
+              { label: "Not Started", value: progressStats.notStarted, icon: Users,        color: "text-slate-500",  bg: "bg-slate-100" },
+            ].map((s, i) => (
+              <Card key={i} className="border border-slate-200 shadow-sm rounded-xl bg-white">
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${s.bg}`}>
+                    <s.icon className={`h-4 w-4 ${s.color}`} />
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{s.label}</p>
+                    <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-col md:flex-row gap-3 bg-slate-50/50 p-1.5 rounded-xl border border-slate-200">
+            <div className="w-full md:w-72">
+              <Select value={progressUnitId} onValueChange={(v) => { setProgressUnitId(v); setProgressDraft({}) }}>
+                <SelectTrigger className="h-10 rounded-lg bg-white border-slate-200 shadow-sm text-sm">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-3.5 w-3.5 text-slate-400" />
+                    <SelectValue placeholder="Filter by Unit" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Units</SelectItem>
+                  {(units || []).map(u => (
+                    <SelectItem key={u.id} value={u.id}>{u.code} — {u.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search student name or email..."
+                className="pl-9 h-10 rounded-lg bg-white border-slate-200 shadow-sm text-sm focus-visible:ring-emerald-500"
+                value={progressSearch}
+                onChange={e => setProgressSearch(e.target.value)}
+              />
+            </div>
+            {progressFilteredRegs.length > 0 && (
+              <Button
+                onClick={handleSaveAllProgress}
+                disabled={savingIds.size > 0}
+                className="h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg shadow-sm px-5 shrink-0"
+              >
+                {savingIds.size > 0
+                  ? <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  : <Save className="h-4 w-4 mr-2" />}
+                Save All
+              </Button>
+            )}
+          </div>
+
+          {/* Table */}
+          <Card className="border border-slate-200 shadow-sm overflow-hidden rounded-xl bg-white">
+            <CardContent className="p-0">
+              {loadingRegs ? (
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+                </div>
+              ) : progressFilteredRegs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20">
+                  <Activity className="h-8 w-8 text-slate-200 mb-3" />
+                  <p className="text-sm text-slate-400">No registrations found.</p>
+                  <p className="text-xs text-slate-300 mt-1">Select a unit or adjust your search.</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader className="bg-slate-50/50">
+                    <TableRow className="border-slate-100 hover:bg-transparent">
+                      <TableHead className="font-semibold text-slate-500 h-10 text-xs pl-5">Student</TableHead>
+                      <TableHead className="font-semibold text-slate-500 h-10 text-xs">Unit</TableHead>
+                      <TableHead className="font-semibold text-slate-500 h-10 text-xs w-[260px]">Progress</TableHead>
+                      <TableHead className="font-semibold text-slate-500 h-10 text-xs text-center w-[80px]">%</TableHead>
+                      <TableHead className="font-semibold text-slate-500 h-10 text-xs text-center w-[90px]">Status</TableHead>
+                      <TableHead className="font-semibold text-slate-500 h-10 text-xs text-right pr-5 w-[80px]">Save</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {progressFilteredRegs.map(reg => {
+                      const current = progressDraft[reg.id] ?? reg.progress ?? 0
+                      const isSaving = savingIds.has(reg.id)
+                      const isComplete = current >= 100
+                      const isInProgress = current > 0 && current < 100
+                      return (
+                        <TableRow key={reg.id} className="hover:bg-slate-50/80 transition-colors border-slate-100">
+                          {/* Student */}
+                          <TableCell className="py-3 pl-5">
+                            <div className="flex items-center gap-2.5">
+                              <div className="h-8 w-8 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-700 font-bold text-xs shrink-0">
+                                {(reg.studentName || "?")[0].toUpperCase()}
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-slate-900">{reg.studentName || "—"}</p>
+                                <p className="text-[10px] text-slate-400">{reg.studentEmail || "—"}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+
+                          {/* Unit */}
+                          <TableCell className="py-3">
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs font-semibold text-slate-800">{reg.unitName}</span>
+                              <span className="text-[10px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded w-fit">{reg.unitCode}</span>
+                            </div>
+                          </TableCell>
+
+                          {/* Slider */}
+                          <TableCell className="py-3">
+                            <div className="flex items-center gap-3">
+                              <Slider
+                                value={[current]}
+                                min={0}
+                                max={100}
+                                step={5}
+                                onValueChange={([v]) => setProgressDraft(p => ({ ...p, [reg.id]: v }))}
+                                className="flex-1"
+                              />
+                            </div>
+                            <div className="flex justify-between text-[9px] text-slate-300 mt-1 px-0.5">
+                              {[0, 25, 50, 75, 100].map(m => (
+                                <span key={m} className={current >= m ? "text-emerald-400 font-semibold" : ""}>{m}%</span>
+                              ))}
+                            </div>
+                          </TableCell>
+
+                          {/* Numeric input */}
+                          <TableCell className="py-3 text-center">
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              value={current}
+                              onChange={e => {
+                                const v = Math.min(100, Math.max(0, Number(e.target.value)))
+                                setProgressDraft(p => ({ ...p, [reg.id]: v }))
+                              }}
+                              className="w-14 h-8 text-center text-sm font-bold border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white text-slate-800"
+                            />
+                          </TableCell>
+
+                          {/* Status badge */}
+                          <TableCell className="py-3 text-center">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              isComplete   ? "bg-emerald-100 text-emerald-700" :
+                              isInProgress ? "bg-amber-100 text-amber-700" :
+                                             "bg-slate-100 text-slate-500"
+                            }`}>
+                              {isComplete ? "Complete" : isInProgress ? "In Progress" : "Not Started"}
+                            </span>
+                          </TableCell>
+
+                          {/* Save button */}
+                          <TableCell className="py-3 text-right pr-5">
+                            <Button
+                              size="sm"
+                              onClick={() => handleSaveProgress(reg)}
+                              disabled={isSaving}
+                              className="h-7 px-3 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg"
+                            >
+                              {isSaving
+                                ? <Loader2 className="h-3 w-3 animate-spin" />
+                                : <Save className="h-3 w-3" />}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+
+          <p className="text-[11px] text-slate-400 text-center">
+            Progress changes are reflected instantly in the Student Portal under <span className="font-semibold">Academics → My Registered Units</span>.
+          </p>
+        </TabsContent>
       </Tabs>
     </div>
   )
 }
+

@@ -5,47 +5,35 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-
 import {
   Search, CheckCircle, Loader2, FileText, User,
   Trash2, BookOpen, GraduationCap, Hash, MessageSquare,
-  ExternalLink, ClipboardCheck
+  ExternalLink, ClipboardCheck, Calendar, X, Filter, Layers
 } from "lucide-react"
-
 import { ref, deleteObject } from "firebase/storage"
 import {
   useFirestore, useCollection, useMemoFirebase,
   useUser, useStorage, updateDocumentNonBlocking, deleteDocumentNonBlocking
 } from "@/firebase"
-
 import { collection, query, orderBy, doc, serverTimestamp, addDoc } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
 
 export default function SubmissionsPage() {
   const [searchTerm, setSearchTerm] = useState("")
+  const [selectedCourse, setSelectedCourse] = useState("all")
   const [selectedUnit, setSelectedUnit] = useState("all")
+  const [dateFrom, setDateFrom] = useState("")
+  const [dateTo, setDateTo] = useState("")
   const [feedbackNote, setFeedbackNote] = useState("")
   const [marks, setMarks] = useState("")
   const [isGradeDialogOpen, setIsGradeDialogOpen] = useState(false)
@@ -68,17 +56,67 @@ export default function SubmissionsPage() {
   )
   const { data: units } = useCollection(unitsRef)
 
+  const coursesRef = useMemoFirebase(
+    () => (firestore && user) ? collection(firestore, "courses") : null,
+    [firestore, user]
+  )
+  const { data: courses } = useCollection(coursesRef)
+
+  // Derive units that belong to the selected course
+  const filteredUnits = useMemo(() => {
+    if (!units) return []
+    if (selectedCourse === "all") return units
+    return units.filter((u: any) => u.courseId === selectedCourse)
+  }, [units, selectedCourse])
+
+  const hasActiveFilters = searchTerm || selectedCourse !== "all" || selectedUnit !== "all" || dateFrom || dateTo
+
+  const clearFilters = () => {
+    setSearchTerm("")
+    setSelectedCourse("all")
+    setSelectedUnit("all")
+    setDateFrom("")
+    setDateTo("")
+  }
+
   const filteredSubs = useMemo(() => {
-    return (submissions || []).filter(sub => {
+    return (submissions || []).filter((sub: any) => {
+      // Name / unit / email search
       const matchesSearch =
+        !searchTerm ||
         sub.studentName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         sub.unitName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         sub.unitCode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         sub.studentEmail?.toLowerCase().includes(searchTerm.toLowerCase())
+
+      // Course filter — submissions may carry courseId or we derive from unit
+      const matchesCourse =
+        selectedCourse === "all" ||
+        sub.courseId === selectedCourse ||
+        filteredUnits.some((u: any) => u.id === sub.unitId)
+
+      // Unit filter
       const matchesUnit = selectedUnit === "all" || sub.unitId === selectedUnit
-      return matchesSearch && matchesUnit
+
+      // Date range
+      let matchesDate = true
+      if (dateFrom || dateTo) {
+        const submittedAt = sub.submittedAt?.toDate ? sub.submittedAt.toDate() : sub.submittedAt ? new Date(sub.submittedAt) : null
+        if (submittedAt) {
+          if (dateFrom) matchesDate = matchesDate && submittedAt >= new Date(dateFrom)
+          if (dateTo) {
+            const toEnd = new Date(dateTo)
+            toEnd.setHours(23, 59, 59, 999)
+            matchesDate = matchesDate && submittedAt <= toEnd
+          }
+        } else {
+          matchesDate = false
+        }
+      }
+
+      return matchesSearch && matchesCourse && matchesUnit && matchesDate
     })
-  }, [submissions, searchTerm, selectedUnit])
+  }, [submissions, searchTerm, selectedCourse, selectedUnit, dateFrom, dateTo, filteredUnits])
 
   const openGradeDialog = (sub: any) => {
     setActiveSub(sub)
@@ -103,7 +141,6 @@ export default function SubmissionsPage() {
         ...(parsedMarks !== null && { marks: parsedMarks }),
         gradedAt: serverTimestamp(),
       })
-
       await addDoc(collection(firestore, "notifications"), {
         studentId: activeSub.studentId,
         title: "Assignment Graded",
@@ -113,7 +150,6 @@ export default function SubmissionsPage() {
         read: false,
         createdAt: serverTimestamp(),
       })
-
       toast({ title: "Graded!", description: `${activeSub.studentName}'s submission has been marked and student notified.` })
       setIsGradeDialogOpen(false)
       setActiveSub(null)
@@ -147,15 +183,20 @@ export default function SubmissionsPage() {
     }
   }
 
-  // Stats
+  const formatDate = (ts: any) => {
+    if (!ts) return "—"
+    const d = ts?.toDate ? ts.toDate() : new Date(ts)
+    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+  }
+
   const totalCount = (submissions || []).length
-  const pendingCount = (submissions || []).filter(s => s.status !== "Graded").length
-  const gradedCount = (submissions || []).filter(s => s.status === "Graded").length
+  const pendingCount = (submissions || []).filter((s: any) => s.status !== "Graded").length
+  const gradedCount = (submissions || []).filter((s: any) => s.status === "Graded").length
 
   return (
     <div className="space-y-6 pb-10 animate-in fade-in duration-500">
 
-      {/* ── Grade Dialog ──────────────────────────────────────────────────── */}
+      {/* ── Grade Dialog ─────────────────────────────────────────────── */}
       <Dialog open={isGradeDialogOpen} onOpenChange={open => {
         if (!open) { setIsGradeDialogOpen(false); setActiveSub(null) }
       }}>
@@ -169,12 +210,8 @@ export default function SubmissionsPage() {
               <div className="mt-2 rounded-lg bg-slate-50 border border-slate-100 px-3 py-2.5 space-y-0.5">
                 <p className="text-xs font-semibold text-slate-800">{activeSub.studentName}</p>
                 <p className="text-[11px] text-slate-500">{activeSub.assignmentTitle || activeSub.unitName}</p>
-                <a
-                  href={activeSub.fileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:underline font-medium mt-1"
-                >
+                <a href={activeSub.fileUrl} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:underline font-medium mt-1">
                   <ExternalLink className="h-2.5 w-2.5" />
                   View submitted file
                 </a>
@@ -183,52 +220,33 @@ export default function SubmissionsPage() {
           </DialogHeader>
 
           <div className="px-5 py-4 space-y-4">
-            {/* Marks */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
                 <Hash className="h-3 w-3 text-slate-400" />
                 Marks <span className="text-slate-400 font-normal">(out of 100)</span>
               </Label>
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                placeholder="e.g. 78"
-                value={marks}
+              <Input type="number" min={0} max={100} placeholder="e.g. 78" value={marks}
                 onChange={e => setMarks(e.target.value)}
-                className="h-10 rounded-lg border-slate-200 focus-visible:ring-emerald-500 text-sm font-mono"
-              />
+                className="h-10 rounded-lg border-slate-200 focus-visible:ring-emerald-500 text-sm font-mono" />
             </div>
-
-            {/* Comments */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
                 <MessageSquare className="h-3 w-3 text-slate-400" />
                 Feedback <span className="text-slate-400 font-normal">(optional)</span>
               </Label>
-              <Textarea
-                placeholder="e.g. Good structure. Work on referencing next time."
-                value={feedbackNote}
-                onChange={e => setFeedbackNote(e.target.value)}
-                className="min-h-[90px] rounded-lg border-slate-200 focus-visible:ring-emerald-500 text-sm resize-none"
-              />
+              <Textarea placeholder="e.g. Good structure. Work on referencing next time."
+                value={feedbackNote} onChange={e => setFeedbackNote(e.target.value)}
+                className="min-h-[90px] rounded-lg border-slate-200 focus-visible:ring-emerald-500 text-sm resize-none" />
             </div>
           </div>
 
           <div className="px-5 pb-5 flex gap-2">
-            <Button
-              variant="outline"
-              className="flex-1 h-10 rounded-xl border-slate-200 text-slate-600 text-sm"
-              onClick={() => setIsGradeDialogOpen(false)}
-              disabled={isSubmitting}
-            >
+            <Button variant="outline" className="flex-1 h-10 rounded-xl border-slate-200 text-slate-600 text-sm"
+              onClick={() => setIsGradeDialogOpen(false)} disabled={isSubmitting}>
               Cancel
             </Button>
-            <Button
-              className="flex-1 h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-sm"
-              onClick={handleGrade}
-              disabled={isSubmitting}
-            >
+            <Button className="flex-1 h-10 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold text-sm"
+              onClick={handleGrade} disabled={isSubmitting}>
               {isSubmitting
                 ? <Loader2 className="h-4 w-4 animate-spin" />
                 : <><CheckCircle className="h-4 w-4 mr-1.5" /> Confirm Grade</>
@@ -238,7 +256,7 @@ export default function SubmissionsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Page Header ──────────────────────────────────────────────────── */}
+      {/* ── Page Header ──────────────────────────────────────────────── */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold text-emerald-600 uppercase tracking-widest mb-1">Academic Management</p>
@@ -263,36 +281,134 @@ export default function SubmissionsPage() {
         </div>
       </div>
 
-      {/* ── Filters ──────────────────────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input
-            placeholder="Search student, unit or email..."
-            className="pl-9 h-10 rounded-lg bg-white border-slate-200 shadow-sm text-sm focus-visible:ring-emerald-500"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="w-full md:w-60">
-          <Select value={selectedUnit} onValueChange={setSelectedUnit}>
-            <SelectTrigger className="h-10 rounded-lg bg-white border-slate-200 shadow-sm text-sm">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-3.5 w-3.5 text-slate-400" />
-                <SelectValue placeholder="Filter by Unit" />
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Units</SelectItem>
-              {(units || []).map(u => (
-                <SelectItem key={u.id} value={u.id}>{u.code} – {u.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+      {/* ── Filters ──────────────────────────────────────────────────── */}
+      <Card className="border border-slate-200 shadow-sm rounded-xl bg-white">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Filter className="h-3.5 w-3.5 text-slate-400" />
+            <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Filter Submissions</span>
+            {hasActiveFilters && (
+              <button onClick={clearFilters}
+                className="ml-auto flex items-center gap-1 text-[10px] font-semibold text-rose-500 hover:text-rose-600 px-2 py-1 rounded-md hover:bg-rose-50 transition-colors">
+                <X className="h-3 w-3" /> Clear all
+              </button>
+            )}
+          </div>
 
-      {/* ── Table ────────────────────────────────────────────────────────── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Search by name */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <Input
+                id="sub-search"
+                placeholder="Search name or email…"
+                className="pl-9 h-10 rounded-lg bg-slate-50 border-slate-200 text-sm focus-visible:ring-emerald-500"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+
+            {/* Course filter */}
+            <Select value={selectedCourse} onValueChange={v => { setSelectedCourse(v); setSelectedUnit("all") }}>
+              <SelectTrigger id="sub-course-filter" className="h-10 rounded-lg bg-slate-50 border-slate-200 text-sm">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-3.5 w-3.5 text-slate-400" />
+                  <SelectValue placeholder="Filter by Course" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Courses</SelectItem>
+                {(courses || []).map((c: any) => (
+                  <SelectItem key={c.id} value={c.id}>{c.code ? `${c.code} – ` : ""}{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Unit filter */}
+            <Select value={selectedUnit} onValueChange={setSelectedUnit}>
+              <SelectTrigger id="sub-unit-filter" className="h-10 rounded-lg bg-slate-50 border-slate-200 text-sm">
+                <div className="flex items-center gap-2">
+                  <BookOpen className="h-3.5 w-3.5 text-slate-400" />
+                  <SelectValue placeholder="Filter by Unit" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Units</SelectItem>
+                {filteredUnits.map((u: any) => (
+                  <SelectItem key={u.id} value={u.id}>{u.code} – {u.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Date range */}
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                <Input
+                  id="sub-date-from"
+                  type="date"
+                  title="From date"
+                  className="pl-8 h-10 rounded-lg bg-slate-50 border-slate-200 text-xs focus-visible:ring-emerald-500"
+                  value={dateFrom}
+                  onChange={e => setDateFrom(e.target.value)}
+                />
+              </div>
+              <div className="relative flex-1">
+                <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                <Input
+                  id="sub-date-to"
+                  type="date"
+                  title="To date"
+                  className="pl-8 h-10 rounded-lg bg-slate-50 border-slate-200 text-xs focus-visible:ring-emerald-500"
+                  value={dateTo}
+                  onChange={e => setDateTo(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Active filter chips */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-slate-100">
+              {searchTerm && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                  Name: "{searchTerm}"
+                  <button onClick={() => setSearchTerm("")}><X className="h-2.5 w-2.5" /></button>
+                </span>
+              )}
+              {selectedCourse !== "all" && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">
+                  Course: {(courses || []).find((c: any) => c.id === selectedCourse)?.name || selectedCourse}
+                  <button onClick={() => { setSelectedCourse("all"); setSelectedUnit("all") }}><X className="h-2.5 w-2.5" /></button>
+                </span>
+              )}
+              {selectedUnit !== "all" && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">
+                  Unit: {(units || []).find((u: any) => u.id === selectedUnit)?.name || selectedUnit}
+                  <button onClick={() => setSelectedUnit("all")}><X className="h-2.5 w-2.5" /></button>
+                </span>
+              )}
+              {dateFrom && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-violet-50 text-violet-700 px-2 py-0.5 rounded-full">
+                  From: {dateFrom}
+                  <button onClick={() => setDateFrom("")}><X className="h-2.5 w-2.5" /></button>
+                </span>
+              )}
+              {dateTo && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-violet-50 text-violet-700 px-2 py-0.5 rounded-full">
+                  To: {dateTo}
+                  <button onClick={() => setDateTo("")}><X className="h-2.5 w-2.5" /></button>
+                </span>
+              )}
+              <span className="inline-flex items-center text-[10px] text-slate-400 ml-1">
+                {filteredSubs.length} result{filteredSubs.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Table ────────────────────────────────────────────────────── */}
       <Card className="border border-slate-200 shadow-sm overflow-hidden rounded-xl bg-white">
         <CardContent className="p-0">
           <Table>
@@ -300,6 +416,7 @@ export default function SubmissionsPage() {
               <TableRow className="border-slate-100 hover:bg-transparent">
                 <TableHead className="font-semibold text-slate-500 h-10 text-xs pl-5">Student</TableHead>
                 <TableHead className="font-semibold text-slate-500 h-10 text-xs">Assignment</TableHead>
+                <TableHead className="font-semibold text-slate-500 h-10 text-xs hidden md:table-cell">Submitted</TableHead>
                 <TableHead className="font-semibold text-slate-500 h-10 text-xs">File</TableHead>
                 <TableHead className="font-semibold text-slate-500 h-10 text-xs text-center w-[100px]">Status</TableHead>
                 <TableHead className="font-semibold text-slate-500 h-10 text-xs text-center w-[80px]">Marks</TableHead>
@@ -309,12 +426,12 @@ export default function SubmissionsPage() {
             <TableBody>
               {loadingSubs ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-64 text-center">
+                  <TableCell colSpan={7} className="h-64 text-center">
                     <Loader2 className="h-8 w-8 animate-spin mx-auto text-emerald-600" />
                   </TableCell>
                 </TableRow>
               ) : filteredSubs.length > 0 ? (
-                filteredSubs.map(sub => (
+                filteredSubs.map((sub: any) => (
                   <TableRow key={sub.id} className="hover:bg-slate-50/80 transition-colors border-slate-100">
                     {/* Student */}
                     <TableCell className="py-3 pl-5">
@@ -335,16 +452,17 @@ export default function SubmissionsPage() {
                       <p className="text-[10px] font-mono text-slate-400 uppercase mt-0.5">{sub.unitCode}</p>
                     </TableCell>
 
+                    {/* Date submitted */}
+                    <TableCell className="py-3 hidden md:table-cell">
+                      <span className="text-xs text-slate-500">{formatDate(sub.submittedAt)}</span>
+                    </TableCell>
+
                     {/* File link */}
                     <TableCell className="py-3">
-                      <a
-                        href={sub.fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-700 px-2 py-1 rounded-md hover:bg-blue-50 transition-colors"
-                      >
+                      <a href={sub.fileUrl} target="_blank" rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-700 px-2 py-1 rounded-md hover:bg-blue-50 transition-colors">
                         <FileText className="h-3.5 w-3.5 shrink-0" />
-                        <span className="text-xs font-medium underline underline-offset-4 decoration-blue-200 line-clamp-1 max-w-[130px]">
+                        <span className="text-xs font-medium underline underline-offset-4 decoration-blue-200 line-clamp-1 max-w-[120px]">
                           {sub.fileName}
                         </span>
                       </a>
@@ -375,21 +493,15 @@ export default function SubmissionsPage() {
                     {/* Actions */}
                     <TableCell className="py-3 pr-4">
                       <div className="flex items-center justify-end gap-1">
-                        <Button
-                          variant="outline"
-                          size="sm"
+                        <Button variant="outline" size="sm"
                           className="h-7 rounded-md text-[10px] font-semibold border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors"
-                          onClick={() => openGradeDialog(sub)}
-                        >
+                          onClick={() => openGradeDialog(sub)}>
                           <GraduationCap className="h-3 w-3 mr-1" />
                           {sub.status === "Graded" ? "Re-grade" : "Grade"}
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
+                        <Button variant="ghost" size="icon"
                           className="h-7 w-7 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50"
-                          onClick={() => handleDeleteSubmission(sub)}
-                        >
+                          onClick={() => handleDeleteSubmission(sub)}>
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
@@ -398,10 +510,15 @@ export default function SubmissionsPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-48 text-center">
+                  <TableCell colSpan={7} className="h-48 text-center">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <FileText className="h-8 w-8 text-slate-200" />
-                      <p className="text-sm text-slate-400">No submissions found.</p>
+                      <p className="text-sm text-slate-400">No submissions match your filters.</p>
+                      {hasActiveFilters && (
+                        <button onClick={clearFilters} className="text-xs text-emerald-600 hover:underline font-medium">
+                          Clear filters
+                        </button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
