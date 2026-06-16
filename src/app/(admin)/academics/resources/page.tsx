@@ -86,8 +86,23 @@ export default function AcademicResourcesPage() {
       })
 
       if (!response.ok) {
-        const err = await response.json()
-        throw new Error(err.error || 'Upload failed')
+        // Safely parse error — server may return plain text on 413 (too large) etc.
+        let errMessage = `Upload failed (HTTP ${response.status})`
+        try {
+          const contentType = response.headers.get('content-type') || ''
+          if (contentType.includes('application/json')) {
+            const err = await response.json()
+            errMessage = err.error || errMessage
+          } else {
+            const text = await response.text()
+            if (response.status === 413) {
+              errMessage = 'File is too large. Please upload a file smaller than 50 MB.'
+            } else if (text) {
+              errMessage = text.slice(0, 200)
+            }
+          }
+        } catch {}
+        throw new Error(errMessage)
       }
 
       const result = await response.json()

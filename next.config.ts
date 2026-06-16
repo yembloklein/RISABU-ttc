@@ -8,11 +8,19 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
-  // Allow up to 50MB uploads in App Router API routes
+  // Allow up to 50MB uploads — applies to Server Actions AND API routes
   experimental: {
     serverActions: {
       bodySizeLimit: '50mb',
     },
+  },
+  // Increase the body size limit for regular API route handlers (App Router)
+  // This overrides the default 4MB limit that was causing the 413 error
+  api: {
+    bodyParser: {
+      sizeLimit: '50mb',
+    },
+    responseLimit: '50mb',
   },
   images: {
     remotePatterns: [

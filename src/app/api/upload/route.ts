@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import cloudinary from '@/lib/cloudinary';
 
+// Raise the body size limit beyond Next.js's default 4MB for this route
+// Without this, large file uploads get a 413 with a plain-text body (not JSON)
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();

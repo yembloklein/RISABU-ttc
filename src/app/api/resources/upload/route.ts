@@ -3,6 +3,13 @@ import { writeFile } from 'fs/promises';
 import { join } from 'path';
 import { mkdir } from 'fs/promises';
 
+// Increase the body size limit for this route to 50MB
+// (Next.js App Router default is 4MB — bodySizeLimit in next.config only applies to Server Actions)
+export const maxDuration = 60; // seconds
+
+// This is the App Router way to disable the body size limit
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
