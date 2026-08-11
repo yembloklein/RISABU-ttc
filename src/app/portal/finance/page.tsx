@@ -6,7 +6,7 @@ import { useMemo, useRef, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import {
   Wallet, CreditCard, Download, Landmark, Loader2,
-  CheckCircle2, AlertCircle, Smartphone, Info, X, Eye, Phone
+  CheckCircle2, AlertCircle, Smartphone, Info, X, Eye, ExternalLink
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -85,9 +85,7 @@ export default function FinancePage() {
   const [activeReceipt, setActiveReceipt] = useState<any>(null)
   const [showReceiptModal, setShowReceiptModal] = useState(false)
   const [paymentAmount, setPaymentAmount] = useState<string>('')
-  const [phoneNumber, setPhoneNumber] = useState<string>('')
-  const [isPaymentLoading, setIsPaymentLoading] = useState(false)
-  const [paymentStatus, setPaymentStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle')
+  const [isRedirecting, setIsRedirecting] = useState(false)
 
   const downloadStatement = async () => {
     if (!statementRef.current) return
@@ -130,60 +128,33 @@ export default function FinancePage() {
     }
   }
 
-  const handleIntaSendSuccess = (invoiceId: string, paidAmount: number) => {
-    if (!firestore || !user || !student) return;
-    addDocumentNonBlocking(collection(firestore, "payments"), {
-      type: "Fee",
-      studentId: student.id,
-      amount: paidAmount,
-      paymentMethod: "IntaSend M-Pesa",
-      transactionReference: invoiceId || `INTASEND-${Date.now().toString().slice(-6)}`,
-      paymentDate: new Date().toISOString(),
-      recordedByUserId: user.uid,
-      recordedByUserFirebaseUid: user.uid,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    setPaymentStatus('success');
-    toast({ title: "Payment Initiated! ✅", description: "Check your phone and enter your M-Pesa PIN to complete payment." });
-  };
-
-  const handleIntaSendPayment = async () => {
+  const handlePesapalPayment = async () => {
     if (!student || !user) return;
     const amount = paymentAmount ? Number(paymentAmount) : feeStats.balance;
-    const phone = phoneNumber.trim();
-    if (!phone) {
-      toast({ title: "Phone Required", description: "Please enter your M-Pesa phone number.", variant: "destructive" });
-      return;
-    }
     if (amount <= 0) {
       toast({ title: "Invalid Amount", description: "Please enter a valid payment amount.", variant: "destructive" });
       return;
     }
-    setIsPaymentLoading(true);
-    setPaymentStatus('pending');
+    setIsRedirecting(true);
     try {
-      const res = await fetch('/api/intasend/stkpush', {
+      const res = await fetch('/api/pesapal/submit-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          phoneNumber: phone,
           amount,
           studentId: student.id,
           email: user.email || 'student@risabu.ac.ke',
+          firstName: student.firstName || '',
+          lastName: student.lastName || '',
+          phone: student.phone || '',
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'STK Push failed');
-      handleIntaSendSuccess(data.invoiceId, amount);
-      setPaymentAmount('');
-      setPhoneNumber('');
+      if (!res.ok || !data.redirectUrl) throw new Error(data.error || 'Could not initiate payment');
+      window.location.href = data.redirectUrl;
     } catch (err: any) {
-      setPaymentStatus('error');
-      toast({ title: "Payment Failed", description: err.message || 'Could not initiate payment. Try again.', variant: "destructive" });
-    } finally {
-      setIsPaymentLoading(false);
-      setTimeout(() => setPaymentStatus('idle'), 8000);
+      toast({ title: "Payment Failed", description: err.message || 'Could not connect to Pesapal. Try again.', variant: "destructive" });
+      setIsRedirecting(false);
     }
   };
 
@@ -403,16 +374,16 @@ export default function FinancePage() {
             </CardContent>
           </Card>
 
-          {/* Pay Here — IntaSend M-Pesa STK Push */}
+          {/* Pay Online — Pesapal Checkout */}
           {!isCleared && (
             <Card className="border border-slate-200 shadow-sm rounded-xl bg-white overflow-hidden">
               <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2">
-                <div className="h-6 w-6 rounded bg-emerald-50 flex items-center justify-center shrink-0">
-                  <Smartphone className="h-3.5 w-3.5 text-emerald-600" />
+                <div className="h-6 w-6 rounded bg-blue-50 flex items-center justify-center shrink-0">
+                  <CreditCard className="h-3.5 w-3.5 text-blue-600" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-semibold text-slate-800">Pay via M-Pesa</h2>
-                  <p className="text-xs text-slate-400">Instant STK Push to your phone via IntaSend</p>
+                  <h2 className="text-sm font-semibold text-slate-800">Pay Online</h2>
+                  <p className="text-xs text-slate-400">M-Pesa, Visa & Mastercard via Pesapal</p>
                 </div>
               </div>
               <CardContent className="p-4 space-y-3">
@@ -422,31 +393,13 @@ export default function FinancePage() {
                   <span className="text-sm font-bold text-rose-600">KES {feeStats.balance.toLocaleString()}</span>
                 </div>
 
-                {/* Phone number input */}
-                <div className="space-y-1.5">
-                  <Label htmlFor="pay-phone" className="text-xs font-semibold text-slate-600">M-Pesa Phone Number</Label>
-                  <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-transparent bg-white">
-                    <span className="px-3 py-2.5 text-xs font-bold text-slate-400 border-r border-slate-200 bg-slate-50 shrink-0 flex items-center gap-1">
-                      <Phone className="h-3 w-3" /> +254
-                    </span>
-                    <Input
-                      id="pay-phone"
-                      type="tel"
-                      placeholder="7XXXXXXXX"
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      className="border-0 focus-visible:ring-0 h-10 font-semibold text-slate-900 text-sm rounded-none"
-                    />
-                  </div>
-                </div>
-
                 {/* Amount input */}
                 <div className="space-y-1.5">
-                  <Label htmlFor="pay-amount" className="text-xs font-semibold text-slate-600">Amount to Pay</Label>
-                  <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-emerald-500 focus-within:border-transparent bg-white">
+                  <Label htmlFor="pesapal-amount" className="text-xs font-semibold text-slate-600">Amount to Pay</Label>
+                  <div className="flex items-center border border-slate-200 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-transparent bg-white">
                     <span className="px-3 py-2.5 text-xs font-bold text-slate-400 border-r border-slate-200 bg-slate-50 shrink-0">KES</span>
                     <Input
-                      id="pay-amount"
+                      id="pesapal-amount"
                       type="number"
                       placeholder={String(feeStats.balance)}
                       value={paymentAmount}
@@ -456,35 +409,23 @@ export default function FinancePage() {
                   </div>
                 </div>
 
-                {/* Status feedback */}
-                {paymentStatus === 'pending' && (
-                  <div className="flex items-center gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5">
-                    <Loader2 className="h-3.5 w-3.5 text-amber-600 animate-spin shrink-0" />
-                    <p className="text-xs text-amber-700 font-medium">STK Push sent — check your phone...</p>
-                  </div>
-                )}
-                {paymentStatus === 'success' && (
-                  <div className="flex items-center gap-2 rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2.5">
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                    <p className="text-xs text-emerald-700 font-medium">Enter your M-Pesa PIN to confirm!</p>
-                  </div>
-                )}
-                {paymentStatus === 'error' && (
-                  <div className="flex items-center gap-2 rounded-lg bg-rose-50 border border-rose-200 px-3 py-2.5">
-                    <AlertCircle className="h-3.5 w-3.5 text-rose-600 shrink-0" />
-                    <p className="text-xs text-rose-700 font-medium">Payment failed. Please try again.</p>
-                  </div>
-                )}
+                {/* Accepted methods */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] text-slate-400 font-medium">Accepts:</span>
+                  <span className="text-[10px] font-semibold bg-green-50 text-green-700 px-2 py-0.5 rounded-full">M-Pesa</span>
+                  <span className="text-[10px] font-semibold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">Visa</span>
+                  <span className="text-[10px] font-semibold bg-orange-50 text-orange-700 px-2 py-0.5 rounded-full">Mastercard</span>
+                </div>
 
                 {/* Pay button */}
                 <Button
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold h-10 rounded-lg transition-colors text-sm gap-2"
-                  onClick={handleIntaSendPayment}
-                  disabled={isPaymentLoading}
+                  className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold h-10 rounded-lg transition-colors text-sm gap-2"
+                  onClick={handlePesapalPayment}
+                  disabled={isRedirecting}
                 >
-                  {isPaymentLoading
-                    ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending STK Push...</>
-                    : <><Smartphone className="h-4 w-4" /> Pay KES {(paymentAmount ? Number(paymentAmount) : feeStats.balance).toLocaleString()} via M-Pesa</>
+                  {isRedirecting
+                    ? <><Loader2 className="h-4 w-4 animate-spin" /> Redirecting to Pesapal...</>
+                    : <><ExternalLink className="h-4 w-4" /> Pay KES {(paymentAmount ? Number(paymentAmount) : feeStats.balance).toLocaleString()} via Pesapal</>
                   }
                 </Button>
               </CardContent>

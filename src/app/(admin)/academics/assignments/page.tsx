@@ -116,6 +116,8 @@ export default function AdminAssignmentsPage() {
         createdAt: serverTimestamp(),
         ...(attachmentUrl && { attachmentUrl, attachmentName, attachmentPublicId }),
       })
+
+
       toast({ title: "Assignment Created", description: `"${form.title}" is now visible to students.` })
       setIsDialogOpen(false)
       setAttachmentFile(null)

@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     });
 
     const info = await transporter.sendMail({
-      from: `"${process.env.NEXT_PUBLIC_APP_NAME || 'Risabu Connect'}" <${process.env.SMTP_USER}>`, 
+      from: `"${process.env.NEXT_PUBLIC_APP_NAME || 'Risabu Technical Training College'}" <${process.env.SMTP_USER}>`, 
       to, 
       subject,
       html, 

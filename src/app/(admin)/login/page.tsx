@@ -46,7 +46,7 @@ export default function LoginPage() {
             <Logo size={64} />
           </div>
           <div>
-            <CardTitle className="text-2xl font-bold">Risabu Connect</CardTitle>
+            <CardTitle className="text-2xl font-bold">Risabu Technical Training College</CardTitle>
             <CardDescription>Sign in to access the College ERP</CardDescription>
           </div>
         </CardHeader>

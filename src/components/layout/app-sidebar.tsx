@@ -152,8 +152,8 @@ export function AppSidebar() {
             <Logo size={40} className="p-0.5" />
           </div>
           <div className="flex flex-col overflow-hidden transition-all group-data-[collapsible=icon]:hidden">
-            <span className="text-lg font-bold leading-none text-primary">Risabu</span>
-            <span className="text-xs text-muted-foreground">Connect College</span>
+            <span className="text-lg font-bold leading-none text-primary">Risabu TTC</span>
+            <span className="text-xs text-muted-foreground">Technical Training College</span>
           </div>
         </div>
       </SidebarHeader>

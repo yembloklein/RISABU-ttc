@@ -26,14 +26,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Slider } from "@/components/ui/slider"
-import { BookOpen, Plus, Search, Edit2, Trash2, Loader2, User, Hash, Filter, Download, Printer, Users, GraduationCap, Activity, CheckCircle2, BarChart3, Save } from "lucide-react"
+import { BookOpen, Plus, Search, Edit2, Trash2, Loader2, User, Hash, Filter, Download, Printer, Users, GraduationCap, Activity, CheckCircle2, BarChart3, Save, LayoutGrid, List, RotateCcw } from "lucide-react"
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from "@/firebase"
 import { collection, doc, serverTimestamp, query, orderBy, updateDoc } from "firebase/firestore"
 import { toast } from "@/hooks/use-toast"
 
 export default function ManageUnitsPage() {
   const [activeTab, setActiveTab] = useState("catalog")
-  
+
   // Catalog State
   const [unitSearchTerm, setUnitSearchTerm] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -55,6 +55,12 @@ export default function ManageUnitsPage() {
   const [unitProgressDraft, setUnitProgressDraft] = useState<Record<string, number>>({})
   const [savingUnitIds, setSavingUnitIds] = useState<Set<string>>(new Set())
 
+  // Progress Tab Filter & View States
+  const [progressSearchTerm, setProgressSearchTerm] = useState("")
+  const [progressSelectedCourse, setProgressSelectedCourse] = useState("all")
+  const [progressSelectedStatus, setProgressSelectedStatus] = useState("all") // all, not_started, in_progress, completed, dirty
+  const [progressViewMode, setProgressViewMode] = useState<"grid" | "table">("grid")
+
   const firestore = useFirestore()
   const { user } = useUser()
 
@@ -63,7 +69,7 @@ export default function ManageUnitsPage() {
   const coursesRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "programs") : null, [firestore, user])
   const regsRef = useMemoFirebase(() => (firestore && user) ? query(collection(firestore, "unit_registrations"), orderBy("registeredAt", "desc")) : null, [firestore, user])
   const studentsRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "students") : null, [firestore, user])
-  
+
   const { data: units, isLoading: loadingUnits } = useCollection(unitsRef)
   const { data: courses } = useCollection(coursesRef)
   const { data: registrations, isLoading: loadingRegs } = useCollection(regsRef)
@@ -71,7 +77,7 @@ export default function ManageUnitsPage() {
 
   // --- CATALOG LOGIC ---
   const filteredUnits = useMemo(() => {
-    return (units || []).filter(u => 
+    return (units || []).filter(u =>
       u.name.toLowerCase().includes(unitSearchTerm.toLowerCase()) ||
       u.code.toLowerCase().includes(unitSearchTerm.toLowerCase()) ||
       u.courseName.toLowerCase().includes(unitSearchTerm.toLowerCase())
@@ -143,21 +149,53 @@ export default function ManageUnitsPage() {
     return map
   }, [registrations])
 
-  // Initialise draft from the first registration's progress for each unit
+  // Build a student lookup map
+  const studentMap = useMemo(() => {
+    const map: Record<string, any> = {}
+    ;(students || []).forEach(s => {
+      map[s.id] = s
+    })
+    return map
+  }, [students])
+
+  // Map of enrolled student details per unit
+  const enrolledStudentsByUnit = useMemo(() => {
+    const map: Record<string, { id: string; name: string; email: string }[]> = {}
+    if (!registrations) return map
+    registrations.forEach(r => {
+      const stu = studentMap[r.studentId]
+      const name = r.studentName || (stu ? `${stu.firstName || ""} ${stu.lastName || ""}`.trim() : "") || "Unknown Student"
+      const email = r.studentEmail || (stu ? stu.contactEmail : "") || ""
+      if (!map[r.unitId]) map[r.unitId] = []
+      map[r.unitId].push({ id: r.studentId, name, email })
+    })
+    return map
+  }, [registrations, studentMap])
+
+  // Derive original progress from the first registration of each unit
+  const originalProgressMap = useMemo(() => {
+    const map: Record<string, number> = {}
+    if (!units) return map
+    units.forEach(u => {
+      const regs = regsByUnit[u.id] || []
+      map[u.id] = regs.length > 0 ? (regs[0].progress ?? 0) : 0
+    })
+    return map
+  }, [units, regsByUnit])
+
+  // Sync draft progress with actual DB values when database loads (only for unedited draft values)
   useEffect(() => {
-    if (!units) return
+    if (Object.keys(originalProgressMap).length === 0) return
     setUnitProgressDraft(prev => {
       const next = { ...prev }
-      units.forEach(u => {
-        if (!(u.id in next)) {
-          const regs = regsByUnit[u.id] || []
-          // Use the existing progress value (all students in a unit share the same value)
-          next[u.id] = regs.length > 0 ? (regs[0].progress ?? 0) : 0
+      Object.entries(originalProgressMap).forEach(([unitId, prog]) => {
+        if (!(unitId in next)) {
+          next[unitId] = prog
         }
       })
       return next
     })
-  }, [units, regsByUnit])
+  }, [originalProgressMap])
 
   // Save progress for ALL students in a unit at once
   const handleSaveUnitProgress = async (unit: any) => {
@@ -185,6 +223,87 @@ export default function ManageUnitsPage() {
     }
   }
 
+  // Save all units that have pending unsaved draft changes
+  const handleSaveAllProgress = async () => {
+    if (!firestore) return
+    const dirtyUnitIds = Object.keys(unitProgressDraft).filter(
+      uid => unitProgressDraft[uid] !== (originalProgressMap[uid] ?? 0)
+    )
+
+    if (dirtyUnitIds.length === 0) return
+
+    setSavingUnitIds(prev => {
+      const next = new Set(prev)
+      dirtyUnitIds.forEach(id => next.add(id))
+      return next
+    })
+
+    let successCount = 0
+    let failCount = 0
+
+    try {
+      await Promise.all(
+        dirtyUnitIds.map(async (unitId) => {
+          const newProgress = unitProgressDraft[unitId] ?? 0
+          const regsForUnit = regsByUnit[unitId] || []
+          if (regsForUnit.length === 0) return
+
+          try {
+            await Promise.all(
+              regsForUnit.map(reg =>
+                updateDoc(doc(firestore, "unit_registrations", reg.id), {
+                  progress: newProgress,
+                  status: newProgress >= 100 ? "Completed" : newProgress > 0 ? "In Progress" : "Registered",
+                  updatedAt: serverTimestamp(),
+                })
+              )
+            )
+            successCount++
+          } catch (err) {
+            console.error(`Error saving unit ${unitId}:`, err)
+            failCount++
+          }
+        })
+      )
+
+      if (failCount === 0) {
+        toast({ title: "All Progress Saved", description: `Successfully updated progress for ${successCount} units.` })
+      } else {
+        toast({ title: "Saved with Errors", description: `Updated ${successCount} units. Failed for ${failCount} units.`, variant: "destructive" })
+      }
+    } catch (e: any) {
+      toast({ title: "Error Saving", description: e.message, variant: "destructive" })
+    } finally {
+      setSavingUnitIds(prev => {
+        const next = new Set(prev)
+        dirtyUnitIds.forEach(id => next.delete(id))
+        return next
+      })
+    }
+  }
+
+  // Discard changes for a single unit
+  const handleDiscardChanges = (unitId: string) => {
+    setUnitProgressDraft(prev => ({
+      ...prev,
+      [unitId]: originalProgressMap[unitId] ?? 0
+    }))
+    toast({ title: "Changes Discarded", description: "Progress reset to saved state." })
+  }
+
+  // Discard all unsaved changes
+  const handleDiscardAllChanges = () => {
+    setUnitProgressDraft(prev => {
+      const next = { ...prev }
+      Object.keys(unitProgressDraft).forEach(uid => {
+        next[uid] = originalProgressMap[uid] ?? 0
+      })
+      return next
+    })
+    toast({ title: "All Changes Discarded", description: "All unsaved changes have been reset." })
+  }
+
+  // Calculate statistics based on current draft state
   const unitProgressStats = useMemo(() => {
     const us = units || []
     if (us.length === 0) return { avg: 0, complete: 0, inProgress: 0, notStarted: 0 }
@@ -195,12 +314,41 @@ export default function ManageUnitsPage() {
     return { avg, complete, inProgress, notStarted }
   }, [units, unitProgressDraft])
 
+  // Filter progress units based on search, course, status, or dirty/draft states
+  const filteredProgressUnits = useMemo(() => {
+    return (units || []).filter(unit => {
+      const draftVal = unitProgressDraft[unit.id] ?? 0
+      const origVal = originalProgressMap[unit.id] ?? 0
+      const isDirty = draftVal !== origVal
+
+      const matchesSearch = 
+        unit.name.toLowerCase().includes(progressSearchTerm.toLowerCase()) ||
+        unit.code.toLowerCase().includes(progressSearchTerm.toLowerCase()) ||
+        unit.courseName.toLowerCase().includes(progressSearchTerm.toLowerCase())
+
+      const matchesCourse = progressSelectedCourse === "all" || unit.courseName === progressSelectedCourse
+
+      let matchesStatus = true
+      if (progressSelectedStatus === "completed") {
+        matchesStatus = draftVal >= 100
+      } else if (progressSelectedStatus === "in_progress") {
+        matchesStatus = draftVal > 0 && draftVal < 100
+      } else if (progressSelectedStatus === "not_started") {
+        matchesStatus = draftVal === 0
+      } else if (progressSelectedStatus === "dirty") {
+        matchesStatus = isDirty
+      }
+
+      return matchesSearch && matchesCourse && matchesStatus
+    })
+  }, [units, unitProgressDraft, originalProgressMap, progressSearchTerm, progressSelectedCourse, progressSelectedStatus])
+
   // --- REGISTRATIONS LOGIC ---
   const studentMap = useMemo(() => {
     const map: Record<string, any> = {}
-    ;(students || []).forEach(s => {
-      map[s.id] = s
-    })
+      ; (students || []).forEach(s => {
+        map[s.id] = s
+      })
     return map
   }, [students])
 
@@ -210,12 +358,12 @@ export default function ManageUnitsPage() {
       const studentName = reg.studentName || `${student.firstName || ""} ${student.lastName || ""}`.trim() || "N/A"
       const studentEmail = reg.studentEmail || student.contactEmail || "N/A"
 
-      const matchesSearch = 
+      const matchesSearch =
         studentName.toLowerCase().includes(regSearchTerm.toLowerCase()) ||
         reg.unitName?.toLowerCase().includes(regSearchTerm.toLowerCase()) ||
         reg.unitCode?.toLowerCase().includes(regSearchTerm.toLowerCase()) ||
         studentEmail.toLowerCase().includes(regSearchTerm.toLowerCase())
-      
+
       const matchesCourse = selectedCourse === "all" || reg.courseName === selectedCourse
       const matchesUnit = selectedUnit === "all" || reg.unitId === selectedUnit
 
@@ -242,7 +390,7 @@ export default function ManageUnitsPage() {
       reg.registeredAt?.seconds ? new Date(reg.registeredAt.seconds * 1000).toLocaleDateString() : ""
     ])
 
-    const csvContent = "data:text/csv;charset=utf-8," 
+    const csvContent = "data:text/csv;charset=utf-8,"
       + headers.join(",") + "\n"
       + rows.map(e => e.join(",")).join("\n")
 
@@ -282,24 +430,24 @@ export default function ManageUnitsPage() {
                   Define a module and associate it with an academic course.
                 </DialogDescription>
               </DialogHeader>
-              
+
               <div className="py-4 space-y-5 px-1">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium text-slate-700">Unit Code</Label>
                     <div className="relative">
                       <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                      <Input 
-                        placeholder="e.g. WD101" 
+                      <Input
+                        placeholder="e.g. WD101"
                         value={formData.code}
-                        onChange={(e) => setFormData({...formData, code: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, code: e.target.value })}
                         className="pl-9 h-10 border-slate-200 focus-visible:ring-emerald-500 rounded-lg font-mono text-sm uppercase"
                       />
                     </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium text-slate-700">Target Course</Label>
-                    <Select value={formData.courseName} onValueChange={(v) => setFormData({...formData, courseName: v})}>
+                    <Select value={formData.courseName} onValueChange={(v) => setFormData({ ...formData, courseName: v })}>
                       <SelectTrigger className="h-10 border-slate-200 focus:ring-emerald-500 rounded-lg">
                         <SelectValue placeholder="Select Course" />
                       </SelectTrigger>
@@ -316,10 +464,10 @@ export default function ManageUnitsPage() {
                   <Label className="text-xs font-medium text-slate-700">Unit Name</Label>
                   <div className="relative">
                     <BookOpen className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <Input 
-                      placeholder="e.g. Advanced JavaScript" 
+                    <Input
+                      placeholder="e.g. Advanced JavaScript"
                       value={formData.name}
-                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       className="pl-9 h-10 border-slate-200 focus-visible:ring-emerald-500 rounded-lg"
                     />
                   </div>
@@ -330,17 +478,17 @@ export default function ManageUnitsPage() {
                     <Label className="text-xs font-medium text-slate-700">Assigned Instructor</Label>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                      <Input 
-                        placeholder="e.g. Mr. Smith" 
+                      <Input
+                        placeholder="e.g. Mr. Smith"
                         value={formData.instructor}
-                        onChange={(e) => setFormData({...formData, instructor: e.target.value})}
+                        onChange={(e) => setFormData({ ...formData, instructor: e.target.value })}
                         className="pl-9 h-10 border-slate-200 focus-visible:ring-emerald-500 rounded-lg"
                       />
                     </div>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium text-slate-700">Status</Label>
-                    <Select value={formData.status} onValueChange={(v) => setFormData({...formData, status: v})}>
+                    <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
                       <SelectTrigger className="h-10 border-slate-200 focus:ring-emerald-500 rounded-lg">
                         <SelectValue />
                       </SelectTrigger>
@@ -354,8 +502,8 @@ export default function ManageUnitsPage() {
               </div>
 
               <DialogFooter className="bg-slate-50 p-4 -mx-6 -mb-6 border-t border-slate-100 mt-2">
-                <Button 
-                  onClick={handleSaveUnit} 
+                <Button
+                  onClick={handleSaveUnit}
                   className="w-full h-10 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg shadow-sm"
                 >
                   {editingUnitId ? "Save Changes" : "Create Unit"}
@@ -387,8 +535,8 @@ export default function ManageUnitsPage() {
         <TabsContent value="catalog" className="space-y-4 m-0 border-0 p-0 focus-visible:ring-0">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input 
-              placeholder="Search by code, name, or course..." 
+            <Input
+              placeholder="Search by code, name, or course..."
               className="pl-9 h-10 rounded-lg bg-white border-slate-200 shadow-sm text-sm focus-visible:ring-emerald-500 max-w-md"
               value={unitSearchTerm}
               onChange={(e) => setUnitSearchTerm(e.target.value)}
@@ -443,9 +591,8 @@ export default function ManageUnitsPage() {
                           </div>
                         </TableCell>
                         <TableCell className="py-3 text-center">
-                          <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md ${
-                            unit.status === 'Active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
-                          }`}>
+                          <span className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md ${unit.status === 'Active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                            }`}>
                             {unit.status || 'Active'}
                           </span>
                         </TableCell>
@@ -478,7 +625,7 @@ export default function ManageUnitsPage() {
         </TabsContent>
 
         <TabsContent value="registrations" className="space-y-4 m-0 border-0 p-0 focus-visible:ring-0">
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:hidden">
             <Card className="border border-slate-200 shadow-sm rounded-xl bg-white">
               <CardContent className="p-5 flex items-center gap-4">
@@ -518,8 +665,8 @@ export default function ManageUnitsPage() {
           <div className="flex flex-col md:flex-row gap-3 print:hidden bg-slate-50/50 p-1.5 rounded-xl border border-slate-200">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input 
-                placeholder="Search student or unit..." 
+              <Input
+                placeholder="Search student or unit..."
                 className="pl-9 h-10 rounded-lg bg-white border-slate-200 shadow-sm text-sm focus-visible:ring-emerald-500"
                 value={regSearchTerm}
                 onChange={(e) => setRegSearchTerm(e.target.value)}
@@ -646,10 +793,10 @@ export default function ManageUnitsPage() {
           {/* Stats row */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { label: "Avg Progress",   value: `${unitProgressStats.avg}%`,      icon: BarChart3,   color: "text-blue-600",    bg: "bg-blue-50"    },
-              { label: "Units Complete", value: unitProgressStats.complete,        icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50" },
-              { label: "In Progress",    value: unitProgressStats.inProgress,      icon: Activity,    color: "text-amber-600",   bg: "bg-amber-50"   },
-              { label: "Not Started",    value: unitProgressStats.notStarted,      icon: Users,       color: "text-slate-500",   bg: "bg-slate-100"  },
+              { label: "Avg Progress", value: `${unitProgressStats.avg}%`, icon: BarChart3, color: "text-blue-600", bg: "bg-blue-50" },
+              { label: "Units Complete", value: unitProgressStats.complete, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-50" },
+              { label: "In Progress", value: unitProgressStats.inProgress, icon: Activity, color: "text-amber-600", bg: "bg-amber-50" },
+              { label: "Not Started", value: unitProgressStats.notStarted, icon: Users, color: "text-slate-500", bg: "bg-slate-100" },
             ].map((s, i) => (
               <Card key={i} className="border border-slate-200 shadow-sm rounded-xl bg-white">
                 <CardContent className="p-4 flex items-center gap-3">
@@ -753,11 +900,10 @@ export default function ManageUnitsPage() {
                             />
                           </TableCell>
                           <TableCell className="py-4 text-center">
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                              isComplete ? "bg-emerald-100 text-emerald-700" :
-                              isInProgress ? "bg-amber-100 text-amber-700" :
-                              "bg-slate-100 text-slate-500"
-                            }`}>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isComplete ? "bg-emerald-100 text-emerald-700" :
+                                isInProgress ? "bg-amber-100 text-amber-700" :
+                                  "bg-slate-100 text-slate-500"
+                              }`}>
                               {isComplete ? "Complete" : isInProgress ? "In Progress" : "Not Started"}
                             </span>
                           </TableCell>

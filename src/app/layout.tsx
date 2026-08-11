@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' });
 
 export const metadata: Metadata = {
-  title: 'Risabu Connect ERP',
+  title: 'Risabu Technical Training College',
   description: 'Enterprise Resource Planning for Risabu Technical Training College',
   icons: {
     icon: '/risabuu.png',

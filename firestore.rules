@@ -63,20 +63,35 @@ service cloud.firestore {
       allow list: if isInternal();
       allow create: if (isOwner(userId) && request.resource.data.firebaseUid == userId) || isAdmin();
       allow update: if (isOwner(userId) || isAdmin()) && (isAdmin() || request.resource.data.firebaseUid == resource.data.firebaseUid);
-      allow delete: if isAdmin();
+      // Only the super admin can permanently delete user records.
+      allow delete: if isSuperAdmin();
     }
 
     match /roles_admin/{userId} {
       allow get: if isSignedIn();
       allow list: if isAdmin();
-      allow create: if isSuperAdmin() && request.auth.uid == userId;
-      allow update, delete: if isSuperAdmin();
+      // Any existing admin can grant admin access to new users.
+      // A user can ALSO self-create their own roles_admin doc on first login
+      // if their users/{uid} profile (written by the creating admin) already
+      // has role == "Admin". This breaks the chicken-and-egg bootstrap deadlock.
+      allow create: if isAdmin() || (
+        isSignedIn() &&
+        request.auth.uid == userId &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "Admin"
+      );
+      allow update: if isAdmin();
+      // Only the super admin can revoke (delete) admin access.
+      allow delete: if isSuperAdmin();
     }
 
     match /roles_staff/{userId} {
       allow get: if isSignedIn();
       allow list: if isAdmin();
-      allow create: if isAdmin(); 
+      // Any existing admin can create/update staff role documents.
+      // A signed-in user can also create their OWN staff document for
+      // self-bootstrapping on first login (layout.tsx bootstrap flow).
+      allow create: if isAdmin() || (isSignedIn() && request.auth.uid == userId);
       allow update: if isOwner(userId) || isAdmin();
       allow delete: if isAdmin();
     }

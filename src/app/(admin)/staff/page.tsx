@@ -136,7 +136,10 @@ export default function StaffPage() {
     return (users || []).find(u => u.id === user?.uid);
   }, [users, user]);
 
+  // Any Admin (including super admin) can view/edit staff profiles and toggle access.
   const isAuthorizedToManage = currentUserRecord?.role === "Admin" || user?.email === "clainyemblo@gmail.com";
+  // Only the super admin can delete users, change roles, or create new admins.
+  const isSuperAdminUser = user?.email === "clainyemblo@gmail.com";
 
   const filteredStaff = useMemo(() => {
     return (users || []).filter(u => {
@@ -147,6 +150,11 @@ export default function StaffPage() {
 
   const handleAddEmployee = async () => {
     if (!firestore || !isAuthorizedToManage) return;
+    // Only the super admin can create Admin accounts
+    if (formData.role === "Admin" && !isSuperAdminUser) {
+      toast({ title: "Restricted", description: "Only the Super Admin can create Administrator accounts.", variant: "destructive" });
+      return;
+    }
     
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
       toast({ title: "Error", description: "Please fill in all required fields, including a password.", variant: "destructive" });
@@ -187,6 +195,16 @@ export default function StaffPage() {
         status: "Active",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+      }, { merge: true });
+
+      // Also write the role collection document immediately so the new user's
+      // role is available in Firestore as soon as they log in, preventing
+      // the dashboard data from appearing null on first visit.
+      const roleCollection = formData.role === "Admin" ? "roles_admin" : "roles_staff";
+      const roleDocRef = doc(firestore, roleCollection, newUserId);
+      setDocumentNonBlocking(roleDocRef, {
+        email: formData.email,
+        assignedAt: serverTimestamp(),
       }, { merge: true });
 
       toast({ title: "Employee Added", description: `${formData.firstName} has been registered and can now log in.` });
@@ -242,13 +260,26 @@ export default function StaffPage() {
   };
 
 
-  const handleUpdateRole = (userId: string, newRole: string) => {
-    if (!firestore || !isAuthorizedToManage) return;
+  const handleUpdateRole = (userId: string, newRole: string, userEmail?: string) => {
+    if (!firestore || !isSuperAdminUser) {
+      toast({ title: "Restricted", description: "Only the Super Admin can change user roles.", variant: "destructive" });
+      return;
+    }
     const docRef = doc(firestore, "users", userId);
     updateDocumentNonBlocking(docRef, {
       role: newRole,
       updatedAt: serverTimestamp(),
     });
+
+    // Keep role collection documents in sync with the users document
+    const newRoleCol = newRole === "Admin" ? "roles_admin" : "roles_staff";
+    const oldRoleCol = newRole === "Admin" ? "roles_staff" : "roles_admin";
+    setDocumentNonBlocking(doc(firestore, newRoleCol, userId), {
+      email: userEmail ?? "",
+      assignedAt: serverTimestamp(),
+    }, { merge: true });
+    deleteDocumentNonBlocking(doc(firestore, oldRoleCol, userId));
+
     toast({
       title: "Role Updated",
       description: `User role changed to ${newRole}.`,
@@ -256,7 +287,10 @@ export default function StaffPage() {
   };
 
   const handleDeleteUser = (userId: string) => {
-    if (!firestore || !isAuthorizedToManage) return;
+    if (!firestore || !isSuperAdminUser) {
+      toast({ title: "Restricted", description: "Only the Super Admin can remove employee records.", variant: "destructive" });
+      return;
+    }
     if (confirm("Are you sure you want to remove this employee record?")) {
       deleteDocumentNonBlocking(doc(firestore, "users", userId));
       toast({
@@ -264,6 +298,19 @@ export default function StaffPage() {
         description: "The employee record has been removed.",
       });
     }
+  };
+
+  const handleUpdateStatus = (userId: string, newStatus: string) => {
+    if (!firestore || !isAuthorizedToManage) return;
+    const docRef = doc(firestore, "users", userId);
+    updateDocumentNonBlocking(docRef, {
+      status: newStatus,
+      updatedAt: serverTimestamp(),
+    });
+    toast({
+      title: newStatus === "Suspended" ? "Access Suspended" : "Access Restored",
+      description: `User access has been ${newStatus === "Suspended" ? "suspended" : "restored"}.`,
+    });
   };
 
   const exportToCSV = () => {
@@ -422,10 +469,14 @@ export default function StaffPage() {
                             <DropdownMenuItem onClick={() => handleUpdateStatus(staff.id, staff.status === "Active" ? "Suspended" : "Active")} className="text-xs">
                               <Lock className="mr-2 h-3.5 w-3.5 text-slate-400" /> Toggle Access
                             </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-xs text-rose-600 focus:bg-rose-50" onClick={() => handleDeleteUser(staff.id)}>
-                              <Trash2 className="mr-2 h-3.5 w-3.5" /> Remove
-                            </DropdownMenuItem>
+                            {isSuperAdminUser && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-xs text-rose-600 focus:bg-rose-50" onClick={() => handleDeleteUser(staff.id)}>
+                                  <Trash2 className="mr-2 h-3.5 w-3.5" /> Remove
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       )}
@@ -501,10 +552,14 @@ export default function StaffPage() {
                               <DropdownMenuItem onClick={() => handleUpdateStatus(staff.id, staff.status === "Active" ? "Suspended" : "Active")} className="text-xs">
                                 <Lock className="mr-2 h-3.5 w-3.5 text-slate-400" /> Toggle Access
                               </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-rose-600 focus:bg-rose-50 text-xs" onClick={() => handleDeleteUser(staff.id)}>
-                                <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
-                              </DropdownMenuItem>
+                              {isSuperAdminUser && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem className="text-rose-600 focus:bg-rose-50 text-xs" onClick={() => handleDeleteUser(staff.id)}>
+                                    <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         )}
@@ -666,7 +721,9 @@ export default function StaffPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Staff">Standard Staff</SelectItem>
-                    <SelectItem value="Admin">Administrator</SelectItem>
+                    {isSuperAdminUser && (
+                      <SelectItem value="Admin">Administrator</SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
               </div>
@@ -711,18 +768,20 @@ export default function StaffPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-medium text-slate-700">Access Role</Label>
-                <Select onValueChange={(v) => setFormData({...formData, role: v})} defaultValue={formData.role}>
-                  <SelectTrigger className="h-10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Staff">Standard Staff</SelectItem>
-                    <SelectItem value="Admin">Administrator</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {isSuperAdminUser && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-slate-700">Access Role</Label>
+                  <Select onValueChange={(v) => setFormData({...formData, role: v})} defaultValue={formData.role}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Staff">Standard Staff</SelectItem>
+                      <SelectItem value="Admin">Administrator</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-medium text-slate-700">Qualifications</Label>

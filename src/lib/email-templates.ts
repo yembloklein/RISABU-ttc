@@ -1,19 +1,19 @@
 export const getAdmissionEmail = (studentName: string) => ({
-  subject: "Welcome to Risabu College - Admission Offered",
+  subject: "Welcome to Risabu Technical Training College - Admission Offered",
   html: `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
       <h2 style="color: #059669; margin-bottom: 16px;">Congratulations, ${studentName}!</h2>
-      <p style="color: #334155; line-height: 1.6;">We are thrilled to inform you that you have been offered admission to Risabu College.</p>
+      <p style="color: #334155; line-height: 1.6;">We are thrilled to inform you that you have been offered admission to Risabu Technical Training College.</p>
       <p style="color: #334155; line-height: 1.6;">Please log in to your student portal to view your official admission letter and complete the enrollment process.</p>
       <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 14px;">
-        <p>Best regards,<br/>The Admissions Team<br/>Risabu College</p>
+        <p>Best regards,<br/>The Admissions Team<br/>Risabu Technical Training College</p>
       </div>
     </div>
   `
 });
 
 export const getEnrollmentEmail = (studentName: string, admissionNo: string) => ({
-  subject: "Enrollment Confirmed - Welcome to Risabu College",
+  subject: "Enrollment Confirmed - Welcome to Risabu Technical Training College",
   html: `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
       <h2 style="color: #059669; margin-bottom: 16px;">Welcome Aboard, ${studentName}!</h2>
@@ -23,14 +23,14 @@ export const getEnrollmentEmail = (studentName: string, admissionNo: string) => 
       </div>
       <p style="color: #334155; line-height: 1.6;">You can use this Admission Number to log in to the student portal. If this is your first time logging in, your password is also your Admission Number.</p>
       <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 14px;">
-        <p>Best regards,<br/>Risabu College Administration</p>
+        <p>Best regards,<br/>Risabu Technical Training College Administration</p>
       </div>
     </div>
   `
 });
 
 export const getExamScheduledEmail = (studentName: string, examName: string, date: string) => ({
-  subject: "New Exam Scheduled - Risabu College",
+  subject: "New Exam Scheduled - Risabu Technical Training College",
   html: `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
       <h2 style="color: #2563eb; margin-bottom: 16px;">Exam Notification</h2>
@@ -44,14 +44,14 @@ export const getExamScheduledEmail = (studentName: string, examName: string, dat
       </div>
       <p style="color: #334155; line-height: 1.6;">Please log in to your portal to download your Exam Pass if all your fees are cleared.</p>
       <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 14px;">
-        <p>Best regards,<br/>Academic Department<br/>Risabu College</p>
+        <p>Best regards,<br/>Academic Department<br/>Risabu Technical Training College</p>
       </div>
     </div>
   `
 });
 
 export const getFeeReminderEmail = (studentName: string, balance: number) => ({
-  subject: "Fee Balance Reminder - Risabu College",
+  subject: "Fee Balance Reminder - Risabu Technical Training College",
   html: `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 8px;">
       <h2 style="color: #e11d48; margin-bottom: 16px;">Fee Reminder</h2>
@@ -64,7 +64,7 @@ export const getFeeReminderEmail = (studentName: string, balance: number) => ({
       <p style="color: #334155; line-height: 1.6;">Please ensure your fees are cleared promptly to avoid any interruptions to your studies and exam access.</p>
       <p style="color: #334155; line-height: 1.6;">You can make payments via M-Pesa or Bank Transfer and upload your receipt on the student portal.</p>
       <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 14px;">
-        <p>Best regards,<br/>Finance Department<br/>Risabu College</p>
+        <p>Best regards,<br/>Finance Department<br/>Risabu Technical Training College</p>
       </div>
     </div>
   `

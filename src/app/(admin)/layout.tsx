@@ -15,6 +15,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const pathname = usePathname()
   const router = useRouter()
   const [isCheckingRole, setIsCheckingRole] = useState(true)
+  const [userRole, setUserRole] = useState<string>("Staff")
 
   const isLoginPage = pathname === "/login"
 
@@ -43,9 +44,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           if (userData.role === "Admin" || user.email === "clainyemblo@gmail.com") {
             const adminRoleRef = doc(firestore, "roles_admin", user.uid)
             await setDoc(adminRoleRef, { email: user.email, assignedAt: serverTimestamp() }, { merge: true })
+            setUserRole("Admin")
           } else {
             const staffRoleRef = doc(firestore, "roles_staff", user.uid)
             await setDoc(staffRoleRef, { email: user.email, assignedAt: serverTimestamp() }, { merge: true })
+            setUserRole(userData.role || "Staff")
           }
           setIsCheckingRole(false)
           return
@@ -122,7 +125,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-10 w-10 animate-spin text-primary" />
-          <p className="text-sm text-muted-foreground animate-pulse">Initializing Risabu Connect...</p>
+          <p className="text-sm text-muted-foreground animate-pulse">Initializing Risabu Technical Training College...</p>
         </div>
       </div>
     )
@@ -161,9 +164,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none mt-0.5 ${
                   user?.email === 'clainyemblo@gmail.com'
                     ? 'bg-emerald-100 text-emerald-700'
+                    : userRole === 'Admin'
+                    ? 'bg-indigo-100 text-indigo-700'
                     : 'bg-blue-100 text-blue-700'
                 }`}>
-                  {user?.email === "clainyemblo@gmail.com" ? '✦ Super Admin' : 'Staff'}
+                  {user?.email === "clainyemblo@gmail.com" ? '✦ Super Admin' : userRole === 'Admin' ? '⬡ Admin' : 'Staff'}
                 </span>
               </div>
               <div className="h-9 w-9 rounded-full bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center text-white font-black text-sm shadow-md">

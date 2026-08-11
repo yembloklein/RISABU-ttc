@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -34,7 +34,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { BookOpen, Plus, Search, Edit2, Trash2, Loader2, Info, Users, GraduationCap, Phone, Mail } from "lucide-react"
 import { useFirestore, useCollection, useMemoFirebase, addDocumentNonBlocking, updateDocumentNonBlocking, deleteDocumentNonBlocking, useUser } from "@/firebase"
-import { collection, doc, serverTimestamp } from "firebase/firestore"
+import { collection, doc, serverTimestamp, getDoc } from "firebase/firestore"
 
 const INITIAL_COURSES = [
   { name: "Graphics Design", tuitionFee: 18000, durationMonths: 3, description: "Professional graphics design course" },
@@ -54,7 +54,20 @@ export default function CoursesPage() {
   
   const firestore = useFirestore()
   const { user } = useUser()
-  const isAdmin = user?.email === "clainyemblo@gmail.com"
+  const [isAdmin, setIsAdmin] = useState(false)
+  const checkedRef = useRef(false)
+
+  useEffect(() => {
+    if (!user || !firestore || checkedRef.current) return
+    checkedRef.current = true
+    const checkRole = async () => {
+      // Super admin is always an admin
+      if (user.email === "clainyemblo@gmail.com") { setIsAdmin(true); return }
+      const snap = await getDoc(doc(firestore, "roles_admin", user.uid)).catch(() => null)
+      if (snap?.exists()) setIsAdmin(true)
+    }
+    checkRole()
+  }, [user, firestore])
   
   const programsRef = useMemoFirebase(() => (firestore && user) ? collection(firestore, "programs") : null, [firestore, user])
   const { data: programs, isLoading } = useCollection(programsRef)
@@ -219,7 +232,7 @@ export default function CoursesPage() {
       {!isAdmin && (
         <div className="bg-primary/5 border border-primary/20 text-primary p-4 rounded-lg flex items-center gap-3">
           <Info className="h-5 w-5" />
-          <p className="text-sm font-medium">Viewing as Staff. Only the Super Admin can add or edit courses.</p>
+      <p className="text-sm font-medium">Viewing as Staff. Only Admins can add or edit courses.</p>
         </div>
       )}
 

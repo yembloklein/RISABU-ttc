@@ -121,6 +121,7 @@ export default function AcademicResourcesPage() {
         updatedAt: serverTimestamp(),
       })
 
+
       setProgress(100)
       toast({ title: "Success", description: "Resource uploaded successfully." })
       setIsDialogOpen(false)
